@@ -9,18 +9,34 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.96.2",
+    "axios": "^1.14.0",
+    "cors": "^2.8.6",
+    "framer-motion": "^12.38.0",
+    "html-to-image": "^1.11.13",
+    "lodash": "^4.18.1",
+    "lucide-react": "^0.577.0",
     "next": "16.2.0",
+    "postcss": "^8.5.8",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-datepicker": "^9.1.0",
+    "react-dom": "19.2.4",
+    "react-hot-toast": "^2.6.0",
+    "react-qr-code": "^2.0.18",
+    "recharts": "^3.8.1",
+    "socket.io-client": "^4.8.3",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/lodash": "^4.17.24",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.0",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.2.2",
     "typescript": "^5"
   }
 }
