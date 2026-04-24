@@ -82,10 +82,7 @@ export default function TablesPage() {
     },
   });
 
-  // Get QR URL
-  //   const getQRUrl = (tableNumber: number) => {
-  //     return `${process.env.NEXT_PUBLIC_FRONTEND_NETWORK_URL}/menu?table=${tableNumber}&restaurant=${restaurantId}`;
-  //   };
+ 
   const getQRUrl = (tableNumber: number) => {
     return `${process.env.NEXT_PUBLIC_FRONTEND_URL}/menu/${restaurantId}?table=${tableNumber}`;
   };

@@ -1,25 +1,26 @@
 import axios from "axios";
+import API from "../config/axios";
 
-const API = axios.create({
-    baseURL: "http://localhost:5000/api",
-});
+// const API = axios.create({
+//     baseURL: "http://localhost:5000/api",
+// });
 
 // GET TABLES
 export const getTables = (restaurantId: string) =>
-    API.get(`/tables?restaurantId=${restaurantId}`);
+    API.get(`api/tables?restaurantId=${restaurantId}`);
 
 // CREATE TABLE
 export const createTable = (data: any) =>
-    API.post("/tables", data);
+    API.post("api/tables", data);
 
 // DELETE TABLE
 export const deleteTable = (id: string) =>
-    API.delete(`/tables/${id}`);
+    API.delete(`api/tables/${id}`);
 
 // TOGGLE TABLE
 export const toggleTable = (id: string) =>
-    API.patch(`/tables/${id}/toggle`);
+    API.patch(`api/tables/${id}/toggle`);
 
 
 export const updateTable = (id: string, data: any) =>
-    API.put(`/tables/${id}`, data);
+    API.put(`api/tables/${id}`, data);
