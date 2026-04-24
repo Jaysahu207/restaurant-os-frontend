@@ -123,8 +123,8 @@ export default function WaiterPage() {
   useEffect(() => {
     if (!restaurant?._id) return;
 
-    const socket = io(process.env.NEXT_PUBLIC_API_URL!, {
-      transports: ["websocket"],
+    const socket = io(process.env.NEXT_PUBLIC_API_URL, {
+      transports: ["websocket", "polling"],
       withCredentials: true,
     });
 

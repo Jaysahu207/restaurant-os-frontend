@@ -141,13 +141,10 @@ export default function OrdersPage() {
   useEffect(() => {
     if (!restaurant?._id) return;
 
-    const socket = io(
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
-      {
-        withCredentials: true,
-        transports: ["websocket"],
-      },
-    );
+    const socket = io(process.env.NEXT_PUBLIC_API_URL, {
+      withCredentials: true,
+      transports: ["websocket"],
+    });
     socketRef.current = socket;
 
     socket.on("connect", () => {

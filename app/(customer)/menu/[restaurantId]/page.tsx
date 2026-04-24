@@ -175,8 +175,8 @@ function CustomerMenuContent() {
   useEffect(() => {
     if (!restaurantId) return;
 
-    const socket = io("http://192.168.205.38:5000", {
-      transports: ["websocket"],
+    const socket = io(process.env.NEXT_PUBLIC_API_URL, {
+      transports: ["websocket", "pooling"],
       withCredentials: true,
     });
 

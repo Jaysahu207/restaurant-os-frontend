@@ -74,7 +74,6 @@ export default function KitchenPage() {
     return () => window.removeEventListener("click", unlockAudio);
   }, []);
 
-
   // Initialize audio on client side
   useEffect(() => {
     audioRef.current = new Audio("/sounds/new-order.mp3");
@@ -139,8 +138,8 @@ export default function KitchenPage() {
   useEffect(() => {
     if (!restaurant?._id) return;
 
-    const socket = io(process.env.NEXT_PUBLIC_API_URL!, {
-      transports: ["websocket"],
+    const socket = io(process.env.NEXT_PUBLIC_API_URL, {
+      transports: ["websocket", "polling"],
       withCredentials: true,
     });
 
