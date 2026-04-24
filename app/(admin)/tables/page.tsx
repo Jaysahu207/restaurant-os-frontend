@@ -87,7 +87,7 @@ export default function TablesPage() {
   //     return `${process.env.NEXT_PUBLIC_FRONTEND_NETWORK_URL}/menu?table=${tableNumber}&restaurant=${restaurantId}`;
   //   };
   const getQRUrl = (tableNumber: number) => {
-    return `${process.env.NEXT_PUBLIC_FRONTEND_NETWORK_URL}/menu/${restaurantId}?table=${tableNumber}`;
+    return `${process.env.NEXT_PUBLIC_FRONTEND_URL}/menu/${restaurantId}?table=${tableNumber}`;
   };
   // Download QR as PNG
   const downloadQR = useCallback(async (id: string, tableNumber: number) => {
