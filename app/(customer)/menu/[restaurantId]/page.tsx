@@ -31,6 +31,8 @@ import {
 import { io, Socket } from "socket.io-client";
 import toast from "react-hot-toast";
 import { button } from "framer-motion/m";
+import API from "@/config/axios";
+import QRCode from "react-qr-code";
 
 // Types
 interface MenuItem {
@@ -49,6 +51,7 @@ interface MenuItem {
 interface Restaurant {
   _id?: string;
   name: string;
+  upiId: string;
 }
 
 interface SelectedVariant {
@@ -69,6 +72,8 @@ interface Order {
   items: any[];
   createdAt: string;
   isPaid?: boolean;
+
+  paymentMethod?: "cash" | "upi";
 }
 
 const statusFlow = ["pending", "preparing", "ready", "served", "completed"];
@@ -403,21 +408,95 @@ function CustomerMenuContent() {
       setSubmitting(false);
     }
   };
+  // 🔥 UPI LINKS (dynamic)
 
-  const handlePayment = async (method: string) => {
+  const handlePayment = async (method: "cash" | "upi") => {
     if (!currentOrder) return;
+
     try {
-      await completePayment(currentOrder._id, method);
-      setCurrentOrder((prev) =>
-        prev ? { ...prev, isPaid: true, status: "completed" } : null,
-      );
-      setShowPayment(false);
-      toast.success("Payment successful!");
+      if (method === "cash") {
+        await API.put(`/api/orders/${currentOrder._id}/pay`);
+
+        setCurrentOrder((prev) =>
+          prev ? { ...prev, isPaid: true, status: "completed" } : null,
+        );
+
+        toast.success("Cash payment done!");
+        setShowPayment(false);
+        return;
+      }
+
+      if (method === "upi") {
+        if (!restaurant?.upiId) {
+          toast.error("UPI not configured");
+          return;
+        }
+
+        await API.put(`/api/orders/${currentOrder._id}/initiate-payment`, {
+          method: "upi",
+        });
+
+        const upiLink = generateUPILink(
+          currentOrder.totalAmount,
+          restaurant.upiId,
+          restaurant.name,
+        );
+
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+        if (isMobile) {
+          // ✅ Open UPI app
+          window.location.href = upiLink;
+        } else {
+          // 💻 Desktop fallback
+          toast.info("Scan QR code to pay using UPI");
+        }
+
+        setShowPayment(false);
+      }
     } catch (err) {
       toast.error("Payment failed");
     }
   };
+  const generateUPILink = (amount: number, upiId: string, name: string) => {};
 
+  const handleUPIPayment = async () => {
+    if (!currentOrder || !restaurant?.upiId) {
+      toast.error("UPI not configured");
+      return;
+    }
+
+    try {
+      // 🔥 prevent multiple clicks
+      if (loading) return;
+
+      // 🔥 mark payment initiated
+      await API.put(`/api/orders/${currentOrder._id}/initiate-payment`, {
+        method: "upi",
+      });
+
+      const upiLink = `upi://pay?pa=${restaurant.upiId}&pn=${encodeURIComponent(
+        restaurant.name,
+      )}&am=${currentOrder.totalAmount}&cu=INR`;
+
+      // 🔥 THIS IS THE REAL FIX
+      window.location.href = upiLink;
+    } catch (err) {
+      toast.error("Failed to open UPI");
+    }
+  };
+  const baseUPI = `upi://pay?pa=${restaurant?.upiId}&pn=${restaurant?.name}&am=${currentOrder?.totalAmount}&cu=INR`;
+  const confirmPayment = async () => {
+    if (!currentOrder) return;
+
+    await API.put(`/api/orders/${currentOrder._id}/pay`);
+
+    setCurrentOrder((prev) =>
+      prev ? { ...prev, isPaid: true, status: "completed" } : null,
+    );
+
+    toast.success("Payment confirmed!");
+  };
   const getRemainingTimeDetailed = (createdAt: string, prepMinutes = 15) => {
     const end = new Date(createdAt).getTime() + prepMinutes * 60000;
     const diff = Math.max(0, end - Date.now());
@@ -639,7 +718,14 @@ function CustomerMenuContent() {
                 Proceed to Pay
               </button>
             )}
-
+            {currentOrder.paymentMethod === "upi" && !isPaid && (
+              <button
+                onClick={confirmPayment}
+                className="w-full py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
+              >
+                I Have Paid ✅
+              </button>
+            )}
             {/* SUCCESS STATE */}
             {(currentOrder.status === "completed" || isPaid) && (
               <>
@@ -665,31 +751,93 @@ function CustomerMenuContent() {
         </div>
 
         {/* Payment Modal */}
-        {showPayment && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-xl w-80 space-y-4">
-              <h3 className="text-lg text-gray-700 font-bold">
-                Select Payment Method
-              </h3>
-              <button
-                onClick={() => handlePayment("cash")}
-                className="w-full py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
-              >
-                Cash
-              </button>
-              <button
-                onClick={() => handlePayment("upi")}
-                className="w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
-              >
-                UPI
-              </button>
+        {showPayment && currentOrder && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+            <div className="bg-white w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-5 animate-fadeIn">
+              {/* Header */}
+              <div className="text-center">
+                <h3 className="text-lg font-bold text-gray-800">
+                  Complete Your Payment
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Total Amount: ₹{currentOrder.totalAmount}
+                </p>
+              </div>
+
+              {/* PAYMENT OPTIONS */}
+              <div className="space-y-3">
+                {/* CASH */}
+                <button
+                  onClick={() => handlePayment("cash")}
+                  className="w-full py-3 bg-gray-100 text-gray-800 rounded-xl hover:bg-gray-200 transition font-medium"
+                >
+                  💵 Pay with Cash
+                </button>
+
+                {/* UPI OPTIONS */}
+                {restaurant?.upiId && (
+                  <div className="space-y-2">
+                    <button
+                      onClick={handleUPIPayment}
+                      className="w-full py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
+                    >
+                      Pay via UPI
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* ⚠️ UPI NOT CONFIGURED */}
+              {!restaurant?.upiId && (
+                <p className="text-xs text-red-500 text-center">
+                  UPI not available for this restaurant
+                </p>
+              )}
+
+              {/* 🔥 QR CODE SECTION */}
+              {restaurant?.upiId && (
+                <div className="flex flex-col items-center space-y-1">
+                  <p className="text-sm text-gray-600 text-center">
+                    Or scan QR to pay
+                  </p>
+                  {restaurant?.upiId && (
+                    <div className="flex flex-col items-center mt-3">
+                      <p className="text-xs text-gray-400 text-center mb-2">
+                        UPI ID: {restaurant.upiId}
+                      </p>
+
+                      <QRCode value={baseUPI} size={150} />
+                    </div>
+                  )}
+
+                  <p className="text-xs text-gray-400 text-center">
+                    Supports PhonePe, GPay, Paytm
+                  </p>
+                </div>
+              )}
+
+              {/* CANCEL */}
               <button
                 onClick={() => setShowPayment(false)}
-                className="w-full py-2 bg-red-600 text-white border rounded-lg hover:bg-gray-50 transition"
+                className="w-full py-2 text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition text-sm"
               >
                 Cancel
               </button>
             </div>
+          </div>
+        )}
+        {currentOrder?.paymentMethod === "upi" && !currentOrder?.isPaid && (
+          <div className="mt-4 text-center space-y-2">
+            <p className="text-sm text-gray-500">
+              After payment, click below 👇
+            </p>
+
+            <button
+              onClick={confirmPayment}
+              className="w-full py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
+            >
+              I Have Paid ✅
+            </button>
           </div>
         )}
       </div>
