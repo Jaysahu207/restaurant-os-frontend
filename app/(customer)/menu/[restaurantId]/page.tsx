@@ -123,6 +123,8 @@ function CustomerMenuContent() {
   const [showPayment, setShowPayment] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [paymentStarted, setPaymentStarted] = useState(false);
+  const [paymentTimeLeft, setpaymentTimeLeft] = useState(120);
 
   const socketRef = useRef<any>(null);
 
@@ -270,6 +272,24 @@ function CustomerMenuContent() {
       setOrderPlaced(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!paymentStarted) return;
+
+    const timer = setInterval(() => {
+      setpaymentTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          toast.error("Payment timeout!");
+          setPaymentStarted(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [paymentStarted]);
 
   const filteredItems = useMemo(() => {
     if (selectedCategory === "All") return menu;
@@ -449,7 +469,7 @@ function CustomerMenuContent() {
           window.location.href = upiLink;
         } else {
           // 💻 Desktop fallback
-          toast.info("Scan QR code to pay using UPI");
+          toast.success("Scan QR code to pay using UPI");
         }
 
         setShowPayment(false);
@@ -458,7 +478,9 @@ function CustomerMenuContent() {
       toast.error("Payment failed");
     }
   };
-  const generateUPILink = (amount: number, upiId: string, name: string) => {};
+  const generateUPILink = (amount: number, upiId: string, name: string) => {
+    return `upi://pay?pa=${upiId}&pn=${encodeURIComponent(name)}&am=${amount}&cu=INR`;
+  };
 
   const handleUPIPayment = async () => {
     if (!currentOrder || !restaurant?.upiId) {
@@ -474,7 +496,8 @@ function CustomerMenuContent() {
       await API.put(`/api/orders/${currentOrder._id}/initiate-payment`, {
         method: "upi",
       });
-
+      setPaymentStarted(true);
+      setpaymentTimeLeft(120);
       const upiLink = `upi://pay?pa=${restaurant.upiId}&pn=${encodeURIComponent(
         restaurant.name,
       )}&am=${currentOrder.totalAmount}&cu=INR`;
@@ -496,6 +519,7 @@ function CustomerMenuContent() {
     );
 
     toast.success("Payment confirmed!");
+    setShowPayment(false);
   };
   const getRemainingTimeDetailed = (createdAt: string, prepMinutes = 15) => {
     const end = new Date(createdAt).getTime() + prepMinutes * 60000;
@@ -779,9 +803,14 @@ function CustomerMenuContent() {
                   <div className="space-y-2">
                     <button
                       onClick={handleUPIPayment}
-                      className="w-full py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
+                      disabled={paymentStarted}
+                      className={`w-full py-3 rounded-lg text-white transition ${
+                        paymentStarted
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-green-500 hover:bg-green-600"
+                      }`}
                     >
-                      Pay via UPI
+                      {paymentStarted ? "Payment Started..." : "Pay via UPI"}
                     </button>
                   </div>
                 )}
@@ -815,7 +844,21 @@ function CustomerMenuContent() {
                   </p>
                 </div>
               )}
+              {paymentStarted && !currentOrder?.isPaid && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-center text-red-500 font-semibold">
+                    Complete payment within {paymentTimeLeft}s
+                  </p>
 
+                  <button
+                    onClick={confirmPayment}
+                    className="w-full py-3 bg-blue-600 text-white rounded-xl"
+                  >
+                    I Have Paid ✅
+                  </button>
+                </div>
+              )}
+              
               {/* CANCEL */}
               <button
                 onClick={() => setShowPayment(false)}
@@ -824,20 +867,6 @@ function CustomerMenuContent() {
                 Cancel
               </button>
             </div>
-          </div>
-        )}
-        {currentOrder?.paymentMethod === "upi" && !currentOrder?.isPaid && (
-          <div className="mt-4 text-center space-y-2">
-            <p className="text-sm text-gray-500">
-              After payment, click below 👇
-            </p>
-
-            <button
-              onClick={confirmPayment}
-              className="w-full py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
-            >
-              I Have Paid ✅
-            </button>
           </div>
         )}
       </div>
@@ -888,13 +917,6 @@ function CustomerMenuContent() {
           ))}
         </div>
       </div>
-
-      {/* Debug (dev only) */}
-      {/* {process.env.NODE_ENV === "development" && debugMsg && (
-        <div className="bg-yellow-50 px-4 py-2 text-xs text-yellow-700">
-          {debugMsg}
-        </div>
-      )} */}
 
       {/* Menu Grid */}
       <main className="max-w-2xl mx-auto px-4 py-4">
