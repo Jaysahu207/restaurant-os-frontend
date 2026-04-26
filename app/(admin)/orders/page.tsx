@@ -182,6 +182,7 @@ export default function OrdersPage() {
             customer: {
               name: newOrder.customerId?.name || "Guest",
               phone: newOrder.customerId?.phone || "",
+              email: newOrder.customer?.email || "",
             },
             table: newOrder.tableNumber,
             items: newOrder.items,
