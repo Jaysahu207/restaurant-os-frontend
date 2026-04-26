@@ -18,6 +18,8 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  CreditCard,
+  Loader2,
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { fetchCustomerMenu } from "@/services/customerMenu";
@@ -67,16 +69,23 @@ interface SelectedAddon {
 interface Order {
   _id: string;
   id?: string;
-  status: "pending" | "preparing" | "ready" | "served" | "completed";
+  status: "pending" | "preparing" | "ready" | "served" | "paid" | "completed";
   totalAmount: number;
   items: any[];
   createdAt: string;
   isPaid?: boolean;
-
+  specialInstructions?: string;
   paymentMethod?: "cash" | "upi";
 }
 
-const statusFlow = ["pending", "preparing", "ready", "served", "completed"];
+const statusFlow = [
+  "pending",
+  "preparing",
+  "ready",
+  "served",
+  "paid",
+  "completed",
+];
 
 export default function CustomerMenuPage() {
   return (
@@ -97,7 +106,7 @@ function CustomerMenuContent() {
   const searchParams = useSearchParams();
   const restaurantId = params?.restaurantId as string;
   const table = searchParams.get("table");
-  console.log("Line No 94 Restaurant Id", restaurantId);
+  // console.log("Line No 94 Restaurant Id", restaurantId);
 
   // State
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -438,7 +447,7 @@ function CustomerMenuContent() {
         await API.put(`/api/orders/${currentOrder._id}/pay`);
 
         setCurrentOrder((prev) =>
-          prev ? { ...prev, isPaid: true, status: "completed" } : null,
+          prev ? { ...prev, isPaid: true, status: "paid" } : null,
         );
 
         toast.success("Cash payment done!");
@@ -515,10 +524,10 @@ function CustomerMenuContent() {
     await API.put(`/api/orders/${currentOrder._id}/pay`);
 
     setCurrentOrder((prev) =>
-      prev ? { ...prev, isPaid: true, status: "completed" } : null,
+      prev ? { ...prev, isPaid: true, status: "paid" } : null,
     );
 
-    toast.success("Payment confirmed!");
+    toast.success("Payment submitted for verification!");
     setShowPayment(false);
   };
   const getRemainingTimeDetailed = (createdAt: string, prepMinutes = 15) => {
@@ -641,239 +650,557 @@ function CustomerMenuContent() {
     );
   }
 
+  // if (orderPlaced && currentOrder) {
+  //   const currentStepIndex = statusFlow.indexOf(currentOrder.status);
+
+  //   return (
+  //     <div className="min-h-screen bg-gray-200 p-4 flex items-center justify-center">
+  //       <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full space-y-6">
+  //         <div className="text-center">
+  //           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+  //             <ChefHat className="w-8 h-8 text-green-600" />
+  //           </div>
+  //           <h2 className="text-xl text-gray-500 font-bold">
+  //             Order #{currentOrder._id.slice(-8)}
+  //           </h2>
+  //           <p className="text-sm text-gray-500">Table {table}</p>
+  //         </div>
+
+  //         {/* Status Progress */}
+  //         <div className="space-y-2">
+  //           <div className="flex justify-between text-xs">
+  //             {statusFlow.map((step, idx) => (
+  //               <div
+  //                 key={step}
+  //                 className={`flex-1 text-center ${
+  //                   idx <= currentStepIndex
+  //                     ? "text-orange-600 font-medium"
+  //                     : "text-gray-400"
+  //                 }`}
+  //               >
+  //                 {step.charAt(0).toUpperCase() + step.slice(1)}
+  //               </div>
+  //             ))}
+  //           </div>
+  //           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+  //             <div
+  //               className="h-full bg-orange-500 transition-all duration-500"
+  //               style={{
+  //                 width: `${(currentStepIndex / (statusFlow.length - 1)) * 100}%`,
+  //               }}
+  //             />
+  //           </div>
+  //         </div>
+
+  //         {/* ETA */}
+  //         {currentOrder.status !== "completed" &&
+  //           currentOrder.status !== "served" && (
+  //             <div className="text-center text-sm text-gray-500 flex items-center justify-center gap-1">
+  //               <Clock className="w-4 h-4" />
+  //               <span>
+  //                 Estimated time:{" "}
+  //                 <span className="font-medium text-gray-700">
+  //                   {timeLeft.minutes}m {timeLeft.seconds}s
+  //                 </span>
+  //               </span>
+  //             </div>
+  //           )}
+
+  //         {/* Order Items */}
+  //         <div className="border-t pt-4 space-y-2">
+  //           {currentOrder.items.map((item: any, idx: number) => (
+  //             <div
+  //               key={idx}
+  //               className="flex justify-between text-sm text-gray-500 "
+  //             >
+  //               <span>
+  //                 {item.quantity} × {item.name}
+  //               </span>
+  //               <span>₹{item.price * item.quantity}</span>
+  //             </div>
+  //           ))}
+  //         </div>
+
+  //         {/* Total */}
+  //         <div className="flex justify-between font-bold border-t pt-3 text-gray-500 ">
+  //           <span>Total</span>
+  //           <span>₹{currentOrder.totalAmount || 0}</span>
+  //         </div>
+
+  //         {/* Actions */}
+  //         <div className="space-y-3">
+  //           {/* ADD MORE */}
+  //           {currentOrder.status !== "completed" &&
+  //             currentOrder.status !== "paid" && (
+  //               <button
+  //                 onClick={() => {
+  //                   setOrderPlaced(false);
+  //                   setIsCartOpen(true);
+  //                 }}
+  //                 className="w-full py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition"
+  //               >
+  //                 Add More Items
+  //               </button>
+  //             )}
+
+  //           {/* PAYMENT */}
+  //           {currentOrder.status === "served" && !currentOrder.isPaid && (
+  //             <button
+  //               onClick={() => setShowPayment(true)}
+  //               className="w-full py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition"
+  //             >
+  //               Proceed to Pay
+  //             </button>
+  //           )}
+  //           {currentOrder.status === "served" &&
+  //             currentOrder.paymentMethod === "upi" &&
+  //             !currentOrder.isPaid && (
+  //               <button
+  //                 onClick={confirmPayment}
+  //                 className="w-full py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
+  //               >
+  //                 I Have Paid ✅
+  //               </button>
+  //             )}
+  //           {/* SUCCESS STATE */}
+  //           {currentOrder.status === "paid" && (
+  //             <div className="text-center space-y-2">
+  //               <div className="text-blue-600 font-semibold">
+  //                 Payment Done ✅
+  //               </div>
+  //               <p className="text-sm text-gray-500">
+  //                 Waiting for restaurant confirmation...
+  //               </p>
+  //             </div>
+  //           )}
+  //           {currentOrder.status === "completed" && (
+  //             <>
+  //               <div className="text-center text-green-600 font-semibold flex items-center justify-center gap-2">
+  //                 <CheckCircle className="w-5 h-5" />
+  //                 Payment Verified ✅
+  //               </div>
+
+  //               <p className="text-sm text-gray-500 text-center">
+  //                 Thank you! Visit Again 👋
+  //               </p>
+
+  //               <button
+  //                 onClick={resetCustomerSession}
+  //                 className="w-full py-3 bg-orange-500 text-white rounded-xl"
+  //               >
+  //                 Back to Menu
+  //               </button>
+  //             </>
+  //           )}
+  //         </div>
+  //       </div>
+
+  //       {/* Payment Modal */}
+  //       {showPayment && currentOrder && (
+  //         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+  //           <div className="bg-white w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-5 animate-fadeIn">
+  //             {/* Header */}
+  //             <div className="text-center">
+  //               <h3 className="text-lg font-bold text-gray-800">
+  //                 Complete Your Payment
+  //               </h3>
+  //               <p className="text-sm text-gray-500">
+  //                 Total Amount: ₹{currentOrder.totalAmount}
+  //               </p>
+  //             </div>
+
+  //             {/* PAYMENT OPTIONS */}
+  //             <div className="space-y-3">
+  //               {/* CASH */}
+  //               <button
+  //                 onClick={() => handlePayment("cash")}
+  //                 className="w-full py-3 bg-gray-100 text-gray-800 rounded-xl hover:bg-gray-200 transition font-medium"
+  //               >
+  //                 💵 Pay with Cash
+  //               </button>
+
+  //               {/* UPI OPTIONS */}
+  //               {restaurant?.upiId && (
+  //                 <div className="space-y-2">
+  //                   <button
+  //                     onClick={handleUPIPayment}
+  //                     disabled={paymentStarted}
+  //                     className={`w-full py-3 rounded-lg text-white transition ${
+  //                       paymentStarted
+  //                         ? "bg-gray-400 cursor-not-allowed"
+  //                         : "bg-green-500 hover:bg-green-600"
+  //                     }`}
+  //                   >
+  //                     {paymentStarted ? "Payment Started..." : "Pay via UPI"}
+  //                   </button>
+  //                 </div>
+  //               )}
+  //             </div>
+
+  //             {/* ⚠️ UPI NOT CONFIGURED */}
+  //             {!restaurant?.upiId && (
+  //               <p className="text-xs text-red-500 text-center">
+  //                 UPI not available for this restaurant
+  //               </p>
+  //             )}
+
+  //             {/* 🔥 QR CODE SECTION */}
+  //             {restaurant?.upiId && (
+  //               <div className="flex flex-col items-center space-y-1">
+  //                 <p className="text-sm text-gray-600 text-center">
+  //                   Or scan QR to pay
+  //                 </p>
+  //                 {restaurant?.upiId && (
+  //                   <div className="flex flex-col items-center mt-3">
+  //                     <p className="text-xs text-gray-400 text-center mb-2">
+  //                       UPI ID: {restaurant.upiId}
+  //                     </p>
+
+  //                     <QRCode value={baseUPI} size={150} />
+  //                   </div>
+  //                 )}
+
+  //                 <p className="text-xs text-gray-400 text-center">
+  //                   Supports PhonePe, GPay, Paytm
+  //                 </p>
+  //               </div>
+  //             )}
+  //             {paymentStarted && !currentOrder?.isPaid && (
+  //               <div className="mt-4 space-y-2">
+  //                 <p className="text-center text-red-500 font-semibold">
+  //                   Complete payment within {paymentTimeLeft}s
+  //                 </p>
+
+  //                 <button
+  //                   onClick={confirmPayment}
+  //                   className="w-full py-3 bg-blue-600 text-white rounded-xl"
+  //                 >
+  //                   I Have Paid ✅
+  //                 </button>
+  //               </div>
+  //             )}
+
+  //             {/* CANCEL */}
+  //             <button
+  //               onClick={() => setShowPayment(false)}
+  //               className="w-full py-2 text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition text-sm"
+  //             >
+  //               Cancel
+  //             </button>
+  //           </div>
+  //         </div>
+  //       )}
+  //     </div>
+  //   );
+  // }
+
+  // Main UI (menu & cart)
+
   if (orderPlaced && currentOrder) {
     const currentStepIndex = statusFlow.indexOf(currentOrder.status);
-    const isPaid = currentOrder.isPaid || currentOrder.status === "completed";
+
     return (
-      <div className="min-h-screen bg-gray-200 p-4 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full space-y-6">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <ChefHat className="w-8 h-8 text-green-600" />
-            </div>
-            <h2 className="text-xl text-gray-500 font-bold">
-              Order #{currentOrder._id.slice(-8)}
-            </h2>
-            <p className="text-sm text-gray-500">Table {table}</p>
-          </div>
-
-          {/* Status Progress */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs">
-              {statusFlow.map((step, idx) => (
-                <div
-                  key={step}
-                  className={`flex-1 text-center ${
-                    idx <= currentStepIndex
-                      ? "text-orange-600 font-medium"
-                      : "text-gray-400"
-                  }`}
-                >
-                  {step.charAt(0).toUpperCase() + step.slice(1)}
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50/30 p-4 flex items-center justify-center">
+        <div className="max-w-md w-full mx-auto space-y-5 animate-fadeInUp">
+          {/* Main Order Card */}
+          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-6 border border-white/20 transition-all duration-300 hover:shadow-xl">
+            {/* Header with Order ID & Table */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <ChefHat className="w-6 h-6 text-white" />
                 </div>
-              ))}
-            </div>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-orange-500 transition-all duration-500"
-                style={{
-                  width: `${(currentStepIndex / (statusFlow.length - 1)) * 100}%`,
-                }}
-              />
-            </div>
-          </div>
-
-          {/* ETA */}
-          {currentOrder.status !== "completed" &&
-            currentOrder.status !== "served" && (
-              <div className="text-center text-sm text-gray-500 flex items-center justify-center gap-1">
-                <Clock className="w-4 h-4" />
-                <span>
-                  Estimated time:{" "}
-                  <span className="font-medium text-gray-700">
-                    {timeLeft.minutes}m {timeLeft.seconds}s
-                  </span>
-                </span>
-              </div>
-            )}
-
-          {/* Order Items */}
-          <div className="border-t pt-4 space-y-2">
-            {currentOrder.items.map((item: any, idx: number) => (
-              <div
-                key={idx}
-                className="flex justify-between text-sm text-gray-500 "
-              >
-                <span>
-                  {item.quantity} × {item.name}
-                </span>
-                <span>₹{item.price * item.quantity}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Total */}
-          <div className="flex justify-between font-bold border-t pt-3 text-gray-500 ">
-            <span>Total</span>
-            <span>₹{currentOrder.totalAmount || 0}</span>
-          </div>
-
-          {/* Actions */}
-          <div className="space-y-3">
-            {/* ADD MORE */}
-            {currentOrder.status !== "completed" && (
-              <button
-                onClick={() => {
-                  setOrderPlaced(false);
-                  setIsCartOpen(true);
-                }}
-                className="w-full py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition"
-              >
-                Add More Items
-              </button>
-            )}
-
-            {/* PAYMENT */}
-            {currentOrder.status === "served" && !isPaid && (
-              <button
-                onClick={() => setShowPayment(true)}
-                className="w-full py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition"
-              >
-                Proceed to Pay
-              </button>
-            )}
-            {currentOrder.paymentMethod === "upi" && !isPaid && (
-              <button
-                onClick={confirmPayment}
-                className="w-full py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
-              >
-                I Have Paid ✅
-              </button>
-            )}
-            {/* SUCCESS STATE */}
-            {(currentOrder.status === "completed" || isPaid) && (
-              <>
-                <div className="text-center text-green-600 font-semibold flex items-center justify-center gap-2">
-                  <CheckCircle className="w-5 h-5" />
-                  Payment Completed ✅
+                <div>
+                  <h2 className="text-lg font-bold text-gray-800 tracking-tight">
+                    Order #{currentOrder._id.slice(-8)}
+                  </h2>
+                  <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <span className="inline-block w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
+                    Table {table}
+                  </p>
                 </div>
-
-                <p className="text-sm text-gray-500 text-center">
-                  Thank you for your order! Visit Again 👋
-                </p>
-
-                {/* 🔥 FINAL CTA */}
-                <button
-                  onClick={resetCustomerSession}
-                  className="w-full py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition"
-                >
-                  Back to Menu
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Payment Modal */}
-        {showPayment && currentOrder && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-            <div className="bg-white w-full max-w-sm p-6 rounded-2xl shadow-xl space-y-5 animate-fadeIn">
-              {/* Header */}
-              <div className="text-center">
-                <h3 className="text-lg font-bold text-gray-800">
-                  Complete Your Payment
-                </h3>
-                <p className="text-sm text-gray-500">
-                  Total Amount: ₹{currentOrder.totalAmount}
-                </p>
               </div>
+              <div className="text-right">
+                <div className="text-xs font-medium px-2 py-1 bg-orange-50 text-orange-600 rounded-full">
+                  {currentOrder.status.toUpperCase()}
+                </div>
+              </div>
+            </div>
 
-              {/* PAYMENT OPTIONS */}
-              <div className="space-y-3">
-                {/* CASH */}
-                <button
-                  onClick={() => handlePayment("cash")}
-                  className="w-full py-3 bg-gray-100 text-gray-800 rounded-xl hover:bg-gray-200 transition font-medium"
-                >
-                  💵 Pay with Cash
-                </button>
-
-                {/* UPI OPTIONS */}
-                {restaurant?.upiId && (
-                  <div className="space-y-2">
-                    <button
-                      onClick={handleUPIPayment}
-                      disabled={paymentStarted}
-                      className={`w-full py-3 rounded-lg text-white transition ${
-                        paymentStarted
-                          ? "bg-gray-400 cursor-not-allowed"
-                          : "bg-green-500 hover:bg-green-600"
-                      }`}
+            {/* Modern Status Timeline */}
+            <div className="my-6">
+              <div className="relative flex justify-between">
+                {statusFlow.map((step, idx) => {
+                  const isActive = idx <= currentStepIndex;
+                  const isCurrent = idx === currentStepIndex;
+                  return (
+                    <div
+                      key={step}
+                      className="flex flex-col items-center flex-1"
                     >
-                      {paymentStarted ? "Payment Started..." : "Pay via UPI"}
-                    </button>
-                  </div>
-                )}
+                      <div
+                        className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                          isActive
+                            ? "bg-gradient-to-r from-orange-500 to-orange-600 shadow-md scale-105"
+                            : "bg-gray-200"
+                        }`}
+                      >
+                        {isActive ? (
+                          <CheckCircle className="w-4 h-4 text-white" />
+                        ) : (
+                          <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                        )}
+                      </div>
+                      <span
+                        className={`text-[11px] font-medium mt-2 text-center ${
+                          isActive ? "text-orange-600" : "text-gray-400"
+                        }`}
+                      >
+                        {step.charAt(0).toUpperCase() + step.slice(1)}
+                      </span>
+                      {idx < statusFlow.length - 1 && (
+                        <div
+                          className={`absolute top-4 left-1/2 w-full h-0.5 -translate-y-1/2 ${
+                            idx < currentStepIndex
+                              ? "bg-orange-500"
+                              : "bg-gray-200"
+                          }`}
+                          style={{
+                            left: `${idx * (100 / (statusFlow.length - 1)) + 50 / (statusFlow.length - 1)}%`,
+                            width: `${100 / (statusFlow.length - 1)}%`,
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+            </div>
 
-              {/* ⚠️ UPI NOT CONFIGURED */}
-              {!restaurant?.upiId && (
-                <p className="text-xs text-red-500 text-center">
-                  UPI not available for this restaurant
-                </p>
+            {/* ETA (only for active orders) */}
+            {currentOrder.status !== "completed" &&
+              currentOrder.status !== "served" && (
+                <div className="bg-gradient-to-r from-gray-100 to-gray-50 rounded-2xl p-3 flex items-center justify-center gap-2 shadow-inner">
+                  {timeLeft.minutes > 0 || timeLeft.seconds > 0 ? (
+                    <>
+                      <Clock className="w-4 h-4 text-orange-500 animate-pulse" />
+                      <span className="text-sm text-gray-600">
+                        Estimated arrival:{" "}
+                        <span className="font-mono font-bold text-gray-800">
+                          {timeLeft.minutes}m {timeLeft.seconds}s
+                        </span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="w-4 h-4 text-red-500 animate-bounce" />
+                      <span className="text-sm text-red-600 font-semibold">
+                        Running late ⏳ — your order will arrive soon
+                      </span>
+                    </>
+                  )}
+                </div>
               )}
 
-              {/* 🔥 QR CODE SECTION */}
-              {restaurant?.upiId && (
-                <div className="flex flex-col items-center space-y-1">
-                  <p className="text-sm text-gray-600 text-center">
-                    Or scan QR to pay
-                  </p>
-                  {restaurant?.upiId && (
-                    <div className="flex flex-col items-center mt-3">
-                      <p className="text-xs text-gray-400 text-center mb-2">
-                        UPI ID: {restaurant.upiId}
-                      </p>
-
-                      <QRCode value={baseUPI} size={150} />
+            {/* Order Items List */}
+            <div className="mt-4 space-y-3">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Your Order
+              </h3>
+              <div className="divide-y divide-gray-100">
+                {currentOrder.items.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="py-2 flex justify-between items-center"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-gray-500 w-6">
+                        {item.quantity}×
+                      </span>
+                      <span className="text-gray-700">{item.name}</span>
                     </div>
+                    <span className="font-medium text-gray-800">
+                      ₹{item.price * item.quantity}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Total */}
+            <div className="mt-4 pt-3 border-t border-dashed border-gray-200 flex justify-between items-center bg-gradient-to-r from-orange-50/50 to-transparent -mx-2 px-2 py-3 rounded-xl">
+              <span className="text-base font-bold text-gray-800">Total</span>
+              <span className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-orange-800">
+                ₹{currentOrder.totalAmount || 0}
+              </span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-3 mt-6">
+                {currentOrder.status !== "completed" &&
+                  currentOrder.status !== "paid" && (
+                    <button
+                      onClick={() => {
+                        setOrderPlaced(false);
+                        setIsCartOpen(true);
+                      }}
+                      className="w-full py-3 rounded-xl font-semibold transition-all duration-200 bg-white border border-gray-200 text-gray-700 hover:border-orange-300 hover:shadow-md flex items-center justify-center gap-2"
+                    >
+                      <span>+</span> Add More Items
+                    </button>
                   )}
 
-                  <p className="text-xs text-gray-400 text-center">
-                    Supports PhonePe, GPay, Paytm
-                  </p>
-                </div>
+              {currentOrder.status === "served" && !currentOrder.isPaid && (
+                <button
+                  onClick={() => setShowPayment(true)}
+                  className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+                >
+                  💳 Proceed to Pay
+                </button>
               )}
-              {paymentStarted && !currentOrder?.isPaid && (
-                <div className="mt-4 space-y-2">
-                  <p className="text-center text-red-500 font-semibold">
-                    Complete payment within {paymentTimeLeft}s
-                  </p>
 
+              {currentOrder.status === "served" &&
+                currentOrder.paymentMethod === "upi" &&
+                !currentOrder.isPaid && (
                   <button
                     onClick={confirmPayment}
-                    className="w-full py-3 bg-blue-600 text-white rounded-xl"
+                    className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md hover:shadow-lg transition-all"
                   >
-                    I Have Paid ✅
+                    ✅ I Have Paid
+                  </button>
+                )}
+
+              {currentOrder.status === "paid" && (
+                <div className="text-center space-y-2 py-4">
+                  <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Payment Done — Waiting for confirmation
+                  </div>
+                </div>
+              )}
+
+              {currentOrder.status === "completed" && (
+                <div className="text-center space-y-4">
+                  <div className="flex items-center justify-center gap-2 text-green-600 font-semibold">
+                    <CheckCircle className="w-6 h-6" />
+                    Payment Verified ✅
+                  </div>
+                  <p className="text-gray-500 text-sm">
+                    Thank you! Visit Again 👋
+                  </p>
+                  <button
+                    onClick={resetCustomerSession}
+                    className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-md hover:shadow-lg transition-all"
+                  >
+                    Back to Menu
                   </button>
                 </div>
               )}
-              
-              {/* CANCEL */}
-              <button
-                onClick={() => setShowPayment(false)}
-                className="w-full py-2 text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition text-sm"
-              >
-                Cancel
-              </button>
             </div>
           </div>
-        )}
+
+          {/* Payment Modal - Modern Overlay */}
+          {showPayment && currentOrder && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
+              <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-300 scale-100">
+                <div className="p-6 space-y-5">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <CreditCard className="w-7 h-7 text-green-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800">
+                      Complete Payment
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Total Amount:{" "}
+                      <span className="font-bold text-gray-800">
+                        ₹{currentOrder.totalAmount}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => handlePayment("cash")}
+                      className="w-full py-3 rounded-xl bg-gray-50 text-gray-800 font-medium hover:bg-gray-100 transition flex items-center justify-center gap-2 border border-gray-200"
+                    >
+                      💵 Pay with Cash
+                    </button>
+
+                    {restaurant?.upiId && (
+                      <div className="space-y-3">
+                        <button
+                          onClick={handleUPIPayment}
+                          disabled={paymentStarted}
+                          className={`w-full py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2 ${
+                            paymentStarted
+                              ? "bg-gray-300 cursor-not-allowed"
+                              : "bg-gradient-to-r from-green-500 to-teal-600 text-white shadow-md hover:shadow-lg"
+                          }`}
+                        >
+                          {paymentStarted ? "⏳ Starting..." : "📱 Pay via UPI"}
+                        </button>
+
+                        <div className="relative flex flex-col items-center border-t border-gray-100 pt-4 mt-2">
+                          <div className="absolute -top-3 bg-white px-2 text-xs text-gray-400">
+                            OR
+                          </div>
+                          <p className="text-sm text-gray-600 mb-2">
+                            Scan QR with any UPI app
+                          </p>
+                          <div className="bg-white p-2 rounded-2xl shadow-md">
+                            <QRCode value={baseUPI} size={140} />
+                          </div>
+                          <div className="mt-3 flex items-center gap-1 text-xs text-gray-400">
+                            <span>UPI: {restaurant.upiId}</span>
+                            <button
+                              onClick={() =>
+                                navigator.clipboard.writeText(restaurant.upiId)
+                              }
+                              className="text-blue-500 hover:text-blue-700"
+                            >
+                              📋
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {!restaurant?.upiId && (
+                      <p className="text-xs text-red-500 text-center">
+                        UPI not available for this restaurant
+                      </p>
+                    )}
+
+                    {paymentStarted && !currentOrder?.isPaid && (
+                      <div className="mt-4 space-y-3 p-3 bg-red-50 rounded-xl">
+                        <p className="text-center text-red-600 font-semibold animate-pulse">
+                          ⏱️ Complete payment within {paymentTimeLeft}s
+                        </p>
+                        <button
+                          onClick={confirmPayment}
+                          className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+                        >
+                          ✅ I Have Paid
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => setShowPayment(false)}
+                    className="w-full py-2 text-red-500 border border-red-200 rounded-xl hover:bg-red-50 transition text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
-
-  // Main UI (menu & cart)
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}

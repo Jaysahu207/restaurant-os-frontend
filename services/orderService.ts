@@ -101,7 +101,11 @@ export const completePayment = async (id: string, method: string) => {
     throw error;
   }
 };
-
+export const verifyPayment = async (orderId: string) => {
+  const res = await PublicAPI.put(`/api/orders/${orderId}/verify-payment`);
+  
+  return res.data;
+};
 // 🔥 GET ORDER BY ID
 export const getOrderById = async (id: string) => {
   try {

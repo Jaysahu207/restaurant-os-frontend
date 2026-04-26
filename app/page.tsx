@@ -140,7 +140,7 @@ export default function Home() {
     if (loading) return;
 
     // 🔴 1. Basic Validation
-    const { name, email, password, confirmPassword, restaurantName, phone } =
+    const { name, email, password, confirmPassword, restaurantName, phone  } =
       registerData;
 
     if (!name || !email || !password || !restaurantName || !phone) {

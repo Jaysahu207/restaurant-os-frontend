@@ -18,6 +18,7 @@ import {
 import {
   getOrders,
   updateOrderStatus as updateStatusAPI,
+  verifyPayment,
 } from "@/services/orderService";
 import { io, Socket } from "socket.io-client";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -37,6 +38,7 @@ interface Order {
   customer: {
     name: string;
     phone: string;
+    email: string;
   };
   table: number;
   items: OrderItem[];
@@ -46,6 +48,8 @@ interface Order {
   status: OrderStatus;
   createdAt: string;
   specialInstructions?: string;
+  paymentMethod?: "cash" | "upi";
+  paymentStatus?: "unpaid" | "pending" | "paid";
 }
 
 type OrderStatus =
@@ -53,6 +57,7 @@ type OrderStatus =
   | "preparing"
   | "ready"
   | "served"
+  | "paid"
   | "completed"
   | "cancelled";
 
@@ -61,6 +66,7 @@ const statusColors: Record<OrderStatus, string> = {
   preparing: "bg-blue-100 text-blue-700 border-blue-200",
   ready: "bg-green-100 text-green-700 border-green-200",
   served: "bg-purple-100 text-purple-700 border-purple-200",
+  paid: "bg-emerald-100 text-emerald-700 border-emerald-200",
   completed: "bg-gray-100 text-gray-700 border-gray-200",
   cancelled: "bg-red-100 text-red-700 border-red-200",
 };
@@ -71,6 +77,7 @@ const statusLabels: Record<OrderStatus | "all", string> = {
   preparing: "Preparing",
   ready: "Ready",
   served: "Served",
+  paid: "Paid",
   completed: "Completed",
   cancelled: "Cancelled",
 };
@@ -107,6 +114,7 @@ export default function OrdersPage() {
         customer: {
           name: o.customerId?.name || "Guest",
           phone: o.customerId?.phone || "",
+          email: o.customerId?.email || "",
         },
         table: o.tableNumber,
         items: o.items,
@@ -115,6 +123,9 @@ export default function OrdersPage() {
         tax: o.tax,
         status: o.status,
         createdAt: o.createdAt,
+        paymentMethod: o.paymentMethod,
+        paymentStatus: o.paymentStatus,
+
         specialInstructions: o.specialInstructions,
       }));
       setOrders(formatted);
@@ -188,26 +199,55 @@ export default function OrdersPage() {
     });
 
     socket.on("ORDER_UPDATED", (updatedOrder: any) => {
+      setOrders((prev) => {
+        const exists = prev.find((o) => o.id === String(updatedOrder._id));
+
+        if (!exists) return prev;
+
+        return prev.map((order) =>
+          order.id === String(updatedOrder._id)
+            ? mapOrder(updatedOrder) // 🔥 FULL REPLACEMENT
+            : order,
+        );
+      });
+    });
+    socket.on("PAYMENT_UPDATED", (updatedOrder: any) => {
       setOrders((prev) =>
         prev.map((order) =>
           order.id === updatedOrder._id
-            ? { ...order, status: updatedOrder.status }
+            ? {
+                ...order,
+                paymentStatus: updatedOrder.paymentStatus,
+                paymentMethod: updatedOrder.paymentMethod,
+              }
             : order,
         ),
       );
-      if (selectedOrder?.id === updatedOrder._id) {
-        setSelectedOrder((prev) =>
-          prev ? { ...prev, status: updatedOrder.status } : null,
-        );
-      }
-      playSound();
-      toast.success(`Order #${updatedOrder._id.slice(-6)} updated!`);
+
+      toast.success(
+        `Payment received for order #${updatedOrder._id.slice(-6)}`,
+      );
     });
 
     return () => {
       socket.disconnect();
     };
   }, [restaurant?._id, selectedDate]);
+  const mapOrder = (o: any): Order => ({
+    id: o._id,
+    table: o.tableNumber,
+    items: [...o.items], // 🔥 IMPORTANT (new reference)
+    total: o.totalAmount,
+    status: o.status,
+    paymentStatus: o.paymentStatus,
+    paymentMethod: o.paymentMethod,
+    createdAt: o.createdAt,
+    customer: {
+      name: o.customerId?.name || "Guest",
+      phone: o.customerId?.phone || "",
+      email: o.customerId?.email || "",
+    },
+  });
 
   // Update order status
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
@@ -246,6 +286,7 @@ export default function OrdersPage() {
     preparing: orders.filter((o) => o.status === "preparing").length,
     ready: orders.filter((o) => o.status === "ready").length,
     served: orders.filter((o) => o.status === "served").length,
+    paid: orders.filter((o) => o.status === "paid").length,
     completed: orders.filter((o) => o.status === "completed").length,
     cancelled: orders.filter((o) => o.status === "cancelled").length,
   };
@@ -635,7 +676,8 @@ function OrderCard({
       pending: ["preparing", "cancelled"],
       preparing: ["ready", "cancelled"],
       ready: ["served", "cancelled"],
-      served: ["completed"],
+      served: ["paid"],
+      paid: ["completed"],
       completed: [],
       cancelled: [],
     };
@@ -696,23 +738,55 @@ function OrderCard({
             >
               <Printer className="w-5 h-5" />
             </button>
+            {/* ✅ VERIFY PAYMENT BUTTON */}
+            {order.paymentStatus === "paid" && order.status !== "completed" && (
+              <button
+                onClick={async () => {
+                  await verifyPayment(order.id);
+                  onUpdateStatus("completed"); // optional if backend doesn't auto update
+                }}
+                className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+              >
+                Verify Payment ✅
+              </button>
+            )}
             <div className="relative">
               <select
                 value={order.status}
                 onChange={(e) => onUpdateStatus(e.target.value as OrderStatus)}
                 className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white cursor-pointer"
               >
-                <option value={order.status} disabled>
+                <option value={order.status}>
                   {statusLabels[order.status]}
                 </option>
-                {getNextStatuses(order.status).map((status) => (
-                  <option key={status} value={status}>
-                    Mark as {statusLabels[status]}
-                  </option>
-                ))}
+
+                {getNextStatuses(order.status).map((status) => {
+                  // ✅ only allow completed when paid
+                  if (order.status === "paid" && status !== "completed")
+                    return null;
+
+                  return (
+                    <option key={status} value={status}>
+                      Mark as {statusLabels[status]}
+                    </option>
+                  );
+                })}
               </select>
+
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
+
+            {order.paymentStatus === "paid" && order.status !== "completed" && (
+              <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">
+                Awaiting Verification ⏳
+              </span>
+            )}
+
+            {order.paymentMethod && (
+              <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                {order.paymentMethod.toUpperCase()}
+              </span>
+            )}
           </div>
         </div>
       </div>
