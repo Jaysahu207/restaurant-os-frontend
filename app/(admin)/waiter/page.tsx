@@ -30,6 +30,7 @@ import {
   VolumeX,
   UtensilsCrossed,
   Eye,
+  LogOut,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -65,7 +66,7 @@ interface Order {
 
 // ==================== Main Component ====================
 export default function WaiterPage() {
-  const { restaurant } = useAuthStore();
+  const { restaurant, user } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,7 +190,12 @@ export default function WaiterPage() {
       loadData(); // Revert on error
     }
   };
-
+  const handleLogout = () => {
+    // Clear auth state and redirect to login
+    localStorage.removeItem("authToken");
+    useAuthStore.setState({ user: null, token: null });
+    window.location.href = "/";
+  };
   // Create new order
   const handleCreateOrder = async (orderData: {
     tableNumber: number;
@@ -230,72 +236,78 @@ export default function WaiterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-[1600px] mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
-              <UtensilsCrossed className="w-8 h-8 text-blue-600" />
-              Waiter Dashboard
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-6">
+        {/* Header with Restaurant, Waiter & Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-orange-600 to-orange-800 bg-clip-text text-transparent truncate">
+              {restaurant?.name || "Restaurant"}
             </h1>
-            <p className="text-gray-500 text-sm mt-1">
-              {socketConnected ? (
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  Live updates enabled
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-amber-600">
-                  <AlertCircle className="w-4 h-4" />
-                  Reconnecting...
-                </span>
-              )}
+            <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+              <User className="w-3 h-3" />
+              <span>Waiter: {user?.name || "John Doe"}</span>
             </p>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Sound Toggle */}
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2 rounded-lg transition ${
+              className={`p-2 rounded-full transition-all ${
                 soundEnabled
-                  ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
-                  : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                  ? "bg-orange-100 text-orange-600"
+                  : "bg-gray-200 text-gray-500"
               }`}
               title={soundEnabled ? "Sound On" : "Sound Off"}
             >
-              {soundEnabled ? (
-                <Volume2 className="w-5 h-5" />
-              ) : (
-                <VolumeX className="w-5 h-5" />
-              )}
+              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
             </button>
+
+            {/* Refresh */}
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition disabled:opacity-50"
-              title="Refresh"
+              className="p-2 rounded-full bg-white shadow-sm text-gray-600 active:scale-95 transition"
             >
               <RefreshCw
-                className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`}
+                size={18}
+                className={refreshing ? "animate-spin" : ""}
               />
             </button>
+
+            {/* Logout */}
             <button
-              onClick={() => setCreateModalOpen(true)}
-              className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition shadow-sm"
+              onClick={handleLogout} // ❗ Implement your logout logic
+              className="p-2 rounded-full bg-red-50 text-red-600 active:scale-95 transition"
+              title="Logout"
             >
-              <Plus className="w-5 h-5" />
-              New Order
+              <LogOut size={18} />
             </button>
           </div>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* Live Connection Status */}
+        <div className="mb-5 text-right text-xs">
+          {socketConnected ? (
+            <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+              Live
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
+              <AlertCircle size={12} />
+              Reconnecting...
+            </span>
+          )}
+        </div>
+
+        {/* Stats Cards (2x2 grid on mobile, 4 columns on larger) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <StatCard
             label="Ready to Serve"
             value={readyOrders.length}
-            color="bg-green-500"
+            color="bg-emerald-500"
             icon={CheckCircle2}
             highlight={readyOrders.length > 0}
           />
@@ -308,7 +320,7 @@ export default function WaiterPage() {
           <StatCard
             label="Pending"
             value={pendingOrders.length}
-            color="bg-yellow-500"
+            color="bg-amber-500"
             icon={Clock}
           />
           <StatCard
@@ -319,21 +331,21 @@ export default function WaiterPage() {
           />
         </div>
 
-        {/* Main Content: Ready Orders Column (most important) */}
-        <div className="mb-8">
+        {/* Ready to Serve Section (most prominent) */}
+        <section className="mb-10">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               Ready to Serve
               {readyOrders.length > 0 && (
-                <span className="bg-green-100 text-green-700 text-sm px-2 py-0.5 rounded-full">
+                <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">
                   {readyOrders.length}
                 </span>
               )}
             </h2>
           </div>
           {readyOrders.length === 0 ? (
-            <EmptyState message="No orders ready for serving" />
+            <EmptyState message="No orders ready" />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {readyOrders.map((order) => (
@@ -347,10 +359,10 @@ export default function WaiterPage() {
               ))}
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Other Status Columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Other Status Sections */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <StatusColumn
             title="Preparing"
             icon={ChefHat}
@@ -362,7 +374,7 @@ export default function WaiterPage() {
             title="Pending"
             icon={Clock}
             orders={pendingOrders}
-            statusColor="border-yellow-400"
+            statusColor="border-amber-400"
             onViewDetail={openDetail}
           />
           <StatusColumn
@@ -373,24 +385,32 @@ export default function WaiterPage() {
             onViewDetail={openDetail}
           />
         </div>
-      </div>
 
-      {/* Modals */}
-      {createModalOpen && (
-        <CreateOrderModal
-          menuItems={menuItems}
-          onClose={() => setCreateModalOpen(false)}
-          onSubmit={handleCreateOrder}
-          restaurantId={restaurant?._id}
-        />
-      )}
-      {detailModalOpen && selectedOrder && (
-        <OrderDetailModal
-          order={selectedOrder}
-          onClose={() => setDetailModalOpen(false)}
-          onUpdateStatus={(status) => updateStatus(selectedOrder._id, status)}
-        />
-      )}
+        {/* Floating Action Button for New Order */}
+        <button
+          onClick={() => setCreateModalOpen(true)}
+          className="fixed bottom-6 right-6 bg-orange-600 text-white p-4 rounded-full shadow-lg hover:bg-orange-700 active:scale-95 transition-all z-20 flex items-center justify-center"
+        >
+          <Plus size={24} />
+        </button>
+
+        {/* Modals (unchanged) */}
+        {createModalOpen && (
+          <CreateOrderModal
+            menuItems={menuItems}
+            onClose={() => setCreateModalOpen(false)}
+            onSubmit={handleCreateOrder}
+            restaurantId={restaurant?._id}
+          />
+        )}
+        {detailModalOpen && selectedOrder && (
+          <OrderDetailModal
+            order={selectedOrder}
+            onClose={() => setDetailModalOpen(false)}
+            onUpdateStatus={(status) => updateStatus(selectedOrder._id, status)}
+          />
+        )}
+      </div>
     </div>
   );
 }

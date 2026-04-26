@@ -38,7 +38,7 @@ interface Order {
   customer: {
     name: string;
     phone: string;
-    email: string;
+    email?: string;
   };
   table: number;
   items: OrderItem[];
@@ -182,6 +182,7 @@ export default function OrdersPage() {
             customer: {
               name: newOrder.customerId?.name || "Guest",
               phone: newOrder.customerId?.phone || "",
+              email: newOrder.customerId?.email || "",
             },
             table: newOrder.tableNumber,
             items: newOrder.items,

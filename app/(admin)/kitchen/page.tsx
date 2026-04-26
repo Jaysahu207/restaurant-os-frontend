@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { useAuthStore } from "@/store/useAuthStore";
 import { getOrders, updateOrderStatus } from "@/services/orderService";
+
 import {
   Clock,
   ChefHat,
@@ -16,6 +17,8 @@ import {
   VolumeX,
   Utensils,
   AlertCircle,
+  LogOut,
+  LogOutIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -42,7 +45,7 @@ type OrderStatus = "pending" | "preparing" | "ready" | "served" | "completed";
 
 // ==================== Main Component ====================
 export default function KitchenPage() {
-  const { restaurant } = useAuthStore();
+  const { restaurant, user } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -228,7 +231,12 @@ export default function KitchenPage() {
     setDetailModalOpen(false);
     setSelectedOrder(null);
   };
-
+  const handleLogout = () => {
+    // Clear auth state and redirect to login
+    localStorage.removeItem("authToken");
+    useAuthStore.setState({ user: null, token: null });
+    window.location.href = "/";
+  };
   // Group orders by status
   const pendingOrders = orders.filter((o) => o.status === "pending");
   const preparingOrders = orders.filter((o) => o.status === "preparing");
@@ -240,65 +248,71 @@ export default function KitchenPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-6">
-      {/* Header */}
-      <div className="max-w-[1600px] mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
-              <ChefHat className="w-8 h-8 text-orange-500" />
-              Kitchen Display
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-6">
+        {/* Header: Restaurant & Chef Info + Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-orange-600 to-orange-800 bg-clip-text text-transparent truncate">
+              {restaurant?.name || "The Grand Kitchen"}
             </h1>
-            <p className="text-gray-500 text-sm mt-1">
-              {socketConnected ? (
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  Live updates enabled
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-amber-600">
-                  <AlertCircle className="w-4 h-4" />
-                  Reconnecting...
-                </span>
-              )}
-            </p>
+            <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
+              <span className="flex items-center gap-1">
+                <ChefHat size={12} />
+                Chef: {user?.name || "Gordon"}
+              </span>
+              <span className="flex items-center gap-1">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${socketConnected ? "bg-green-500 animate-pulse" : "bg-red-500"}`}
+                />
+                {socketConnected ? "Live" : "Offline"}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Sound Toggle */}
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2 rounded-lg transition ${
+              className={`p-2 rounded-full transition-all ${
                 soundEnabled
-                  ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
-                  : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                  ? "bg-orange-100 text-orange-600"
+                  : "bg-gray-200 text-gray-500"
               }`}
               title={soundEnabled ? "Sound On" : "Sound Off"}
             >
-              {soundEnabled ? (
-                <Volume2 className="w-5 h-5" />
-              ) : (
-                <VolumeX className="w-5 h-5" />
-              )}
+              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
             </button>
+
+            {/* Refresh */}
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition disabled:opacity-50"
-              title="Refresh orders"
+              className="p-2 rounded-full bg-white shadow-sm text-gray-600 active:scale-95 transition"
             >
               <RefreshCw
-                className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`}
+                size={18}
+                className={refreshing ? "animate-spin" : ""}
               />
+            </button>
+
+            {/* Logout */}
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-full bg-red-50 text-red-600 active:scale-95 transition"
+              title="Logout"
+            >
+              <LogOut size={18} />
             </button>
           </div>
         </div>
 
-        {/* Stats Summary */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        {/* Stats Overview - Responsive Grid (2 columns mobile, 5 columns desktop) */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
           <StatCard
             label="Pending"
             value={pendingOrders.length}
-            color="bg-yellow-500"
+            color="bg-amber-500"
             icon={Clock}
           />
           <StatCard
@@ -310,7 +324,7 @@ export default function KitchenPage() {
           <StatCard
             label="Ready"
             value={readyOrders.length}
-            color="bg-green-500"
+            color="bg-emerald-500"
             icon={CheckCircle2}
           />
           <StatCard
@@ -322,63 +336,74 @@ export default function KitchenPage() {
           <StatCard
             label="Completed"
             value={orders.filter((o) => o.status === "completed").length}
-            color="bg-purple-500"
+            color="bg-gray-500"
             icon={CheckCircle}
           />
         </div>
 
-        {/* Kanban Columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Column
-            title="Pending"
-            subtitle="New orders waiting"
-            orders={pendingOrders}
-            onUpdate={updateStatus}
-            onViewDetail={openDetail}
-            nextStatus="preparing"
-            statusColor="border-yellow-400"
-            buttonColor="bg-blue-600 hover:bg-blue-700"
-          />
-          <Column
-            title="Preparing"
-            subtitle="Currently cooking"
-            orders={preparingOrders}
-            onUpdate={updateStatus}
-            onViewDetail={openDetail}
-            nextStatus="ready"
-            statusColor="border-blue-400"
-            buttonColor="bg-green-600 hover:bg-green-700"
-          />
-          <Column
-            title="Ready"
-            subtitle="Ready for serving"
-            orders={readyOrders}
-            onUpdate={updateStatus}
-            onViewDetail={openDetail}
-            nextStatus="served"
-            statusColor="border-green-400"
-            buttonColor="bg-purple-600 hover:bg-purple-700"
-          />
+        {/* Kanban Columns - Horizontal Scroll on Mobile, Grid on Desktop */}
+        <div className="flex overflow-x-auto lg:overflow-visible lg:grid lg:grid-cols-3 gap-5 pb-4 -mx-4 px-4 lg:mx-0 lg:px-0">
+          {/* Pending Column */}
+          <div className="min-w-[280px] lg:min-w-0 flex-1">
+            <Column
+              title="Pending"
+              subtitle="New orders waiting"
+              orders={pendingOrders}
+              onUpdate={updateStatus}
+              onViewDetail={openDetail}
+              nextStatus="preparing"
+              statusColor="border-amber-400"
+              buttonColor="bg-blue-600 hover:bg-blue-700"
+            />
+          </div>
+
+          {/* Preparing Column */}
+          <div className="min-w-[280px] lg:min-w-0 flex-1">
+            <Column
+              title="Preparing"
+              subtitle="Currently cooking"
+              orders={preparingOrders}
+              onUpdate={updateStatus}
+              onViewDetail={openDetail}
+              nextStatus="ready"
+              statusColor="border-blue-400"
+              buttonColor="bg-emerald-600 hover:bg-emerald-700"
+            />
+          </div>
+
+          {/* Ready Column */}
+          <div className="min-w-[280px] lg:min-w-0 flex-1">
+            <Column
+              title="Ready"
+              subtitle="Ready for serving"
+              orders={readyOrders}
+              onUpdate={updateStatus}
+              onViewDetail={openDetail}
+              nextStatus="served"
+              statusColor="border-emerald-400"
+              buttonColor="bg-purple-600 hover:bg-purple-700"
+            />
+          </div>
         </div>
 
-        {/* Empty state for all columns */}
+        {/* Empty State */}
         {orders.length === 0 && !loading && (
-          <div className="mt-8 text-center py-12 bg-white rounded-xl shadow-sm">
+          <div className="mt-12 text-center py-12 bg-white/60 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100">
             <Utensils className="w-12 h-12 text-gray-400 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-gray-800">
               No active orders
             </h3>
-            <p className="text-gray-500">
+            <p className="text-gray-500 text-sm">
               New orders will appear here automatically
             </p>
           </div>
         )}
-      </div>
 
-      {/* Order Detail Modal */}
-      {detailModalOpen && selectedOrder && (
-        <OrderDetailModal order={selectedOrder} onClose={closeDetail} />
-      )}
+        {/* Order Detail Modal (unchanged) */}
+        {detailModalOpen && selectedOrder && (
+          <OrderDetailModal order={selectedOrder} onClose={closeDetail} />
+        )}
+      </div>
     </div>
   );
 }
