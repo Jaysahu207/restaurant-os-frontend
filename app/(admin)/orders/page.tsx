@@ -38,7 +38,7 @@ interface Order {
   customer: {
     name: string;
     phone: string;
-    email: string;
+    email?: string;
   };
   table: number;
   items: OrderItem[];
