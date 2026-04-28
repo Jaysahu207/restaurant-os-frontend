@@ -11,9 +11,11 @@ const API = axios.create({
 // 🔐 Attach token automatically (Zustand)
 API.interceptors.request.use((config) => {
     const token = useAuthStore.getState().token; // ✅ from Zustand
-    
-    // console.log("TOKEN =>", token); // 🔥
+
+
     // console.log("HEADERS =>", config.headers); // 🔥
+    console.log("🔥 TOKEN FROM ZUSTAND:", token);
+    console.log("🔥 REQUEST URL:", config.url);
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     } else {
