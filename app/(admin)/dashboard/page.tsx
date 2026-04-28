@@ -224,7 +224,9 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
     preparing: "bg-blue-100 text-blue-700",
     ready: "bg-emerald-100 text-emerald-700",
     served: "bg-purple-100 text-purple-700",
-     paid: "bg-green-100 text-green-700",
+
+    paid: "bg-green-100 text-green-700",
+
     completed: "bg-gray-100 text-gray-700",
   };
   return (
@@ -344,7 +346,7 @@ export default function DashboardPage() {
       try {
         setLoading(true);
         const res = await getDashboardData(restaurant._id);
-        setData(res);
+        setData(res.data);
       } catch (err) {
         console.error(err);
       } finally {
@@ -399,7 +401,7 @@ export default function DashboardPage() {
     if (!restaurant?._id) return;
 
     const res = await getDashboardData(restaurant._id);
-    setData(res);
+    setData(res.data);
   };
   if (loading) {
     return (
