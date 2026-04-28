@@ -11,6 +11,7 @@ export interface Customer {
     _id: string;
     name: string;
     phone: string;
+    email?: string;
     table?: number;
     totalOrders?: number;
     totalSpent?: number;
@@ -73,6 +74,7 @@ export const getCustomerHistory = async (customerId: string) => {
 export const saveCustomer = async (data: {
     name: string;
     phone: string;
+    email?: string;
     table: number;
     restaurantId: string;
 }) => {

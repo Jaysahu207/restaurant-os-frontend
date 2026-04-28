@@ -1,4 +1,4 @@
-import { PublicAPI } from "@/config/axios";
+import API, { PublicAPI } from "@/config/axios";
 
 type OrderItem = {
   menuItemId: string;
@@ -39,7 +39,7 @@ export const getOrders = async (restaurantId: string, date?: string) => {
     const res = await PublicAPI.get(
       `/api/orders?restaurantId=${restaurantId}&date=${date}`
     );
-    console.log("Fetched order -->>  ", res.data)
+    // console.log("Fetched order -->>  ", res.data)
     return res.data;
   } catch (error: any) {
     console.error("GET ORDERS ERROR:", error?.response?.data || error.message);
@@ -92,6 +92,7 @@ export const completePayment = async (id: string, method: string) => {
     const res = await PublicAPI.put(`/api/orders/${id}/pay`, {
       paymentMethod: method, // ✅ IMPORTANT
     });
+    console.log("PAYMENT RESPONSE:", res);
     return res.data;
   } catch (error: any) {
     console.error(
@@ -103,13 +104,15 @@ export const completePayment = async (id: string, method: string) => {
 };
 export const verifyPayment = async (orderId: string) => {
   const res = await PublicAPI.put(`/api/orders/${orderId}/verify-payment`);
-  
+
   return res.data;
 };
 // 🔥 GET ORDER BY ID
 export const getOrderById = async (id: string) => {
+  console.log(id)
   try {
-    const res = await PublicAPI.get(`/api/orders/${id}`);
+    const res = await API.get(`/api/orders/${id}`);
+    // console.log(res.data)
     return res.data;
   } catch (error: any) {
     console.error("GET ORDER BY ID ERROR:", error?.response?.data || error.message);

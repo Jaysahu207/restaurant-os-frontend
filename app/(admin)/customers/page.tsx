@@ -129,12 +129,13 @@ export default function CustomersPage() {
   useEffect(() => {
     let filtered = [...customers];
 
-    // 🔍 Search filter (name + phone)
+    // 🔍 Search filter (name + phone + email)
     if (search) {
       filtered = filtered.filter(
         (c) =>
           c.name.toLowerCase().includes(search.toLowerCase()) ||
-          c.phone.includes(search),
+          c.phone.includes(search) ||
+          c.email?.toLowerCase().includes(search.toLowerCase()),
       );
     }
 
@@ -163,7 +164,7 @@ export default function CustomersPage() {
     try {
       setModalLoading(true);
       const historyData = await getCustomerHistory(customer._id);
-      console.log("backend data", historyData);
+      // console.log("backend data", historyData);
       setSelectedCustomer(historyData.customer);
       setOrders(historyData.history || []);
       setAnalytics(historyData.analytics || null);
@@ -308,7 +309,7 @@ export default function CustomersPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search by name or phone..."
+              placeholder="Search by name or phone number, email..."
               value={inputValue}
               onChange={handleSearchChange}
               className="w-full pl-10 pr-4 py-2.5 border text-gray-700 border-gray-300 rounded-lg"

@@ -20,11 +20,12 @@ import {
   AlertCircle,
   CreditCard,
   Loader2,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { fetchCustomerMenu } from "@/services/customerMenu";
 import { useParams, useSearchParams } from "next/navigation";
-import axios from "axios";
 import {
   placeOrder,
   completePayment,
@@ -32,11 +33,13 @@ import {
 } from "@/services/orderService";
 import { io, Socket } from "socket.io-client";
 import toast from "react-hot-toast";
-import { button } from "framer-motion/m";
 import API from "@/config/axios";
 import QRCode from "react-qr-code";
+import { sendInvoice } from "@/services/invoiceService";
 
+// ------------------------------------------------------------
 // Types
+// ------------------------------------------------------------
 interface MenuItem {
   _id: string;
   name: string;
@@ -53,32 +56,63 @@ interface MenuItem {
 interface Restaurant {
   _id?: string;
   name: string;
-  upiId: string;
+  slug: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  upiId?: string;
+  address?: { street: string; city: string; state: string; pincode: string };
+  tax: { cgst: number; sgst: number; igst?: number; serviceCharge: number };
+  billing: {
+    invoicePrefix: string;
+    invoiceStart: number;
+    enableTaxes: boolean;
+    enableServiceCharge: boolean;
+    roundOff: boolean;
+  };
+  business?: { type: string; cuisines: string[] };
+  legal?: { fssaiNumber?: string; gstNumber?: string; panNumber?: string };
+  operations?: {
+    tableCount: number;
+    dineIn: boolean;
+    takeaway: boolean;
+    delivery: boolean;
+  };
+  logo?: string;
+  coverImage?: string;
+  isActive?: boolean;
+  currency?: string;
+  timezone?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-interface SelectedVariant {
+interface OrderItem {
+  _id?: string;
+  menuItemId?: string;
   name: string;
   price: number;
-}
-
-interface SelectedAddon {
-  name: string;
-  price: number;
+  quantity: number;
 }
 
 interface Order {
   _id: string;
-  id?: string;
   status: "pending" | "preparing" | "ready" | "served" | "paid" | "completed";
   totalAmount: number;
-  items: any[];
+  finalAmount: number;
+  items: OrderItem[];
   createdAt: string;
+  orderNumber: string;
   isPaid?: boolean;
-  specialInstructions?: string;
   paymentMethod?: "cash" | "upi";
+  cgstAmount?: number;
+  sgstAmount?: number;
+  serviceChargeAmount?: number;
 }
 
-const statusFlow = [
+// ------------------------------------------------------------
+// Constants
+// ------------------------------------------------------------
+const STATUS_FLOW: Order["status"][] = [
   "pending",
   "preparing",
   "ready",
@@ -86,7 +120,40 @@ const statusFlow = [
   "paid",
   "completed",
 ];
+const PREP_TIME_MINUTES = 15;
 
+// ------------------------------------------------------------
+// Helper: Calculate cart totals with taxes (mirrors backend)
+// ------------------------------------------------------------
+const calculateCartTotals = (
+  subtotal: number,
+  restaurant: Restaurant | null,
+) => {
+  if (!restaurant)
+    return {
+      subtotal,
+      cgst: 0,
+      sgst: 0,
+      serviceCharge: 0,
+      grandTotal: subtotal,
+    };
+  let cgst = 0,
+    sgst = 0,
+    serviceCharge = 0;
+  if (restaurant.billing.enableTaxes) {
+    cgst = (subtotal * restaurant.tax.cgst) / 100;
+    sgst = (subtotal * restaurant.tax.sgst) / 100;
+  }
+  if (restaurant.billing.enableServiceCharge) {
+    serviceCharge = (subtotal * restaurant.tax.serviceCharge) / 100;
+  }
+  const grandTotal = subtotal + cgst + sgst + serviceCharge;
+  return { subtotal, cgst, sgst, serviceCharge, grandTotal };
+};
+
+// ------------------------------------------------------------
+// Main Component
+// ------------------------------------------------------------
 export default function CustomerMenuPage() {
   return (
     <Suspense
@@ -106,39 +173,47 @@ function CustomerMenuContent() {
   const searchParams = useSearchParams();
   const restaurantId = params?.restaurantId as string;
   const table = searchParams.get("table");
-  // console.log("Line No 94 Restaurant Id", restaurantId);
 
-  // State
+  // --- State ---
   const [menu, setMenu] = useState<MenuItem[]>([]);
-  const [categories, setCategories] = useState(["All"]);
+  const [categories, setCategories] = useState<string[]>(["All"]);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [debugMsg] = useState("");
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
-  const [selectedVariant, setSelectedVariant] =
-    useState<SelectedVariant | null>(null);
-  const [selectedAddons, setSelectedAddons] = useState<SelectedAddon[]>([]);
+  const [selectedVariant, setSelectedVariant] = useState<{
+    name: string;
+    price: number;
+  } | null>(null);
+  const [selectedAddons, setSelectedAddons] = useState<
+    { name: string; price: number }[]
+  >([]);
   const [modalQuantity, setModalQuantity] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [paymentStarted, setPaymentStarted] = useState(false);
-  const [paymentTimeLeft, setpaymentTimeLeft] = useState(120);
+  const [paymentTimeLeft, setPaymentTimeLeft] = useState(120);
+  const [sending, setSending] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [timeLeft, setTimeLeft] = useState({ minutes: 0, seconds: 0 });
 
-  const socketRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // --- Cart Store ---
   const {
-    items,
+    items: cartItems,
     addItem,
     increaseQty,
     decreaseQty,
@@ -146,16 +221,21 @@ function CustomerMenuContent() {
     clearCart,
     getTotal,
   } = useCartStore();
-  const cartItems = items;
-  const cartTotal = getTotal();
   const cartCount = cartItems.reduce((sum, i) => sum + i.quantity, 0);
-  const [timeLeft, setTimeLeft] = useState({ minutes: 0, seconds: 0 });
-  const currentOrderRef = useRef<any>(null);
+  const cartSubtotal = getTotal();
 
-  // Fetch menu
+  // --- Derived cart totals with taxes ---
+  const cartTotals = useMemo(
+    () => calculateCartTotals(cartSubtotal, restaurant),
+    [cartSubtotal, restaurant],
+  );
+
+  // ------------------------------------------------------------
+  // Effects
+  // ------------------------------------------------------------
+  // Load menu & restaurant
   useEffect(() => {
     if (!restaurantId) return;
-
     const loadMenu = async () => {
       try {
         setLoading(true);
@@ -164,16 +244,16 @@ function CustomerMenuContent() {
         const restaurantData = data?.restaurant || null;
         setMenu(menuItems);
         setRestaurant(restaurantData);
-        const uniqueCategories = [
+        const uniqueCategories: string[] = [
           "All",
-          ...Array.from(
+          ...(Array.from(
             new Set(
               menuItems
-                .map((item: any) => item.category?.trim())
+                .map((item: MenuItem) => item.category?.trim())
                 .filter(Boolean),
             ),
-          ),
-        ] as string[];
+          ) as string[]),
+        ];
         setCategories(uniqueCategories);
       } catch (err) {
         console.error(err);
@@ -183,110 +263,96 @@ function CustomerMenuContent() {
         setLoading(false);
       }
     };
-
     loadMenu();
   }, [restaurantId]);
 
-  // Real-time socket for order updates
+  // Restore order from localStorage
   useEffect(() => {
-    if (!restaurantId) return;
-
-    const socket = io(process.env.NEXT_PUBLIC_API_URL, {
-      transports: ["websocket", "pooling"],
-      withCredentials: true,
-    });
-
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      console.log("🟢 Connected:", socket.id);
-
-      socket.emit("joinRestaurant", restaurantId);
-      console.log("📌 Joined restaurant room:", restaurantId);
-    });
-    socket.on("connect_error", (err) => {
-      console.log("❌ CONNECT ERROR:", err.message);
-    });
-    // ✅ ORDER UPDATE
-    socket.on("ORDER_UPDATED", (updatedOrder) => {
-      console.log("📩 ORDER UPDATED RECEIVED:", updatedOrder);
-
-      setCurrentOrder((prev) => {
-        if (!prev) return prev;
-
-        if (String(prev._id) === String(updatedOrder._id)) {
-          console.log("✅ UI UPDATED");
-          setOrderPlaced(true);
-          return updatedOrder;
-        }
-
-        return prev;
-      });
-    });
-    socket.on("ORDER_READY", (order) => {
-      console.log("🟢 ORDER_READY EVENT:", order);
-    });
-    socket.on("ORDER_READY", (order: any) => {
-      if (String(order._id) === String(currentOrder?._id)) {
-        console.log("🔥 ORDER READY RECEIVED");
-
-        playSound();
-
-        setCurrentOrder(order); // ✅ update UI
-
-        toast.success("🍽️ Your order is ready!");
-      }
-    });
-    socket.on("ORDER_COMPLETED", (order: any) => {
-      if (String(order._id) === String(currentOrder?._id)) {
-        console.log("🔥 Order Completed");
-
-        playSound();
-
-        setCurrentOrder(order); // ✅ update UI
-
-        toast.success("✅ Your order is completed! Thanks for dining with us.");
-        console.log("🟢 ORDER_COMPLETED EVENT");
-      }
-    });
-    return () => {
-      socket.disconnect();
-    };
-  }, [restaurantId, table, currentOrder?._id]);
-
-  useEffect(() => {
-    if (!currentOrder?._id) return;
-
-    const fetchLatest = async () => {
-      const data = await getOrderById(currentOrder._id);
-      setCurrentOrder(data);
-    };
-
-    fetchLatest();
+    const saved = localStorage.getItem("currentOrder");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setCurrentOrder(parsed);
+        setOrderPlaced(true);
+      } catch (e) {}
+    }
   }, []);
-  useEffect(() => {
-    console.log("🟡 CURRENT ORDER:", currentOrder);
-  }, [currentOrder]);
 
+  // Save order to localStorage when updated
   useEffect(() => {
     if (currentOrder) {
       localStorage.setItem("currentOrder", JSON.stringify(currentOrder));
     }
   }, [currentOrder]);
 
+  // Socket connection for real-time updates
   useEffect(() => {
-    const saved = localStorage.getItem("currentOrder");
-    if (saved) {
-      setCurrentOrder(JSON.parse(saved));
-      setOrderPlaced(true);
-    }
-  }, []);
+    if (!restaurant?._id) return;
+    const socket = io(process.env.NEXT_PUBLIC_API_URL, {
+      transports: ["websocket", "polling"],
+      withCredentials: true,
+    });
+    socketRef.current = socket;
 
+    socket.on("connect", () => {
+      console.log("Socket connected");
+      socket.emit("joinRestaurant", restaurant._id);
+    });
+
+    socket.on("ORDER_UPDATED", (updatedOrder: Order) => {
+      setCurrentOrder((prev) =>
+        prev && prev._id === updatedOrder._id ? updatedOrder : prev,
+      );
+      setOrderPlaced(true);
+    });
+
+    // Single ORDER_READY handler
+    socket.on("ORDER_READY", (order: Order) => {
+      if (currentOrder?._id === order._id) {
+        playSound();
+        setCurrentOrder(order);
+        toast.success("🍽️ Your order is ready!");
+      }
+    });
+
+    socket.on("ORDER_COMPLETED", (order: Order) => {
+      if (currentOrder?._id === order._id) {
+        playSound();
+        setCurrentOrder(order);
+        toast.success("✅ Order completed! Thanks for dining with us.");
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [restaurant?._id, currentOrder?._id]); // added dependency to avoid stale closure
+
+  // Timer for ETA
+  useEffect(() => {
+    if (!currentOrder?.createdAt) return;
+    const updateTimer = () => {
+      const end =
+        new Date(currentOrder.createdAt).getTime() + PREP_TIME_MINUTES * 60000;
+      const diff = Math.max(0, end - Date.now());
+      setTimeLeft({
+        minutes: Math.floor(diff / 60000),
+        seconds: Math.floor((diff % 60000) / 1000),
+      });
+    };
+    updateTimer();
+    timerIntervalRef.current = setInterval(updateTimer, 1000);
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, [currentOrder?.createdAt]);
+
+  // Payment timeout
   useEffect(() => {
     if (!paymentStarted) return;
-
     const timer = setInterval(() => {
-      setpaymentTimeLeft((prev) => {
+      setPaymentTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
           toast.error("Payment timeout!");
@@ -296,14 +362,34 @@ function CustomerMenuContent() {
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(timer);
   }, [paymentStarted]);
 
-  const filteredItems = useMemo(() => {
-    if (selectedCategory === "All") return menu;
-    return menu.filter((item) => item.category === selectedCategory);
-  }, [menu, selectedCategory]);
+  // Audio setup
+  useEffect(() => {
+    audioRef.current = new Audio("/sounds/order-placed.mp3");
+    audioRef.current.load();
+    const unlockAudio = () => {
+      audioRef.current
+        ?.play()
+        .then(() => audioRef.current?.pause())
+        .catch(() => {});
+      window.removeEventListener("click", unlockAudio);
+    };
+    window.addEventListener("click", unlockAudio);
+    return () => window.removeEventListener("click", unlockAudio);
+  }, []);
+
+  // ------------------------------------------------------------
+  // Handlers
+  // ------------------------------------------------------------
+  const playSound = useCallback(() => {
+    if (!soundEnabled || !audioRef.current) return;
+    audioRef.current.currentTime = 0;
+    audioRef.current
+      .play()
+      .catch((err) => console.warn("Audio play failed:", err));
+  }, [soundEnabled]);
 
   const openItemModal = (item: MenuItem) => {
     setSelectedItem(item);
@@ -370,28 +456,22 @@ function CustomerMenuContent() {
     setSelectedItem(null);
     toast.success(`${finalName} added to cart`);
   };
-  useEffect(() => {
-    if (!currentOrder?.createdAt) return;
 
-    const interval = setInterval(() => {
-      const remaining = getRemainingTimeDetailed(currentOrder.createdAt);
-      setTimeLeft(remaining);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [currentOrder]);
   const handlePlaceOrder = async () => {
-    if (!customerName.trim() || !customerPhone.trim()) {
+    if (!customerName.trim() || !customerPhone.trim() || !cartItems.length) {
       toast.error("Please enter your name and phone number");
       return;
     }
-
     setSubmitting(true);
     try {
       const payload = {
         restaurantId,
         tableNumber: table ? parseInt(table, 10) : 0,
-        customer: { name: customerName, phone: customerPhone },
+        customer: {
+          name: customerName,
+          phone: customerPhone,
+          email: customerEmail,
+        },
         items: cartItems.map((item) => ({
           menuItemId: item._id,
           name: item.name,
@@ -400,34 +480,24 @@ function CustomerMenuContent() {
         })),
         specialInstructions,
       };
+      let res;
       if (currentOrder) {
-        // 🔥 EXISTING ORDER → ADD ITEMS
-        const res = await axios.put(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/orders/${currentOrder._id}/add-items`,
+        // Add items to existing order
+        const { data } = await API.put(
+          `/api/orders/${currentOrder._id}/add-items`,
           {
-            items: cartItems.map((item) => ({
-              menuItemId: item._id,
-              name: item.name,
-              price: item.price,
-              quantity: item.quantity,
-            })),
+            items: payload.items,
           },
         );
-
-        setCurrentOrder(res.data);
-
-        setOrderPlaced(true);
-        toast.success("Items added to existing order!");
+        res = data;
       } else {
-        // 🆕 NEW ORDER
-        const res = await placeOrder(payload);
-
-        setCurrentOrder(res);
-        setOrderPlaced(true);
+        res = await placeOrder(payload);
       }
+      setCurrentOrder(res);
+      setOrderPlaced(true);
       clearCart();
       setIsCheckingOut(false);
-      setIsCartOpen(false); // ✅ important
+      setIsCartOpen(false);
       playSound();
       toast.success("Order placed successfully!");
     } catch (err) {
@@ -437,182 +507,109 @@ function CustomerMenuContent() {
       setSubmitting(false);
     }
   };
-  // 🔥 UPI LINKS (dynamic)
 
-  const handlePayment = async (method: "cash" | "upi") => {
-    if (!currentOrder) return;
-
-    try {
-      if (method === "cash") {
-        await API.put(`/api/orders/${currentOrder._id}/pay`);
-
-        setCurrentOrder((prev) =>
-          prev ? { ...prev, isPaid: true, status: "paid" } : null,
-        );
-
-        toast.success("Cash payment done!");
-        setShowPayment(false);
-        return;
-      }
-
-      if (method === "upi") {
-        if (!restaurant?.upiId) {
-          toast.error("UPI not configured");
-          return;
-        }
-
-        await API.put(`/api/orders/${currentOrder._id}/initiate-payment`, {
-          method: "upi",
-        });
-
-        const upiLink = generateUPILink(
-          currentOrder.totalAmount,
-          restaurant.upiId,
-          restaurant.name,
-        );
-
-        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-        if (isMobile) {
-          // ✅ Open UPI app
-          window.location.href = upiLink;
-        } else {
-          // 💻 Desktop fallback
-          toast.success("Scan QR code to pay using UPI");
-        }
-
-        setShowPayment(false);
-      }
-    } catch (err) {
-      toast.error("Payment failed");
-    }
-  };
   const generateUPILink = (amount: number, upiId: string, name: string) => {
     return `upi://pay?pa=${upiId}&pn=${encodeURIComponent(name)}&am=${amount}&cu=INR`;
   };
 
-  const handleUPIPayment = async () => {
-    if (!currentOrder || !restaurant?.upiId) {
-      toast.error("UPI not configured");
-      return;
-    }
-
+  const handlePayment = async (method: "cash" | "upi") => {
+    if (!currentOrder) return;
+    setIsPaying(true);
+    console.log(currentOrder._id);
     try {
-      // 🔥 prevent multiple clicks
-      if (loading) return;
-
-      // 🔥 mark payment initiated
-      await API.put(`/api/orders/${currentOrder._id}/initiate-payment`, {
-        method: "upi",
-      });
-      setPaymentStarted(true);
-      setpaymentTimeLeft(120);
-      const upiLink = `upi://pay?pa=${restaurant.upiId}&pn=${encodeURIComponent(
-        restaurant.name,
-      )}&am=${currentOrder.totalAmount}&cu=INR`;
-
-      // 🔥 THIS IS THE REAL FIX
-      window.location.href = upiLink;
+      if (method === "cash") {
+        // await API.put(`/api/orders/${currentOrder._id}/pay`);
+        await completePayment(currentOrder._id, "cash"); // ✅ FIX
+        // Refresh order to get updated status
+        const updated = await getOrderById(currentOrder._id);
+        setCurrentOrder(updated);
+        toast.success("Cash payment recorded!");
+        setShowPayment(false);
+      } else if (method === "upi") {
+        if (!restaurant?.upiId) {
+          toast.error("UPI not configured");
+          return;
+        }
+        await API.put(`/api/orders/${currentOrder._id}/initiate-payment`, {
+          method: "upi",
+        });
+        setPaymentStarted(true);
+        setPaymentTimeLeft(120);
+        const upiLink = generateUPILink(
+          currentOrder.finalAmount,
+          restaurant.upiId,
+          restaurant.name,
+        );
+        // Open UPI app in new tab (keeps original page)
+        window.open(upiLink, "_blank");
+        toast.success("Open your UPI app to complete payment");
+      }
     } catch (err) {
-      toast.error("Failed to open UPI");
+      toast.error("Payment failed");
+    } finally {
+      setIsPaying(false);
     }
   };
-  const baseUPI = `upi://pay?pa=${restaurant?.upiId}&pn=${restaurant?.name}&am=${currentOrder?.totalAmount}&cu=INR`;
+
   const confirmPayment = async () => {
     if (!currentOrder) return;
-
-    await API.put(`/api/orders/${currentOrder._id}/pay`);
-
-    setCurrentOrder((prev) =>
-      prev ? { ...prev, isPaid: true, status: "paid" } : null,
-    );
-
-    toast.success("Payment submitted for verification!");
-    setShowPayment(false);
+    setIsPaying(true);
+    try {
+      await completePayment(currentOrder._id, "upi");
+      const updated = await getOrderById(currentOrder._id);
+      if (updated.paymentStatus === "paid") {
+        setPaymentStarted(false);
+      }
+      setCurrentOrder(updated);
+      toast.success("Payment submitted for verification!");
+      setShowPayment(false);
+      setPaymentStarted(false);
+    } catch (err: any) {
+      console.error("PAYMENT ERROR:", err?.response?.data || err.message);
+      toast.error(err?.response?.data?.message || "Payment failed");
+    } finally {
+      setIsPaying(false);
+    }
   };
-  const getRemainingTimeDetailed = (createdAt: string, prepMinutes = 15) => {
-    const end = new Date(createdAt).getTime() + prepMinutes * 60000;
-    const diff = Math.max(0, end - Date.now());
 
-    const minutes = Math.floor(diff / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-
-    return { minutes, seconds };
+  const handleSendEmail = async () => {
+    if (!currentOrder) return;
+    if (sending) return;
+    setSending(true);
+    try {
+      await sendInvoice({ orderId: currentOrder._id, email: customerEmail });
+      toast.success("Invoice sent to your email!");
+    } catch (err) {
+      toast.error("Failed to send invoice");
+    } finally {
+      setSending(false);
+    }
   };
+
   const resetCustomerSession = () => {
-    // Clear Zustand cart
     clearCart();
-
-    // Reset states
     setCurrentOrder(null);
     setOrderPlaced(false);
     setIsCartOpen(false);
     setIsCheckingOut(false);
     setShowPayment(false);
-
-    // Clear inputs
     setCustomerName("");
     setCustomerPhone("");
+    setCustomerEmail("");
     setSpecialInstructions("");
-
-    // 🔥 Clear localStorage (if used)
-    localStorage.removeItem("cart-storage"); // zustand persist key (change if different)
-    localStorage.removeItem("currentOrder"); // if you saved order
-
-    // Optional: reload menu clean
-    // window.location.reload(); ❌ not needed usually
+    localStorage.removeItem("cart-storage");
+    localStorage.removeItem("currentOrder");
+    toast.success("Session reset. You can start a new order.");
   };
 
-  // sounds
-  useEffect(() => {
-    const unlockAudio = () => {
-      if (audioRef.current) {
-        audioRef.current
-          .play()
-          .then(() => {
-            if (audioRef.current) {
-              audioRef.current.pause();
-              audioRef.current.currentTime = 0;
-            }
-          })
-          .catch(() => {});
-      }
+  // ------------------------------------------------------------
+  // Render Helpers
+  // ------------------------------------------------------------
+  const filteredItems = useMemo(() => {
+    if (selectedCategory === "All") return menu;
+    return menu.filter((item) => item.category === selectedCategory);
+  }, [menu, selectedCategory]);
 
-      window.removeEventListener("click", unlockAudio);
-    };
-
-    window.addEventListener("click", unlockAudio);
-
-    return () => window.removeEventListener("click", unlockAudio);
-  }, []);
-
-  // Initialize audio on client side
-  useEffect(() => {
-    audioRef.current = new Audio("/sounds/order-placed.mp3");
-    // Preload audio
-    audioRef.current.load();
-  }, []);
-
-  // Play sound with user interaction handling
-  const playSound = useCallback(() => {
-    if (!soundEnabled || !audioRef.current) return;
-
-    try {
-      audioRef.current.currentTime = 0;
-
-      const playPromise = audioRef.current.play();
-
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn("Audio play failed:", err);
-        });
-      }
-    } catch (err) {
-      console.error("Unexpected audio error:", err);
-    }
-  }, [soundEnabled]);
-
-  // Guards
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3">
@@ -650,31 +647,27 @@ function CustomerMenuContent() {
     );
   }
 
- 
-  // Main UI (menu & cart)
-
+  // --- Order Placed View ---
   if (orderPlaced && currentOrder) {
-    const currentStepIndex = statusFlow.indexOf(currentOrder.status);
+    const currentStepIndex = STATUS_FLOW.indexOf(currentOrder.status);
+    const baseUPI = `upi://pay?pa=${restaurant?.upiId}&pn=${restaurant?.name}&am=${currentOrder.finalAmount}&cu=INR`;
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50/30 p-4 flex items-center justify-center">
         <div className="max-w-md w-full mx-auto space-y-5 animate-fadeInUp">
-          {/* Main Order Card */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-6 border border-white/20 transition-all duration-300 hover:shadow-xl">
-            {/* Header with Order ID & Table */}
+          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-6 border border-white/20">
+            {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
                   <ChefHat className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-800 tracking-tight">
-                    Order #{currentOrder._id.slice(-8)}
+                  <h2 className="text-lg font-bold text-gray-800">
+                    Order #{currentOrder.orderNumber.slice(-3)}
                   </h2>
-                  <p className="text-xs text-gray-500 flex items-center gap-1">
-                    <span className="inline-block w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
-                    Table {table}
-                  </p>
+
+                  <p className="text-xs text-gray-500">Table No. {table}</p>
                 </div>
               </div>
               <div className="text-right">
@@ -684,21 +677,20 @@ function CustomerMenuContent() {
               </div>
             </div>
 
-            {/* Modern Status Timeline */}
+            {/* Status Timeline */}
             <div className="my-6">
               <div className="relative flex justify-between">
-                {statusFlow.map((step, idx) => {
+                {STATUS_FLOW.map((step, idx) => {
                   const isActive = idx <= currentStepIndex;
-                  const isCurrent = idx === currentStepIndex;
                   return (
                     <div
                       key={step}
                       className="flex flex-col items-center flex-1"
                     >
                       <div
-                        className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                        className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
                           isActive
-                            ? "bg-gradient-to-r from-orange-500 to-orange-600 shadow-md scale-105"
+                            ? "bg-gradient-to-r from-orange-500 to-orange-600 shadow-md"
                             : "bg-gray-200"
                         }`}
                       >
@@ -709,57 +701,31 @@ function CustomerMenuContent() {
                         )}
                       </div>
                       <span
-                        className={`text-[11px] font-medium mt-2 text-center ${
-                          isActive ? "text-orange-600" : "text-gray-400"
-                        }`}
+                        className={`text-[11px] font-medium mt-2 ${isActive ? "text-orange-600" : "text-gray-400"}`}
                       >
                         {step.charAt(0).toUpperCase() + step.slice(1)}
                       </span>
-                      {idx < statusFlow.length - 1 && (
-                        <div
-                          className={`absolute top-4 left-1/2 w-full h-0.5 -translate-y-1/2 ${
-                            idx < currentStepIndex
-                              ? "bg-orange-500"
-                              : "bg-gray-200"
-                          }`}
-                          style={{
-                            left: `${idx * (100 / (statusFlow.length - 1)) + 50 / (statusFlow.length - 1)}%`,
-                            width: `${100 / (statusFlow.length - 1)}%`,
-                          }}
-                        />
-                      )}
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            {/* ETA (only for active orders) */}
+            {/* ETA */}
             {currentOrder.status !== "completed" &&
               currentOrder.status !== "served" && (
-                <div className="bg-gradient-to-r from-gray-100 to-gray-50 rounded-2xl p-3 flex items-center justify-center gap-2 shadow-inner">
-                  {timeLeft.minutes > 0 || timeLeft.seconds > 0 ? (
-                    <>
-                      <Clock className="w-4 h-4 text-orange-500 animate-pulse" />
-                      <span className="text-sm text-gray-600">
-                        Estimated arrival:{" "}
-                        <span className="font-mono font-bold text-gray-800">
-                          {timeLeft.minutes}m {timeLeft.seconds}s
-                        </span>
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Clock className="w-4 h-4 text-red-500 animate-bounce" />
-                      <span className="text-sm text-red-600 font-semibold">
-                        Running late ⏳ — your order will arrive soon
-                      </span>
-                    </>
-                  )}
+                <div className="bg-gradient-to-r from-gray-100 to-gray-50 rounded-2xl p-3 flex items-center justify-center gap-2">
+                  <Clock className="w-4 h-4 text-orange-500 animate-pulse" />
+                  <span className="text-sm text-gray-600">
+                    Estimated arrival:{" "}
+                    <span className="font-mono font-bold text-gray-800">
+                      {timeLeft.minutes}m {timeLeft.seconds}s
+                    </span>
+                  </span>
                 </div>
               )}
 
-            {/* Order Items List */}
+            {/* Order Items */}
             <div className="mt-4 space-y-3">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                 Your Order
@@ -767,7 +733,7 @@ function CustomerMenuContent() {
               <div className="divide-y divide-gray-100">
                 {currentOrder.items.map((item, idx) => (
                   <div
-                    key={idx}
+                    key={item._id || idx}
                     className="py-2 flex justify-between items-center"
                   >
                     <div className="flex items-center gap-3">
@@ -777,59 +743,67 @@ function CustomerMenuContent() {
                       <span className="text-gray-700">{item.name}</span>
                     </div>
                     <span className="font-medium text-gray-800">
-                      ₹{item.price * item.quantity}
+                      ₹{(item.price * item.quantity).toFixed(2)}
                     </span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Total */}
-            <div className="mt-4 pt-3 border-t border-dashed border-gray-200 flex justify-between items-center bg-gradient-to-r from-orange-50/50 to-transparent -mx-2 px-2 py-3 rounded-xl">
-              <span className="text-base font-bold text-gray-800">Total</span>
-              <span className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-orange-800">
-                ₹{currentOrder.totalAmount || 0}
-              </span>
+            {/* Totals */}
+            <div className="mt-4 pt-3 border-t border-dashed border-gray-200">
+              <div className="space-y-1 text-sm text-gray-600">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>₹{currentOrder.totalAmount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>CGST</span>
+                  <span>₹{currentOrder.cgstAmount || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>SGST</span>
+                  <span>₹{currentOrder.sgstAmount || 0}</span>
+                </div>
+                {restaurant?.billing.enableServiceCharge && (
+                  <div className="flex justify-between">
+                    <span>Service Charge</span>
+                    <span>₹{currentOrder.serviceChargeAmount || 0}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
+                  <span>Grand Total</span>
+                  <span>₹{currentOrder.finalAmount}</span>
+                </div>
+              </div>
             </div>
 
             {/* Action Buttons */}
             <div className="space-y-3 mt-6">
-                {currentOrder.status !== "completed" &&
-                  currentOrder.status !== "paid" && (
-                    <button
-                      onClick={() => {
-                        setOrderPlaced(false);
-                        setIsCartOpen(true);
-                      }}
-                      className="w-full py-3 rounded-xl font-semibold transition-all duration-200 bg-white border border-gray-200 text-gray-700 hover:border-orange-300 hover:shadow-md flex items-center justify-center gap-2"
-                    >
-                      <span>+</span> Add More Items
-                    </button>
-                  )}
+              {!["completed", "paid"].includes(currentOrder.status) && (
+                <button
+                  onClick={() => {
+                    setOrderPlaced(false);
+                    setIsCartOpen(true);
+                  }}
+                  className="w-full py-3 rounded-xl font-semibold bg-white border border-gray-200 text-gray-700 hover:border-orange-300"
+                >
+                  + Add More Items
+                </button>
+              )}
 
-              {currentOrder.status === "served" && !currentOrder.isPaid && (
+              {currentOrder.status === "served" && (
                 <button
                   onClick={() => setShowPayment(true)}
-                  className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+                  className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md hover:shadow-lg"
                 >
                   💳 Proceed to Pay
                 </button>
               )}
 
-              {currentOrder.status === "served" &&
-                currentOrder.paymentMethod === "upi" &&
-                !currentOrder.isPaid && (
-                  <button
-                    onClick={confirmPayment}
-                    className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md hover:shadow-lg transition-all"
-                  >
-                    ✅ I Have Paid
-                  </button>
-                )}
-
               {currentOrder.status === "paid" && (
-                <div className="text-center space-y-2 py-4">
-                  <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold">
+                <div className="text-center py-4">
+                  <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Payment Done — Waiting for confirmation
                   </div>
@@ -846,8 +820,20 @@ function CustomerMenuContent() {
                     Thank you! Visit Again 👋
                   </p>
                   <button
+                    onClick={handleSendEmail}
+                    disabled={sending}
+                    className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md flex items-center justify-center gap-2"
+                  >
+                    {sending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "📧"
+                    )}{" "}
+                    Get Bill on Email
+                  </button>
+                  <button
                     onClick={resetCustomerSession}
-                    className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-md hover:shadow-lg transition-all"
+                    className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-orange-500 to-amber-600 text-white"
                   >
                     Back to Menu
                   </button>
@@ -856,101 +842,84 @@ function CustomerMenuContent() {
             </div>
           </div>
 
-          {/* Payment Modal - Modern Overlay */}
-          {showPayment && currentOrder && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
-              <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-300 scale-100">
-                <div className="p-6 space-y-5">
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <CreditCard className="w-7 h-7 text-green-600" />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-800">
-                      Complete Payment
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Total Amount:{" "}
-                      <span className="font-bold text-gray-800">
-                        ₹{currentOrder.totalAmount}
-                      </span>
-                    </p>
+          {/* Payment Modal */}
+          {showPayment && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+              <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 space-y-5">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <CreditCard className="w-7 h-7 text-green-600" />
                   </div>
-
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => handlePayment("cash")}
-                      className="w-full py-3 rounded-xl bg-gray-50 text-gray-800 font-medium hover:bg-gray-100 transition flex items-center justify-center gap-2 border border-gray-200"
-                    >
-                      💵 Pay with Cash
-                    </button>
-
-                    {restaurant?.upiId && (
-                      <div className="space-y-3">
-                        <button
-                          onClick={handleUPIPayment}
-                          disabled={paymentStarted}
-                          className={`w-full py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2 ${
-                            paymentStarted
-                              ? "bg-gray-300 cursor-not-allowed"
-                              : "bg-gradient-to-r from-green-500 to-teal-600 text-white shadow-md hover:shadow-lg"
-                          }`}
-                        >
-                          {paymentStarted ? "⏳ Starting..." : "📱 Pay via UPI"}
-                        </button>
-
-                        <div className="relative flex flex-col items-center border-t border-gray-100 pt-4 mt-2">
-                          <div className="absolute -top-3 bg-white px-2 text-xs text-gray-400">
-                            OR
-                          </div>
-                          <p className="text-sm text-gray-600 mb-2">
-                            Scan QR with any UPI app
-                          </p>
-                          <div className="bg-white p-2 rounded-2xl shadow-md">
-                            <QRCode value={baseUPI} size={140} />
-                          </div>
-                          <div className="mt-3 flex items-center gap-1 text-xs text-gray-400">
-                            <span>UPI: {restaurant.upiId}</span>
-                            <button
-                              onClick={() =>
-                                navigator.clipboard.writeText(restaurant.upiId)
-                              }
-                              className="text-blue-500 hover:text-blue-700"
-                            >
-                              📋
-                            </button>
-                          </div>
+                  <h3 className="text-xl font-bold">Complete Payment</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Total:{" "}
+                    <span className="font-bold">
+                      ₹{currentOrder.finalAmount || currentOrder.totalAmount}
+                    </span>
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => handlePayment("cash")}
+                    disabled={isPaying}
+                    className="w-full py-3 rounded-xl bg-gray-50 text-gray-800 font-medium hover:bg-gray-100 border border-gray-200"
+                  >
+                    {isPaying ? "Processing..." : "💵 Pay with Cash"}
+                  </button>
+                  {restaurant?.upiId && (
+                    <>
+                      <button
+                        onClick={() => handlePayment("upi")}
+                        disabled={isPaying || paymentStarted}
+                        className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-teal-600 text-white shadow-md"
+                      >
+                        {isPaying ? "Processing..." : "📱 Pay via UPI"}
+                      </button>
+                      <div className="relative flex flex-col items-center border-t border-gray-100 pt-4 mt-2">
+                        <div className="absolute -top-3 bg-white px-2 text-xs text-gray-400">
+                          OR
+                        </div>
+                        <p className="text-sm text-gray-600 mb-2">
+                          Scan QR with any UPI app
+                        </p>
+                        <div className="bg-white p-2 rounded-2xl shadow-md">
+                          <QRCode value={baseUPI} size={140} />
+                        </div>
+                        <div className="mt-3 flex items-center gap-1 text-xs text-gray-400">
+                          <span>UPI: {restaurant.upiId}</span>
+                          <button
+                            onClick={() =>
+                              navigator.clipboard.writeText(restaurant.upiId!)
+                            }
+                            className="text-blue-500"
+                          >
+                            📋
+                          </button>
                         </div>
                       </div>
-                    )}
-
-                    {!restaurant?.upiId && (
-                      <p className="text-xs text-red-500 text-center">
-                        UPI not available for this restaurant
+                    </>
+                  )}
+                  {paymentStarted && currentOrder.status !== "paid" && (
+                    <div className="mt-4 p-3 bg-red-50 rounded-xl">
+                      <p className="text-center text-red-600 font-semibold animate-pulse">
+                        ⏱️ Complete payment within {paymentTimeLeft}s
                       </p>
-                    )}
-
-                    {paymentStarted && !currentOrder?.isPaid && (
-                      <div className="mt-4 space-y-3 p-3 bg-red-50 rounded-xl">
-                        <p className="text-center text-red-600 font-semibold animate-pulse">
-                          ⏱️ Complete payment within {paymentTimeLeft}s
-                        </p>
-                        <button
-                          onClick={confirmPayment}
-                          className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
-                        >
-                          ✅ I Have Paid
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => setShowPayment(false)}
-                    className="w-full py-2 text-red-500 border border-red-200 rounded-xl hover:bg-red-50 transition text-sm font-medium"
-                  >
-                    Cancel
-                  </button>
+                      <button
+                        onClick={confirmPayment}
+                        disabled={isPaying}
+                        className="w-full mt-2 py-2 bg-blue-600 text-white rounded-lg"
+                      >
+                        {isPaying ? "Confirming..." : "✅ I Have Paid"}
+                      </button>
+                    </div>
+                  )}
                 </div>
+                <button
+                  onClick={() => setShowPayment(false)}
+                  className="w-full py-2 text-red-500 border border-red-200 rounded-xl"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           )}
@@ -958,6 +927,8 @@ function CustomerMenuContent() {
       </div>
     );
   }
+
+  // --- Menu & Cart View ---
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
@@ -969,21 +940,33 @@ function CustomerMenuContent() {
             </h1>
             <p className="text-xs text-gray-500">Table {table}</p>
           </div>
-          <button
-            onClick={() => setIsCartOpen(true)}
-            className="relative p-2 bg-orange-50 text-orange-500 rounded-full hover:bg-orange-100 transition"
-          >
-            <ShoppingCart className="w-6 h-6" />
-            {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-                {cartCount}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSoundEnabled((s) => !s)}
+              className="p-2 text-gray-600"
+            >
+              {soundEnabled ? (
+                <Volume2 className="w-5 h-5" />
+              ) : (
+                <VolumeX className="w-5 h-5" />
+              )}
+            </button>
+            <button
+              onClick={() => setIsCartOpen(true)}
+              className="relative p-2 bg-orange-50 text-orange-500 rounded-full"
+            >
+              <ShoppingCart className="w-6 h-6" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Category Tabs */}
+      {/* Categories */}
       <div className="bg-white border-b sticky top-[57px] z-10 overflow-x-auto">
         <div className="flex gap-2 px-4 py-2 max-w-2xl mx-auto">
           {categories.map((cat) => (
@@ -1112,13 +1095,15 @@ function CustomerMenuContent() {
         <div className="fixed bottom-4 left-4 right-4 z-30 max-w-2xl mx-auto">
           <button
             onClick={() => setIsCartOpen(true)}
-            className="w-full bg-orange-500 text-white rounded-2xl py-4 px-5 flex items-center justify-between shadow-xl hover:bg-orange-600 transition"
+            className="w-full bg-orange-500 text-white rounded-2xl py-4 px-5 flex items-center justify-between shadow-xl hover:bg-orange-600"
           >
             <span className="bg-orange-600 px-2 py-1 rounded-lg text-xs font-bold">
               {cartCount} items
             </span>
             <span className="font-semibold">View Cart</span>
-            <span className="font-bold">₹{cartTotal.toFixed(2)}</span>
+            <span className="font-bold">
+              ₹{cartTotals.grandTotal.toFixed(2)}
+            </span>
           </button>
         </div>
       )}
@@ -1150,7 +1135,7 @@ function CustomerMenuContent() {
               ) : (
                 cartItems.map((item) => (
                   <div
-                    key={item._id}
+                    key={`${item._id}-${item.name}`}
                     className="flex items-center gap-3 bg-gray-50 rounded-xl p-3"
                   >
                     <div className="flex-1">
@@ -1193,14 +1178,41 @@ function CustomerMenuContent() {
             </div>
             {cartItems.length > 0 && (
               <div className="border-t p-4 space-y-4">
-                <div className="flex justify-between font-bold">
-                  <span>Total</span>
-                  <span>₹{cartTotal.toFixed(2)}</span>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span>₹{cartTotals.subtotal.toFixed(2)}</span>
+                  </div>
+                  {restaurant?.billing.enableTaxes && (
+                    <>
+                      <div className="flex justify-between">
+                        <span>CGST ({restaurant.tax.cgst}%)</span>
+                        <span>₹{cartTotals.cgst.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>SGST ({restaurant.tax.sgst}%)</span>
+                        <span>₹{cartTotals.sgst.toFixed(2)}</span>
+                      </div>
+                    </>
+                  )}
+                  {restaurant?.billing.enableServiceCharge && (
+                    <div className="flex justify-between">
+                      <span>
+                        Service Charge ({restaurant.tax.serviceCharge}%)
+                      </span>
+                      <span>₹{cartTotals.serviceCharge.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-lg border-t pt-2">
+                    <span>Grand Total</span>
+                    <span>₹{cartTotals.grandTotal.toFixed(2)}</span>
+                  </div>
                 </div>
+
                 {!isCheckingOut ? (
                   <button
                     onClick={() => setIsCheckingOut(true)}
-                    className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600"
+                    className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold"
                   >
                     Proceed to Checkout
                   </button>
@@ -1211,26 +1223,33 @@ function CustomerMenuContent() {
                       placeholder="Your Name *"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full px-3 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-300"
+                      className="w-full px-3 py-2.5 border rounded-xl text-sm"
                     />
                     <input
                       type="tel"
                       placeholder="Phone Number *"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="w-full px-3 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-orange-300"
+                      className="w-full px-3 py-2.5 border rounded-xl text-sm"
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email (optional)"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      className="w-full px-3 py-2.5 border rounded-xl text-sm"
                     />
                     <textarea
                       placeholder="Special instructions (optional)"
                       value={specialInstructions}
                       onChange={(e) => setSpecialInstructions(e.target.value)}
                       rows={2}
-                      className="w-full px-3 py-2.5 border rounded-xl text-sm resize-none focus:ring-2 focus:ring-orange-300"
+                      className="w-full px-3 py-2.5 border rounded-xl text-sm resize-none"
                     />
                     <div className="flex gap-2">
                       <button
                         onClick={() => setIsCheckingOut(false)}
-                        className="flex-1 py-2.5 border rounded-xl text-sm font-medium"
+                        className="flex-1 py-2.5 border rounded-xl text-sm"
                       >
                         Back
                       </button>
@@ -1239,7 +1258,11 @@ function CustomerMenuContent() {
                         disabled={submitting}
                         className="flex-1 py-2.5 bg-green-500 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
                       >
-                        {submitting ? "Placing..." : "Place Order"}
+                        {submitting ? (
+                          <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                        ) : (
+                          "Place Order"
+                        )}
                       </button>
                     </div>
                   </div>
@@ -1302,7 +1325,7 @@ function CustomerMenuContent() {
                             : "bg-white text-gray-700 border-gray-300"
                         }`}
                       >
-                        {variant.name} (+₹{variant.price - selectedItem.price})
+                        {variant.name} (₹{variant.price})
                       </button>
                     ))}
                   </div>
@@ -1362,7 +1385,7 @@ function CustomerMenuContent() {
 
               <button
                 onClick={addCustomizedToCart}
-                className="w-full mt-4 bg-orange-500 text-white py-3 rounded-xl font-semibold hover:bg-orange-600"
+                className="w-full mt-4 bg-orange-500 text-white py-3 rounded-xl font-semibold"
               >
                 Add to Cart • ₹{getModalItemTotal().toFixed(2)}
               </button>

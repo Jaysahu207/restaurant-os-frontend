@@ -5,14 +5,21 @@ import API from "../config/axios";
 // 🏢 RESTAURANTS
 // =============================
 
-export const getAllRestaurants = async () => {
-    const res = await API.get("/api/super-admin/restaurants");
-    return res.data;
+export const getAllRestaurants = async (
+    page = 1,
+    search = ""
+) => {
+    const response = await API.get(
+        `api/super-admin/restaurants?page=${page}&search=${search}`
+    );
+    console.log("🚀 ~ file: superAdminService.ts ~ line 14 ~ getAllRestaurants ~ response", response)
+    return response.data;
 };
 
 export const getRestaurantDetails = async (id: string) => {
     const res = await API.get(`/api/super-admin/restaurants/${id}`);
-    return res.data;
+    console.log("Fetched restaurant details for ID:", id, res.data);
+    return res.data.data;
 };
 
 export const createRestaurant = async (data: any) => {
@@ -32,6 +39,7 @@ export const toggleRestaurantStatus = async (id: string) => {
 
 export const deleteRestaurant = async (id: string) => {
     const res = await API.delete(`/api/super-admin/restaurants/${id}`);
+    console.log("Deleted restaurant", id);
     return res.data;
 };
 
@@ -70,10 +78,45 @@ export const deleteUser = async (id: string) => {
     return res.data;
 };
 
+// ===============================
+// PLANS
+// ===============================
 
+export const getAllPlans = async () => {
+    const response = await API.get(
+        "api/super-admin/plans"
+    );
+
+    return response.data;
+};
+
+export const createPlan = async (
+    planData: any
+) => {
+    const response = await API.post(
+        "api/super-admin/plans",
+        planData
+    );
+
+    return response.data;
+};
+
+export const updatePlan = async (
+    planId: string,
+    planData: any
+) => {
+    const response = await API.put(
+        `/super-admin/plans/${planId}`,
+        planData
+    );
+
+    return response.data;
+};
 // =============================
 // 💳 SUBSCRIPTIONS & BILLING
 // =============================
+
+
 
 export const updateSubscription = async (
     restaurantId: string,

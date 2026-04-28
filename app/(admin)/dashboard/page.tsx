@@ -42,6 +42,9 @@ interface DashboardData {
 
 interface RecentOrder {
   id: string;
+  orderNumber: string;
+  finalAmount: number;
+  afterTax: number;
   table: number;
   items: number;
   total: number;
@@ -224,9 +227,7 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
     preparing: "bg-blue-100 text-blue-700",
     ready: "bg-emerald-100 text-emerald-700",
     served: "bg-purple-100 text-purple-700",
-
     paid: "bg-green-100 text-green-700",
-
     completed: "bg-gray-100 text-gray-700",
   };
   return (
@@ -253,6 +254,7 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
               <th className="px-5 py-3 font-medium">Table</th>
               <th className="px-5 py-3 font-medium">Items</th>
               <th className="px-5 py-3 font-medium">Total</th>
+              <th className="px-5 py-3 font-medium">After Tax</th>
               <th className="px-5 py-3 font-medium">Status</th>
               <th className="px-5 py-3 font-medium">Time</th>
               <th className="px-5 py-3 font-medium"></th>
@@ -262,7 +264,7 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
             {orders.map((order) => (
               <tr key={order.id} className="hover:bg-gray-50 transition">
                 <td className="px-5 py-3 font-mono text-sm text-gray-800">
-                  {order.id}
+                  {order.orderNumber || order.id.slice(-8)}
                 </td>
                 <td className="px-5 py-3 text-sm text-gray-600">
                   Table {order.table}
@@ -272,6 +274,9 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
                 </td>
                 <td className="px-5 py-3 text-sm font-medium text-gray-800">
                   ₹{order.total}
+                </td>
+                <td className="px-5 py-3 text-sm font-medium text-gray-800">
+                  ₹{order.afterTax}
                 </td>
                 <td className="px-5 py-3">
                   <span
@@ -346,6 +351,7 @@ export default function DashboardPage() {
       try {
         setLoading(true);
         const res = await getDashboardData(restaurant._id);
+        console.log("📦 Dashboard Data:", res.data);
         setData(res.data);
       } catch (err) {
         console.error(err);
@@ -368,7 +374,7 @@ export default function DashboardPage() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("🟢 Dashboard connected:", socket.id);
+      // console.log("🟢 Dashboard connected:", socket.id);
       socket.emit("joinRestaurant", restaurant._id);
     });
 

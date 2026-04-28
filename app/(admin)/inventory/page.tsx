@@ -23,6 +23,8 @@ import {
   updateInventory,
   deleteInventory,
 } from "@/services/inventoryService";
+import { toast } from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 const CATEGORIES = [
   "All",
@@ -66,6 +68,7 @@ export default function InventoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
+  const router = useRouter();
 
   const [toast, setToast] = useState<{
     message: string;
@@ -109,9 +112,12 @@ export default function InventoryPage() {
     try {
       setLoading(true);
       setError(null);
+
       const res = await getInventory();
-      // Normalize response: array or { data: [...] }
+
+      // Normalize response
       let items = Array.isArray(res) ? res : res?.data || [];
+
       const normalized = items.map((item: any) => ({
         ...item,
         _id: item._id || item.id,
@@ -119,15 +125,31 @@ export default function InventoryPage() {
         reorderLevel: Number(item.reorderLevel) || 0,
         costPerUnit: Number(item.costPerUnit) || 0,
       }));
+
       setInventory(normalized);
-    } catch (err) {
-      console.error("Inventory fetch error:", err);
-      setError("Failed to load inventory. Please refresh.");
+    } catch (err: any) {
+      // console.error("Inventory fetch error:", err);
+
+      const status = err?.response?.status;
+
+      const backendMessage =
+        err?.response?.data?.message || "Failed to load inventory";
+
+      // 🚨 FEATURE LOCKED
+      if (status === 403) {
+        setError(backendMessage);
+
+        showToast(backendMessage, "error");
+
+        return;
+      }
+
+      // ❌ OTHER ERRORS
+      setError("Something went wrong");
     } finally {
       setLoading(false);
     }
   };
-
   const showToast = (message: string, type: "success" | "error") =>
     setToast({ message, type });
 
@@ -416,11 +438,23 @@ export default function InventoryPage() {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-        {error}
-        <button onClick={fetchInventory} className="ml-4 underline">
-          Retry
-        </button>
+      <div className="min-h-[70vh] flex items-center justify-center">
+        <div className="bg-white border rounded-2xl shadow-sm p-8 max-w-md text-center">
+          <AlertTriangle className="w-14 h-14 text-orange-500 mx-auto mb-4" />
+
+          <h2 className="text-2xl font-bold text-gray-800">
+            Feature Not Available
+          </h2>
+
+          <p className="text-gray-600 mt-3">{error}</p>
+
+          <button
+            onClick={() => router.push("/subscription")}
+            className="mt-6 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl"
+          >
+            Upgrade Plan
+          </button>
+        </div>
       </div>
     );
   }

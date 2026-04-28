@@ -23,6 +23,8 @@ import {
 import { io, Socket } from "socket.io-client";
 import { useAuthStore } from "@/store/useAuthStore";
 import toast from "react-hot-toast";
+import InvoiceTemplate from "@/components/invoice/InvoiceTemplate";
+import { printInvoice } from "@/components/invoice/PrintInvoice";
 
 // ==================== Types ====================
 interface OrderItem {
@@ -40,11 +42,15 @@ interface Order {
     phone: string;
     email?: string;
   };
+  orderNumber: string;
   table: number;
   items: OrderItem[];
-  total: number;
-  subtotal?: number;
-  tax?: number;
+  total: number; // Grand total after all taxes (final amount)
+  subtotal: number; // Subtotal before taxes
+  cgstAmount: number; // CGST amount
+  sgstAmount: number; // SGST amount
+  serviceChargeAmount: number;
+  invoiceNumber: string;
   status: OrderStatus;
   createdAt: string;
   specialInstructions?: string;
@@ -98,7 +104,7 @@ export default function OrdersPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0], // default = today
+    new Date().toISOString().split("T")[0],
   );
 
   // Load orders with optional date filter
@@ -106,28 +112,9 @@ export default function OrdersPage() {
     if (!restaurant?._id) return;
     try {
       setLoading(true);
-      // Pass date only if selected; otherwise fetch all orders
       const dateParam = selectedDate || undefined;
       const data = await getOrders(restaurant._id, dateParam);
-      const formatted: Order[] = data.map((o: any) => ({
-        id: o._id,
-        customer: {
-          name: o.customerId?.name || "Guest",
-          phone: o.customerId?.phone || "",
-          email: o.customerId?.email || "",
-        },
-        table: o.tableNumber,
-        items: o.items,
-        total: o.totalAmount,
-        subtotal: o.subtotal,
-        tax: o.tax,
-        status: o.status,
-        createdAt: o.createdAt,
-        paymentMethod: o.paymentMethod,
-        paymentStatus: o.paymentStatus,
-
-        specialInstructions: o.specialInstructions,
-      }));
+      const formatted: Order[] = data.map((o: any) => mapOrder(o));
       setOrders(formatted);
     } catch (error) {
       console.error("Failed to load orders:", error);
@@ -142,7 +129,6 @@ export default function OrdersPage() {
     loadOrders();
   }, [loadOrders]);
 
-  // Manual refresh
   const handleRefresh = () => {
     setRefreshing(true);
     loadOrders();
@@ -168,50 +154,29 @@ export default function OrdersPage() {
     });
 
     socket.on("NEW_ORDER", (newOrder: any) => {
-      // Only add if the order's date matches current filter (or if showing all)
       const orderDate = new Date(newOrder.createdAt)
         .toISOString()
         .split("T")[0];
       if (selectedDate && orderDate !== selectedDate) return;
-
+      const formattedOrder = mapOrder(newOrder);
       setOrders((prev) => {
-        if (prev.find((o) => o.id === newOrder._id)) return prev;
-        return [
-          {
-            id: newOrder._id,
-            customer: {
-              name: newOrder.customerId?.name || "Guest",
-              phone: newOrder.customerId?.phone || "",
-              email: newOrder.customerId?.email || "",
-            },
-            table: newOrder.tableNumber,
-            items: newOrder.items,
-            total: newOrder.totalAmount,
-            status: newOrder.status,
-            createdAt: newOrder.createdAt,
-          },
-          ...prev,
-        ];
+        if (prev.find((o) => o.id === formattedOrder.id)) return prev;
+        return [formattedOrder, ...prev];
       });
-
       playSound();
-
       toast.success(`New order #${newOrder._id.slice(-6)} received!`);
     });
 
     socket.on("ORDER_UPDATED", (updatedOrder: any) => {
-      setOrders((prev) => {
-        const exists = prev.find((o) => o.id === String(updatedOrder._id));
-
-        if (!exists) return prev;
-
-        return prev.map((order) =>
+      setOrders((prev) =>
+        prev.map((order) =>
           order.id === String(updatedOrder._id)
-            ? mapOrder(updatedOrder) // 🔥 FULL REPLACEMENT
+            ? mapOrder(updatedOrder)
             : order,
-        );
-      });
+        ),
+      );
     });
+
     socket.on("PAYMENT_UPDATED", (updatedOrder: any) => {
       setOrders((prev) =>
         prev.map((order) =>
@@ -224,7 +189,6 @@ export default function OrdersPage() {
             : order,
         ),
       );
-
       toast.success(
         `Payment received for order #${updatedOrder._id.slice(-6)}`,
       );
@@ -234,15 +198,23 @@ export default function OrdersPage() {
       socket.disconnect();
     };
   }, [restaurant?._id, selectedDate]);
+
   const mapOrder = (o: any): Order => ({
     id: o._id,
     table: o.tableNumber,
-    items: [...o.items], // 🔥 IMPORTANT (new reference)
-    total: o.totalAmount,
+    items: [...o.items],
+    total: o.finalAmount ?? o.totalAmount, // finalAmount is the grand total after taxes
+    subtotal: o.subtotal ?? o.totalAmount,
+    cgstAmount: o.cgstAmount ?? 0,
+    sgstAmount: o.sgstAmount ?? 0,
+    serviceChargeAmount: o.serviceChargeAmount ?? 0,
     status: o.status,
+    invoiceNumber: o.invoiceNumber,
+    orderNumber: o.orderNumber,
     paymentStatus: o.paymentStatus,
     paymentMethod: o.paymentMethod,
     createdAt: o.createdAt,
+    specialInstructions: o.specialInstructions,
     customer: {
       name: o.customerId?.name || "Guest",
       phone: o.customerId?.phone || "",
@@ -250,11 +222,9 @@ export default function OrdersPage() {
     },
   });
 
-  // Update order status
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
       await updateStatusAPI(orderId, newStatus);
-      // Optimistic update
       setOrders((prev) =>
         prev.map((order) =>
           order.id === orderId ? { ...order, status: newStatus } : order,
@@ -267,20 +237,19 @@ export default function OrdersPage() {
     } catch (error) {
       console.error("Status update failed:", error);
       toast.error("Failed to update status");
-      loadOrders(); // Revert on error
+      loadOrders();
     }
   };
 
-  // Filtered & searched orders
   const filteredOrders = orders
     .filter((order) => filter === "all" || order.status === filter)
     .filter(
       (order) =>
         order.id.toLowerCase().includes(search.toLowerCase()) ||
+        order.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
         order.customer.name.toLowerCase().includes(search.toLowerCase()),
     );
 
-  // Stats with count badges
   const stats = {
     total: orders.length,
     pending: orders.filter((o) => o.status === "pending").length,
@@ -313,55 +282,35 @@ export default function OrdersPage() {
       if (audioRef.current) {
         audioRef.current
           .play()
-          .then(() => {
-            if (audioRef.current) {
-              audioRef.current.pause();
-              audioRef.current.currentTime = 0;
-            }
-          })
+          .then(() => audioRef.current?.pause())
           .catch(() => {});
       }
-
       window.removeEventListener("click", unlockAudio);
     };
-
     window.addEventListener("click", unlockAudio);
-
     return () => window.removeEventListener("click", unlockAudio);
   }, []);
 
-  // Initialize audio on client side
   useEffect(() => {
     audioRef.current = new Audio("/sounds/new-order.mp3");
-    // Preload audio
     audioRef.current.load();
   }, []);
 
-  // Play sound with user interaction handling
   const playSound = useCallback(() => {
     if (!soundEnabled || !audioRef.current) return;
-
-    try {
-      audioRef.current.currentTime = 0;
-
-      const playPromise = audioRef.current.play();
-
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn("Audio play failed:", err);
-        });
-      }
-    } catch (err) {
-      console.error("Unexpected audio error:", err);
-    }
+    audioRef.current.currentTime = 0;
+    audioRef.current
+      .play()
+      .catch((err) => console.warn("Audio play failed:", err));
   }, [soundEnabled]);
 
   if (loading && !refreshing) {
     return <OrdersSkeleton />;
   }
+
   return (
     <div className="space-y-6 p-4 md:p-6 max-w-7xl mx-auto">
-      {/* Header with title and refresh */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">Order Management</h1>
         <button
@@ -376,7 +325,7 @@ export default function OrdersPage() {
         </button>
       </div>
 
-      {/* Stats Grid with improved visual hierarchy */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard
           label="Total Orders"
@@ -418,23 +367,19 @@ export default function OrdersPage() {
         />
       </div>
 
-      {/* Filters & Search Bar */}
+      {/* Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm space-y-4 border border-gray-100">
-        {/* Top Row: Search, Date, Actions */}
         <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search Input */}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search by Order ID or Customer..."
+              placeholder="Search by Order No. or Customer..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
             />
           </div>
-
-          {/* Date Picker with Quick Actions */}
           <div className="flex items-center gap-2">
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -442,29 +387,27 @@ export default function OrdersPage() {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
               />
             </div>
             <button
               onClick={() =>
                 setSelectedDate(new Date().toISOString().split("T")[0])
               }
-              className="px-3 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition shadow-sm"
+              className="px-3 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600"
             >
               Today
             </button>
             <button
               onClick={() => setSelectedDate("")}
-              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition"
+              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
             >
               All Dates
             </button>
           </div>
         </div>
-
-        {/* Bottom Row: Status Filters & Clear */}
         <div className="flex items-center justify-between">
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto pb-1">
             {(
               [
                 "all",
@@ -488,11 +431,7 @@ export default function OrdersPage() {
                 {statusLabels[status]}
                 {status !== "all" && (
                   <span
-                    className={`px-1.5 py-0.5 rounded-full text-xs ${
-                      filter === status
-                        ? "bg-white/20 text-white"
-                        : "bg-gray-200 text-gray-600"
-                    }`}
+                    className={`px-1.5 py-0.5 rounded-full text-xs ${filter === status ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"}`}
                   >
                     {stats[status]}
                   </span>
@@ -507,8 +446,7 @@ export default function OrdersPage() {
               onClick={clearFilters}
               className="ml-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
             >
-              <X className="w-4 h-4" />
-              Clear
+              <X className="w-4 h-4" /> Clear
             </button>
           )}
         </div>
@@ -636,11 +574,7 @@ function StatCard({
 }) {
   return (
     <div
-      className={`bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition border ${
-        highlight
-          ? "border-orange-200 ring-1 ring-orange-200"
-          : "border-gray-100"
-      }`}
+      className={`bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition border ${highlight ? "border-orange-200 ring-1 ring-orange-200" : "border-gray-100"}`}
     >
       <div className="flex justify-between items-center">
         <div>
@@ -667,11 +601,6 @@ function OrderCard({
   onKOT: () => void;
   onUpdateStatus: (status: OrderStatus) => void;
 }) {
-  const formattedTime = new Date(order.createdAt).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
   const getNextStatuses = (current: OrderStatus): OrderStatus[] => {
     const flow: Record<OrderStatus, OrderStatus[]> = {
       pending: ["preparing", "cancelled"],
@@ -691,7 +620,7 @@ function OrderCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2 flex-wrap">
             <span className="text-sm font-mono font-semibold text-gray-700">
-              #{order.id.slice(-8)}
+              #{order.orderNumber?.slice(-3)}
             </span>
             <span
               className={`px-2 py-1 text-xs font-medium rounded-full border ${statusColors[order.status]}`}
@@ -699,7 +628,7 @@ function OrderCard({
               {statusLabels[order.status]}
             </span>
             <span className="text-xs text-gray-500 flex items-center gap-1">
-              <Clock className="w-3 h-3" />
+              <Clock className="w-3 h-3" />{" "}
               {new Date(order.createdAt).toLocaleString()}
             </span>
           </div>
@@ -719,9 +648,26 @@ function OrderCard({
 
         <div className="flex items-center gap-4 md:gap-6">
           <div className="text-right">
-            <p className="text-sm text-gray-500">Total</p>
+            <p className="text-xs text-gray-500">
+              Subtotal: ₹{order.subtotal.toFixed(2)}
+            </p>
+            {order.cgstAmount > 0 && (
+              <p className="text-xs text-gray-500">
+                CGST: ₹{order.cgstAmount.toFixed(2)}
+              </p>
+            )}
+            {order.sgstAmount > 0 && (
+              <p className="text-xs text-gray-500">
+                SGST: ₹{order.sgstAmount.toFixed(2)}
+              </p>
+            )}
+            {order.serviceChargeAmount > 0 && (
+              <p className="text-xs text-gray-500">
+                Service Charge: ₹{order.serviceChargeAmount.toFixed(2)}
+              </p>
+            )}
             <p className="text-lg font-bold text-gray-800">
-              ₹{order.total.toFixed(2)}
+              Total: ₹{order.total.toFixed(2)}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -739,12 +685,11 @@ function OrderCard({
             >
               <Printer className="w-5 h-5" />
             </button>
-            {/* ✅ VERIFY PAYMENT BUTTON */}
             {order.paymentStatus === "paid" && order.status !== "completed" && (
               <button
                 onClick={async () => {
                   await verifyPayment(order.id);
-                  onUpdateStatus("completed"); // optional if backend doesn't auto update
+                  onUpdateStatus("completed");
                 }}
                 className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
               >
@@ -760,12 +705,9 @@ function OrderCard({
                 <option value={order.status}>
                   {statusLabels[order.status]}
                 </option>
-
                 {getNextStatuses(order.status).map((status) => {
-                  // ✅ only allow completed when paid
                   if (order.status === "paid" && status !== "completed")
                     return null;
-
                   return (
                     <option key={status} value={status}>
                       Mark as {statusLabels[status]}
@@ -773,16 +715,13 @@ function OrderCard({
                   );
                 })}
               </select>
-
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
-
             {order.paymentStatus === "paid" && order.status !== "completed" && (
               <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">
                 Awaiting Verification ⏳
               </span>
             )}
-
             {order.paymentMethod && (
               <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
                 {order.paymentMethod.toUpperCase()}
@@ -795,7 +734,7 @@ function OrderCard({
   );
 }
 
-// ==================== Order Detail Modal ====================
+// ==================== Order Detail Modal (with full tax breakdown & print) ====================
 function OrderDetailModal({
   order,
   onClose,
@@ -807,44 +746,9 @@ function OrderDetailModal({
   onUpdateStatus: (status: OrderStatus) => void;
   restaurantName?: string;
 }) {
-  const subtotal = order.subtotal ?? order.total;
-  const tax = order.tax ?? 0;
-
   const handlePrint = () => {
-    const printContent = document.getElementById("order-detail-print");
-    const originalTitle = document.title;
-    document.title = `Order_${order.id.slice(-6)}`;
-    if (printContent) {
-      const WindowPrt = window.open(
-        "",
-        "",
-        "left=0,top=0,width=800,height=900,toolbar=0,scrollbars=0,status=0",
-      );
-      if (WindowPrt) {
-        WindowPrt.document.write(`
-          <html>
-            <head>
-              <title>Order #${order.id.slice(-8)}</title>
-              <style>
-                body { font-family: system-ui, sans-serif; padding: 20px; }
-                .header { text-align: center; margin-bottom: 20px; }
-                table { width: 100%; border-collapse: collapse; }
-                th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-                .total { font-weight: bold; }
-              </style>
-            </head>
-            <body>${printContent.innerHTML}</body>
-          </html>
-        `);
-        WindowPrt.document.close();
-        WindowPrt.focus();
-        WindowPrt.print();
-        WindowPrt.close();
-      }
-    }
-    document.title = originalTitle;
+    printInvoice("order-detail-print", order.invoiceNumber);
   };
-
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
@@ -863,131 +767,11 @@ function OrderDetailModal({
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
-
         <div id="order-detail-print" className="p-6 space-y-6">
-          {/* Print header */}
-          <div className="text-center border-b pb-4 hidden print:block">
-            <h2 className="text-xl font-bold">{restaurantName}</h2>
-            <p className="text-sm text-gray-500">Order Receipt</p>
-          </div>
-
-          {/* Order header */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div>
-              <p className="text-xs text-gray-500">Order ID</p>
-              <p className="text-sm font-mono font-semibold">{order.id}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Status</p>
-              <select
-                value={order.status}
-                onChange={(e) => onUpdateStatus(e.target.value as OrderStatus)}
-                className="mt-1 px-2 py-1 text-sm border border-gray-300 rounded-lg print:hidden"
-              >
-                {Object.entries(statusLabels).map(([value, label]) => {
-                  if (value === "all") return null;
-                  return (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  );
-                })}
-              </select>
-              <p className="text-sm hidden print:block">
-                {statusLabels[order.status]}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Time</p>
-              <p className="text-sm">
-                {new Date(order.createdAt).toLocaleString()}
-              </p>
-            </div>
-          </div>
-
-          {/* Customer info */}
-          <div className="border-t pt-4">
-            <h4 className="font-medium text-gray-700 mb-2">Customer Details</h4>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <p>
-                <span className="text-gray-500">Name:</span>{" "}
-                {order.customer.name}
-              </p>
-              <p>
-                <span className="text-gray-500">Phone:</span>{" "}
-                {order.customer.phone}
-              </p>
-              <p>
-                <span className="text-gray-500">Table:</span> {order.table}
-              </p>
-            </div>
-          </div>
-
-          {/* Items table */}
-          <div className="border-t pt-4">
-            <h4 className="font-medium text-gray-700 mb-2">Items</h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Item</th>
-                    <th className="px-3 py-2 text-center">Qty</th>
-                    <th className="px-3 py-2 text-right">Price</th>
-                    <th className="px-3 py-2 text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {order.items.map((item, idx) => (
-                    <tr key={idx}>
-                      <td className="px-3 py-2">
-                        {item.name}
-                        {item.specialInstructions && (
-                          <div className="text-xs text-gray-500 italic">
-                            {item.specialInstructions}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-center">{item.quantity}</td>
-                      <td className="px-3 py-2 text-right">
-                        ₹{item.price.toFixed(2)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        ₹{(item.quantity * item.price).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Bill summary */}
-          <div className="border-t pt-4 space-y-1">
-            <div className="flex justify-between text-sm">
-              <span>Subtotal</span>
-              <span>₹{subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Tax</span>
-              <span>₹{tax.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between font-bold text-base pt-2">
-              <span>Total</span>
-              <span>₹{order.total.toFixed(2)}</span>
-            </div>
-          </div>
-
-          {/* Special instructions */}
-          {order.specialInstructions && (
-            <div className="border-t pt-4">
-              <h4 className="font-medium text-gray-700 mb-1">
-                Special Instructions
-              </h4>
-              <p className="text-sm text-gray-600 italic">
-                {order.specialInstructions}
-              </p>
-            </div>
-          )}
+          <InvoiceTemplate
+            order={{ ...order, table: String(order.table) }}
+            restaurantName={restaurantName}
+          />
         </div>
 
         <div className="border-t px-6 py-4 flex justify-end gap-3">
@@ -1001,8 +785,7 @@ function OrderDetailModal({
             onClick={handlePrint}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center gap-2"
           >
-            <Printer className="w-4 h-4" />
-            Print
+            <Printer className="w-4 h-4" /> Print
           </button>
         </div>
       </div>
@@ -1021,40 +804,9 @@ function KOTModal({
   restaurantName?: string;
 }) {
   const handlePrint = () => {
-    const printContent = document.getElementById("kot-print");
-    const originalTitle = document.title;
-    document.title = `KOT_${order.id.slice(-6)}`;
-    if (printContent) {
-      const WindowPrt = window.open(
-        "",
-        "",
-        "left=0,top=0,width=400,height=600,toolbar=0,scrollbars=0,status=0",
-      );
-      if (WindowPrt) {
-        WindowPrt.document.write(`
-          <html>
-            <head>
-              <title>KOT #${order.id.slice(-8)}</title>
-              <style>
-                body { font-family: 'Courier New', monospace; margin: 0; padding: 16px; }
-                .kot { max-width: 300px; margin: 0 auto; }
-                h2 { text-align: center; margin: 0 0 8px; }
-                .divider { border-top: 1px dashed #000; margin: 12px 0; }
-                .item { display: flex; justify-content: space-between; }
-                .note { font-style: italic; }
-              </style>
-            </head>
-            <body>${printContent.innerHTML}</body>
-          </html>
-        `);
-        WindowPrt.document.close();
-        WindowPrt.focus();
-        WindowPrt.print();
-        WindowPrt.close();
-      }
-    }
-    document.title = originalTitle;
+    printInvoice("kot-print", `KOT-${order.orderNumber}`);
   };
+  console.log(order);
 
   return (
     <div
@@ -1076,11 +828,12 @@ function KOTModal({
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
+
         <div id="kot-print" className="p-6 space-y-4">
           <div className="text-center">
             <h2 className="font-bold text-xl">{restaurantName}</h2>
             <p className="text-sm text-gray-500 font-mono">
-              KOT #{order.id.slice(-8)}
+              KOT #{order.orderNumber.slice(-3)}
             </p>
             <p className="text-sm text-gray-500">
               {new Date(order.createdAt).toLocaleString()}
@@ -1119,8 +872,7 @@ function KOTModal({
             onClick={handlePrint}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
           >
-            <Printer className="w-4 h-4" />
-            Print KOT
+            <Printer className="w-4 h-4" /> Print KOT
           </button>
         </div>
       </div>

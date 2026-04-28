@@ -54,6 +54,10 @@ const menuSections = [
       { name: "Settings", icon: Settings, path: "/settings" },
     ],
   },
+  {
+    title: "Subscription",
+    items: [{ name: "Subscription", icon: Star, path: "/subscription" }],
+  },
 ];
 
 export default function Sidebar() {

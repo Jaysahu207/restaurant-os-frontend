@@ -14,8 +14,8 @@ API.interceptors.request.use((config) => {
 
 
     // console.log("HEADERS =>", config.headers); // 🔥
-    console.log("🔥 TOKEN FROM ZUSTAND:", token);
-    console.log("🔥 REQUEST URL:", config.url);
+    // console.log("🔥 TOKEN FROM ZUSTAND:", token);
+    // console.log("🔥 REQUEST URL:", config.url);
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     } else {

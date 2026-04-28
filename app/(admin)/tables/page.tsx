@@ -34,7 +34,8 @@ export default function TablesPage() {
   const [formData, setFormData] = useState({ number: "", capacity: "" });
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const restaurantId = useAuthStore((state) => state.restaurant?._id) || ""; // Get restaurant ID from auth store
+  const restaurantId = useAuthStore((state) => state.restaurant?._id); // Get restaurant ID from auth store
+  const slug = useAuthStore((state) => state.restaurant?.slug) || ""; // Get restaurant ID from auth store
   // Fetch Tables
   const { data, isLoading, error } = useQuery({
     queryKey: ["tables"],
@@ -82,9 +83,8 @@ export default function TablesPage() {
     },
   });
 
- 
   const getQRUrl = (tableNumber: number) => {
-    return `${process.env.NEXT_PUBLIC_FRONTEND_URL}/menu/${restaurantId}?table=${tableNumber}`;
+    return `${process.env.NEXT_PUBLIC_FRONTEND_URL}/menu/${slug}?table=${tableNumber}`;
   };
   // Download QR as PNG
   const downloadQR = useCallback(async (id: string, tableNumber: number) => {
