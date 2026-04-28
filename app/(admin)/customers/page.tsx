@@ -64,7 +64,7 @@ export default function CustomersPage() {
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [dateFilter, setDateFilter] = useState(""); // YYYY-MM-DD for filtering customers by last order date
+  const [dateFilter, setDateFilter] = useState("");
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   // Modal state
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
