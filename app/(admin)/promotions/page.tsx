@@ -625,7 +625,7 @@ export default function PromotionsPage() {
             if (editingPromo) {
               await handleUpdatePromotion(editingPromo._id, formData);
             } else {
-              await handleCreatePromotion(formData);
+              await handleCreatePromotion(formData , restaurant);
             }
             setIsModalOpen(false);
           }}
