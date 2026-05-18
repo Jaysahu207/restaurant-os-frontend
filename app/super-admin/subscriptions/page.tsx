@@ -116,7 +116,7 @@ function AssignPlanModal({
             <X size={18} />
           </button>
         </div>
-        <div className="p-6 space-y-4">
+       <div className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Select Plan
