@@ -129,7 +129,7 @@ function AssignPlanModal({
               <option value="">-- None (No subscription) --</option>
               {plans.map((plan) => (
                 <option key={plan.code} value={plan.code}>
-                  {plan.name} – ₹{plan.price}/month
+                  {plan.name} – ₹{plan.basePrice}/month
                 </option>
               ))}
             </select>
@@ -138,14 +138,21 @@ function AssignPlanModal({
             <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-600">
               <p className="font-medium">Plan features:</p>
               <ul className="list-disc list-inside mt-1 space-y-0.5">
-                {plans
-                  .find((p) => p.code === selectedPlan)
-                  ?.features.slice(0, 3)
-                  .map((f, i) => (
-                    <li key={i}>{f}</li>
-                  ))}
-                {plans.find((p) => p.code === selectedPlan)?.features.length >
-                  3 && <li>+ more</li>}
+                {Object.entries(
+                  plans.find((p) => p.code === selectedPlan)?.features || {},
+                )
+                  .slice(0, 3)
+                  .map(
+                    ([key, value], i) =>
+                      value && (
+                        <li key={i}>
+                          {key.charAt(0).toUpperCase() + key.slice(1)}
+                        </li>
+                      ),
+                  )}
+                {Object.entries(
+                  plans.find((p) => p.code === selectedPlan)?.features || {},
+                ).filter(([_, v]) => v).length > 3 && <li>+ more</li>}
               </ul>
             </div>
           )}
@@ -211,7 +218,6 @@ export default function SubscriptionsPage() {
     setLoading(true);
     try {
       const response = await getAllPlans();
-      
 
       setPlans(response.plans);
     } catch (error) {

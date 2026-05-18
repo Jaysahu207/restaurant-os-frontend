@@ -20,6 +20,7 @@ import {
   deleteRestaurant as deleteRestaurantService,
   getRestaurantDetails,
 } from "../../../services/superAdminService";
+import API from "@/config/axios";
 
 interface PaginatedResponse {
   restaurants: any[];
