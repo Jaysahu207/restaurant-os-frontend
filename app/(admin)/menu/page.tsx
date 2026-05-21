@@ -26,12 +26,16 @@ import API from "@/config/axios";
 
 // All possible categories (for filter dropdown)
 const allCategories = [
+  "--select--",
   "Starters",
   "Lunch",
   "Breakfast",
   "Main Course",
+  "Snacks",
+  "Beverages",
   "Drinks",
   "Desserts",
+  "Thali Meals",
   "Specials",
   "Side Dishes",
   "Soups",

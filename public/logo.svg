@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 200" width="520" height="200">
+
+  <!-- OUTER PLATE RING -->
+  <circle
+    cx="100"
+    cy="100"
+    r="88"
+    fill="none"
+    stroke="#EA580C"
+    stroke-width="6"
+  />
+
+  <!-- INNER PLATE RING -->
+  <circle
+    cx="100"
+    cy="100"
+    r="74"
+    fill="none"
+    stroke="#EA580C"
+    stroke-width="2"
+    opacity="0.35"
+  />
+
+  <!-- FLAME -->
+  <path
+    d="M78 22 
+       Q86 0 100 14 
+       Q112 -4 122 18 
+       Q136 40 120 56 
+       Q110 66 100 62 
+       Q88 66 78 56 
+       Q62 40 78 22Z"
+    fill="#EA580C"
+  />
+
+  <!-- INNER FLAME HIGHLIGHT -->
+  <path
+    d="M88 32 
+       Q94 16 100 26 
+       Q107 12 112 30 
+       Q120 46 108 54 
+       Q100 58 92 54 
+       Q82 46 88 32Z"
+    fill="#ffffff"
+    opacity="0.3"
+  />
+
+  <!-- QR TEXT -->
+  <text
+    x="100"
+    y="118"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="72"
+    font-weight="700"
+    fill="#111827"
+    text-anchor="middle"
+  >
+    QR
+  </text>
+
+  <!-- RASOI TEXT INSIDE ICON -->
+  <text
+    x="100"
+    y="152"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="26"
+    fill="#111827"
+    text-anchor="middle"
+    letter-spacing="5"
+    opacity="0.85"
+  >
+    rasoi
+  </text>
+
+  <!-- DECORATIVE DOTS -->
+  <circle cx="82" cy="178" r="3" fill="#EA580C" opacity="0.6" />
+  <circle cx="100" cy="183" r="3" fill="#EA580C" opacity="0.6" />
+  <circle cx="118" cy="178" r="3" fill="#EA580C" opacity="0.6" />
+
+  <!-- DIVIDER -->
+  <line
+    x1="210"
+    y1="40"
+    x2="210"
+    y2="185"
+    stroke="#EA580C"
+    stroke-width="1.5"
+    opacity="0.4"
+  />
+
+  <!-- BRAND NAME -->
+  <text
+    x="228"
+    y="106"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="64"
+    font-weight="700"
+    fill="#111827"
+  >
+    QRasoi
+  </text>
+
+  <!-- TAGLINE -->
+  <text
+    x="230"
+    y="140"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="22"
+    fill="#EA580C"
+    letter-spacing="3"
+  >
+    scan. cook. enjoy.
+  </text>
+
+</svg>

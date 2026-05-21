@@ -32,6 +32,7 @@ import {
   getOrderById,
 } from "@/services/orderService";
 import { io, Socket } from "socket.io-client";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import API from "@/config/axios";
 import QRCode from "react-qr-code";
@@ -186,6 +187,7 @@ function CustomerMenuContent() {
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [customerLocked, setCustomerLocked] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -206,7 +208,10 @@ function CustomerMenuContent() {
   const [sending, setSending] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [timeLeft, setTimeLeft] = useState({ minutes: 0, seconds: 0 });
-
+  const [selectedPayment, setSelectedPayment] = useState<"cash" | "qr" | null>(
+    null,
+  );
+  const router = useRouter();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -311,7 +316,7 @@ function CustomerMenuContent() {
       if (currentOrder?._id === order._id) {
         playSound();
         setCurrentOrder(order);
-        toast.success("🍽️ Your order is ready!");
+        toast.success("✅ Your order is ready!");
       }
     });
 
@@ -320,6 +325,42 @@ function CustomerMenuContent() {
         playSound();
         setCurrentOrder(order);
         toast.success("✅ Order completed! Thanks for dining with us.");
+      }
+    });
+
+    socket.on("ORDER_CANCELLED", (order: Order) => {
+      if (currentOrder?._id === order._id) {
+        playSound();
+
+        // Clear states
+        setCurrentOrder(null);
+        setOrderPlaced(false);
+
+        // Clear cart
+        clearCart();
+
+        // Reset checkout
+        setIsCheckingOut(false);
+
+        // Clear customer details
+        setCustomerName("");
+        setCustomerPhone("");
+        setCustomerEmail("");
+
+        // Unlock customer
+        setCustomerLocked(false);
+
+        // Remove localStorage
+        localStorage.removeItem("currentOrder");
+        localStorage.removeItem("customerInfo");
+
+        // Notification
+        toast.error("❌ Your order was cancelled by restaurant");
+
+        // Optional redirect
+        setTimeout(() => {
+          router.refresh();
+        }, 2000);
       }
     });
 
@@ -499,6 +540,7 @@ function CustomerMenuContent() {
       setIsCheckingOut(false);
       setIsCartOpen(false);
       playSound();
+      setCustomerLocked(true);
       toast.success("Order placed successfully!");
     } catch (err) {
       console.error(err);
@@ -508,43 +550,53 @@ function CustomerMenuContent() {
     }
   };
 
-  const generateUPILink = (amount: number, upiId: string, name: string) => {
-    return `upi://pay?pa=${upiId}&pn=${encodeURIComponent(name)}&am=${amount}&cu=INR`;
+  const generateUPILink = (
+    amount: number,
+    upiId: string,
+    name: string,
+    orderId: string,
+  ) => {
+    return `upi://pay?pa=${upiId}&pn=${encodeURIComponent(
+      name,
+    )}&tn=${encodeURIComponent(
+      `Order Payment ${orderId}`,
+    )}&am=${amount}&cu=INR`;
   };
 
-  const handlePayment = async (method: "cash" | "upi") => {
+  const handlePayment = async (method: "cash" | "qr") => {
     if (!currentOrder) return;
-    setIsPaying(true);
-    console.log(currentOrder._id);
+
     try {
+      setIsPaying(true);
+
+      // ================= CASH =================
       if (method === "cash") {
-        // await API.put(`/api/orders/${currentOrder._id}/pay`);
-        await completePayment(currentOrder._id, "cash"); // ✅ FIX
-        // Refresh order to get updated status
+        await completePayment(currentOrder._id, "cash");
+
         const updated = await getOrderById(currentOrder._id);
+
         setCurrentOrder(updated);
-        toast.success("Cash payment recorded!");
+
+        toast.success("Cash payment selected!");
+
         setShowPayment(false);
-      } else if (method === "upi") {
-        if (!restaurant?.upiId) {
-          toast.error("UPI not configured");
-          return;
-        }
+      }
+
+      // ================= QR =================
+      if (method === "qr") {
+        setSelectedPayment("qr");
+
         await API.put(`/api/orders/${currentOrder._id}/initiate-payment`, {
           method: "upi",
         });
+
         setPaymentStarted(true);
-        setPaymentTimeLeft(120);
-        const upiLink = generateUPILink(
-          currentOrder.finalAmount,
-          restaurant.upiId,
-          restaurant.name,
-        );
-        // Open UPI app in new tab (keeps original page)
-        window.open(upiLink, "_blank");
-        toast.success("Open your UPI app to complete payment");
+
+        toast.success("Scan QR to complete payment");
       }
-    } catch (err) {
+    } catch (error) {
+      console.error(error);
+
       toast.error("Payment failed");
     } finally {
       setIsPaying(false);
@@ -654,8 +706,8 @@ function CustomerMenuContent() {
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50/30 p-4 flex items-center justify-center">
-        <div className="max-w-md w-full mx-auto space-y-5 animate-fadeInUp">
-          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-6 border border-white/20">
+        <div className="max-w-md w-full mx-auto space-y-5 animate-fadeInUp  ">
+          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-6 ">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -844,79 +896,139 @@ function CustomerMenuContent() {
 
           {/* Payment Modal */}
           {showPayment && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-              <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 space-y-5">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-[320px] rounded-3xl border border-orange-100 bg-white p-4 shadow-2xl">
+                {/* Header */}
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <CreditCard className="w-7 h-7 text-green-600" />
+                  <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-100 to-orange-200">
+                    <CreditCard className="h-5 w-5 text-orange-600" />
                   </div>
-                  <h3 className="text-xl font-bold">Complete Payment</h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Total:{" "}
-                    <span className="font-bold">
-                      ₹{currentOrder.finalAmount || currentOrder.totalAmount}
-                    </span>
+
+                  <h3 className="text-lg font-black text-gray-900">
+                    Complete Payment
+                  </h3>
+
+                  <p className="mt-1 text-xs text-gray-500">Amount To Pay</p>
+
+                  <p className="mt-1 text-2xl font-black text-green-600">
+                    ₹{currentOrder.finalAmount || currentOrder.totalAmount}
                   </p>
                 </div>
-                <div className="space-y-3">
+
+                {/* Payment Buttons */}
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {/* Cash */}
                   <button
                     onClick={() => handlePayment("cash")}
                     disabled={isPaying}
-                    className="w-full py-3 rounded-xl bg-gray-50 text-gray-800 font-medium hover:bg-gray-100 border border-gray-200"
+                    className="rounded-2xl border border-gray-200 bg-gray-50 py-3 text-sm font-bold text-gray-800 transition-all active:scale-95"
                   >
-                    {isPaying ? "Processing..." : "💵 Pay with Cash"}
+                    💵 Cash
                   </button>
+
+                  {/* QR */}
                   {restaurant?.upiId && (
-                    <>
-                      <button
-                        onClick={() => handlePayment("upi")}
-                        disabled={isPaying || paymentStarted}
-                        className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-teal-600 text-white shadow-md"
-                      >
-                        {isPaying ? "Processing..." : "📱 Pay via UPI"}
-                      </button>
-                      <div className="relative flex flex-col items-center border-t border-gray-100 pt-4 mt-2">
-                        <div className="absolute -top-3 bg-white px-2 text-xs text-gray-400">
-                          OR
-                        </div>
-                        <p className="text-sm text-gray-600 mb-2">
-                          Scan QR with any UPI app
-                        </p>
-                        <div className="bg-white p-2 rounded-2xl shadow-md">
-                          <QRCode value={baseUPI} size={140} />
-                        </div>
-                        <div className="mt-3 flex items-center gap-1 text-xs text-gray-400">
-                          <span>UPI: {restaurant.upiId}</span>
-                          <button
-                            onClick={() =>
-                              navigator.clipboard.writeText(restaurant.upiId!)
-                            }
-                            className="text-blue-500"
-                          >
-                            📋
-                          </button>
-                        </div>
-                      </div>
-                    </>
+                    <button
+                      onClick={() => handlePayment("qr")}
+                      disabled={isPaying}
+                      className={`rounded-2xl py-3 text-sm font-bold text-white shadow-md transition-all active:scale-95 ${
+                        selectedPayment === "qr"
+                          ? "bg-gradient-to-r from-green-500 to-emerald-600"
+                          : "bg-gradient-to-r from-orange-500 to-orange-600"
+                      }`}
+                    >
+                      📱 QR Pay
+                    </button>
                   )}
-                  {paymentStarted && currentOrder.status !== "paid" && (
-                    <div className="mt-4 p-3 bg-red-50 rounded-xl">
-                      <p className="text-center text-red-600 font-semibold animate-pulse">
-                        ⏱️ Complete payment within {paymentTimeLeft}s
+                </div>
+
+                {/* QR Section */}
+                {restaurant?.upiId && (
+                  <div className="mt-4 rounded-3xl border border-orange-100 bg-orange-50/40 p-3">
+                    <div className="text-center">
+                      <h4 className="text-sm font-bold text-gray-800">
+                        Scan QR To Pay
+                      </h4>
+
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        Scan using another phone
                       </p>
+                    </div>
+
+                    {/* QR */}
+                    <div className="relative mt-3 flex justify-center">
+                      <div
+                        className={`rounded-2xl bg-white p-2 shadow-md transition-all duration-500 ${
+                          selectedPayment !== "qr"
+                            ? "blur-sm opacity-40"
+                            : "blur-0 opacity-100"
+                        }`}
+                      >
+                        <QRCode value={baseUPI} size={135} />
+                      </div>
+
+                      {/* Overlay */}
+                      {selectedPayment !== "qr" && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="rounded-full bg-black/70 px-3 py-1 text-[10px] font-semibold text-white">
+                            Select QR Pay
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* UPI ID */}
+                    <div className="mt-3">
+                      <p className="mb-1 text-center text-[11px] font-medium text-gray-500">
+                        UPI ID
+                      </p>
+
+                      <div className="flex items-center gap-1 rounded-2xl bg-white p-1.5 shadow-sm">
+                        <div className="flex-1 truncate rounded-xl bg-gray-50 px-2 py-2 text-xs font-semibold text-gray-700">
+                          {restaurant.upiId}
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(restaurant.upiId!);
+                            toast.success("UPI ID copied");
+                          }}
+                          className="rounded-xl bg-orange-500 px-3 py-2 text-xs font-bold text-white active:scale-95"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Confirm */}
+                    {selectedPayment === "qr" && (
                       <button
                         onClick={confirmPayment}
                         disabled={isPaying}
-                        className="w-full mt-2 py-2 bg-blue-600 text-white rounded-lg"
+                        className="mt-4 w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-sm font-bold text-white shadow-md transition-all active:scale-95"
                       >
                         {isPaying ? "Confirming..." : "✅ I Have Paid"}
                       </button>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Timer */}
+                {paymentStarted && currentOrder.status !== "paid" && (
+                  <div className="mt-3 rounded-2xl bg-red-50 p-2">
+                    <p className="text-center text-xs font-bold text-red-600 animate-pulse">
+                      ⏱️ Complete payment within {paymentTimeLeft}s
+                    </p>
+                  </div>
+                )}
+
+                {/* Cancel */}
                 <button
-                  onClick={() => setShowPayment(false)}
-                  className="w-full py-2 text-red-500 border border-red-200 rounded-xl"
+                  onClick={() => {
+                    setShowPayment(false);
+                    setSelectedPayment(null);
+                  }}
+                  className="mt-4 w-full rounded-2xl border border-red-200 py-2.5 text-sm font-bold text-red-500 transition-all active:scale-95"
                 >
                   Cancel
                 </button>
@@ -1211,10 +1323,18 @@ function CustomerMenuContent() {
 
                 {!isCheckingOut ? (
                   <button
-                    onClick={() => setIsCheckingOut(true)}
+                    onClick={() => {
+                      if (customerLocked) {
+                        handlePlaceOrder();
+                      } else {
+                        setIsCheckingOut(true);
+                      }
+                    }}
                     className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold"
                   >
-                    Proceed to Checkout
+                    {customerLocked
+                      ? `Add more items • ₹${cartTotals.grandTotal.toFixed(2)}`
+                      : "Proceed to Checkout"}
                   </button>
                 ) : (
                   <div className="space-y-3">
@@ -1223,6 +1343,7 @@ function CustomerMenuContent() {
                       placeholder="Your Name *"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
+                      disabled={customerLocked}
                       className="w-full px-3 py-2.5 border rounded-xl text-sm"
                     />
                     <input
@@ -1230,6 +1351,7 @@ function CustomerMenuContent() {
                       placeholder="Phone Number *"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
+                      disabled={customerLocked}
                       className="w-full px-3 py-2.5 border rounded-xl text-sm"
                     />
                     <input
@@ -1237,6 +1359,7 @@ function CustomerMenuContent() {
                       placeholder="Email (optional)"
                       value={customerEmail}
                       onChange={(e) => setCustomerEmail(e.target.value)}
+                      disabled={customerLocked}
                       className="w-full px-3 py-2.5 border rounded-xl text-sm"
                     />
                     <textarea

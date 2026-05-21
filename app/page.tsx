@@ -17,6 +17,7 @@ import API from "../config/axios";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
+import Image from "next/image";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -195,8 +196,8 @@ export default function AuthPage() {
     <div className="min-h-screen bg-[#0B0F19] text-white overflow-hidden">
       {/* Background Effects */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute top-[-100px] left-[-100px] w-[350px] h-[350px] bg-orange-500/20 blur-3xl rounded-full" />
-        <div className="absolute bottom-[-120px] right-[-100px] w-[350px] h-[350px] bg-amber-500/20 blur-3xl rounded-full" />
+        <div className="absolute top-[-100px] left-[-100px] w-[450px] h-[350px] bg-orange-100/20 blur-3xl rounded-full" />
+        <div className="absolute bottom-[-120px] right-[-100px] w-[450px] h-[350px] bg-amber-100/20 blur-3xl rounded-full" />
       </div>
 
       <div className="relative z-10 grid lg:grid-cols-2 min-h-screen">
@@ -207,19 +208,21 @@ export default function AuthPage() {
           {/* Logo */}
           <div>
             <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-3 rounded-2xl shadow-lg">
-                <UtensilsCrossed className="w-7 h-7 text-white" />
-              </div>
+              <Image
+                src="/logo.svg"
+                alt="QRasoi Logo"
+                width={200}
+                height={40}
+              />
 
-              <div>
-                <h1 className="text-3xl font-bold">QREats</h1>
+              {/* <div>
+                <h1 className="text-3xl font-bold">QRasoi</h1>
                 <p className="text-gray-400 text-sm">
                   Smart Restaurant Operating System
                 </p>
-              </div>
+              </div> */}
             </div>
           </div>
-
           {/* Main Content */}
           <div className="max-w-xl">
             <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 px-4 py-2 rounded-full text-orange-300 text-sm mb-8">
@@ -299,16 +302,15 @@ export default function AuthPage() {
         {/* RIGHT SIDE */}
         {/* ========================================= */}
         <div className="flex items-center justify-center p-6 md:p-10">
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-lg">
             {/* Mobile Logo */}
-            <div className="lg:hidden flex items-center justify-center gap-3 mb-10">
-              <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-3 rounded-2xl">
-                <UtensilsCrossed className="w-6 h-6 text-white" />
-              </div>
-
-              <div>
-                <h1 className="text-2xl font-bold">QREats</h1>
-              </div>
+            <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
+              <Image
+                src="/logo.svg"
+                alt="QRasoi Logo"
+                width={200}
+                height={30}
+              />
             </div>
 
             {/* Card */}
