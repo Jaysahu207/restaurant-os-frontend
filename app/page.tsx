@@ -161,7 +161,7 @@ export default function AuthPage() {
         throw new Error("No response from server");
       }
 
-      toast.success("Account created successfully");
+      toast.success("Account created successfully! Please login.");
 
       setRegisterData({
         restaurantName: "",
@@ -193,385 +193,370 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-white overflow-hidden">
-      {/* Background Effects */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute top-[-100px] left-[-100px] w-[450px] h-[350px] bg-orange-100/20 blur-3xl rounded-full" />
-        <div className="absolute bottom-[-120px] right-[-100px] w-[450px] h-[350px] bg-amber-100/20 blur-3xl rounded-full" />
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50">
+      <div className="container mx-auto px-4 py-8 lg:py-12">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center max-w-7xl mx-auto">
+          {/* ========================================= */}
+          {/* LEFT SIDE - Branding & Features */}
+          {/* ========================================= */}
+          <div className="hidden lg:block space-y-8">
+            {/* Logo */}
+            <Image
+              src="/logo.svg"
+              alt="QRasoi Logo"
+              width={250}
+              height={50}
+              className="mb-6"
+            />
 
-      <div className="relative z-10 grid lg:grid-cols-2 min-h-screen">
-        {/* ========================================= */}
-        {/* LEFT SIDE */}
-        {/* ========================================= */}
-        <div className="hidden lg:flex flex-col justify-between p-12 border-r border-white/10">
-          {/* Logo */}
-          <div>
-            <div className="flex items-center gap-3">
-              <Image
-                src="/logo.svg"
-                alt="QRasoi Logo"
-                width={200}
-                height={40}
-              />
+            {/* Hero Section */}
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2 bg-orange-100 border border-orange-200 px-4 py-2 rounded-full text-orange-700 text-sm font-medium">
+                <QrCode className="w-4 h-4" />
+                Modern QR Ordering Platform
+              </div>
 
-              {/* <div>
-                <h1 className="text-3xl font-bold">QRasoi</h1>
-                <p className="text-gray-400 text-sm">
-                  Smart Restaurant Operating System
-                </p>
-              </div> */}
+              <h1 className="text-5xl lg:text-6xl font-bold leading-tight text-gray-900">
+                Run Your Restaurant
+                <span className="block bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+                  Smarter & Faster
+                </span>
+              </h1>
+
+              <p className="text-gray-600 text-lg leading-relaxed">
+                Accept QR orders, manage tables, kitchen operations, billing,
+                staff, analytics, and customer experience from one powerful
+                dashboard.
+              </p>
             </div>
-          </div>
-          {/* Main Content */}
-          <div className="max-w-xl">
-            <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 px-4 py-2 rounded-full text-orange-300 text-sm mb-8">
-              <QrCode className="w-4 h-4" />
-              Modern QR Ordering Platform
-            </div>
 
-            <h2 className="text-5xl font-bold leading-tight">
-              Run Your Restaurant
-              <span className="block bg-gradient-to-r from-orange-400 to-amber-300 bg-clip-text text-transparent">
-                Smarter & Faster
-              </span>
-            </h2>
-
-            <p className="text-gray-400 text-lg mt-6 leading-relaxed">
-              Accept QR orders, manage tables, kitchen operations, billing,
-              staff, analytics, and customer experience from one powerful
-              dashboard.
-            </p>
-
-            {/* Features */}
-            <div className="mt-10 grid grid-cols-2 gap-5">
+            {/* Feature Grid */}
+            <div className="grid grid-cols-2 gap-5">
               {[
                 {
-                  icon: <QrCode className="w-5 h-5" />,
+                  icon: <QrCode className="w-5 h-5 text-orange-600" />,
                   title: "QR Ordering",
+                  desc: "Contactless & fast",
                 },
                 {
-                  icon: <BarChart3 className="w-5 h-5" />,
+                  icon: <BarChart3 className="w-5 h-5 text-orange-600" />,
                   title: "Analytics",
+                  desc: "Real-time insights",
                 },
                 {
-                  icon: <Zap className="w-5 h-5" />,
+                  icon: <Zap className="w-5 h-5 text-orange-600" />,
                   title: "Live Orders",
+                  desc: "Instant updates",
                 },
                 {
-                  icon: <Shield className="w-5 h-5" />,
+                  icon: <Shield className="w-5 h-5 text-orange-600" />,
                   title: "Secure System",
+                  desc: "Data protected",
                 },
               ].map((item, index) => (
                 <div
                   key={index}
-                  className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-xl"
+                  className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
                 >
-                  <div className="text-orange-400 mb-3">{item.icon}</div>
-
-                  <h3 className="font-semibold">{item.title}</h3>
-
-                  <p className="text-sm text-gray-400 mt-1">
-                    Powerful tools for modern restaurants.
-                  </p>
+                  <div className="mb-3">{item.icon}</div>
+                  <h3 className="font-semibold text-gray-800">{item.title}</h3>
+                  <p className="text-sm text-gray-500 mt-1">{item.desc}</p>
                 </div>
               ))}
             </div>
-          </div>
 
-          {/* Bottom */}
-          <div className="flex items-center gap-6 text-sm text-gray-400">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-400" />
-              No setup fee
-            </div>
-
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-400" />
-              Free trial
-            </div>
-
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-400" />
-              Cloud hosted
+            {/* Trust Badges */}
+            <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600 pt-4 border-t border-gray-200">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                No setup fee
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                14-day free trial
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                Cloud hosted
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* ========================================= */}
-        {/* RIGHT SIDE */}
-        {/* ========================================= */}
-        <div className="flex items-center justify-center p-6 md:p-10">
-          <div className="w-full max-w-lg">
-            {/* Mobile Logo */}
-            <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-              <Image
-                src="/logo.svg"
-                alt="QRasoi Logo"
-                width={200}
-                height={30}
-              />
-            </div>
-
-            {/* Card */}
-            <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-3xl p-8 shadow-2xl">
-              {/* Tabs */}
-              <div className="flex bg-white/5 rounded-2xl p-1 mb-8">
-                <button
-                  onClick={() => setActiveTab("login")}
-                  className={`flex-1 py-3 rounded-xl font-medium transition-all duration-300 ${
-                    activeTab === "login"
-                      ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg"
-                      : "text-gray-400 hover:text-white"
-                  }`}
-                >
-                  Login
-                </button>
-
-                <button
-                  onClick={() => setActiveTab("register")}
-                  className={`flex-1 py-3 rounded-xl font-medium transition-all duration-300 ${
-                    activeTab === "register"
-                      ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg"
-                      : "text-gray-400 hover:text-white"
-                  }`}
-                >
-                  Register
-                </button>
+          {/* ========================================= */}
+          {/* RIGHT SIDE - Auth Forms */}
+          {/* ========================================= */}
+          <div className="flex items-center justify-center">
+            <div className="w-full max-w-md">
+              {/* Mobile Logo */}
+              <div className="lg:hidden flex justify-center mb-8">
+                <Image
+                  src="/logo.svg"
+                  alt="QRasoi Logo"
+                  width={250}
+                  height={100}
+                />
               </div>
 
-              {/* LOGIN */}
-              {activeTab === "login" ? (
-                <form onSubmit={handleLogin} className="space-y-5">
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-2">
-                      Email Address
-                    </label>
+              {/* Card */}
+              <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-8">
+                {/* Tabs */}
+                <div className="flex bg-gray-100 rounded-2xl p-1 mb-8">
+                  <button
+                    onClick={() => setActiveTab("login")}
+                    className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                      activeTab === "login"
+                        ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("register")}
+                    className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                      activeTab === "register"
+                        ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    Register
+                  </button>
+                </div>
 
-                    <input
-                      type="email"
-                      value={loginData.email}
-                      onChange={(e) =>
-                        setLoginData({
-                          ...loginData,
-                          email: e.target.value,
-                        })
-                      }
-                      placeholder="you@example.com"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-2">
-                      Password
-                    </label>
-
-                    <div className="relative">
+                {/* LOGIN FORM */}
+                {activeTab === "login" ? (
+                  <form onSubmit={handleLogin} className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Email Address
+                      </label>
                       <input
-                        type={showLoginPassword ? "text" : "password"}
-                        value={loginData.password}
+                        type="email"
+                        value={loginData.email}
                         onChange={(e) =>
-                          setLoginData({
-                            ...loginData,
-                            password: e.target.value,
-                          })
+                          setLoginData({ ...loginData, email: e.target.value })
                         }
-                        placeholder="Enter password"
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-12 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="you@example.com"
+                        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                       />
+                    </div>
 
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showLoginPassword ? "text" : "password"}
+                          value={loginData.password}
+                          onChange={(e) =>
+                            setLoginData({
+                              ...loginData,
+                              password: e.target.value,
+                            })
+                          }
+                          placeholder="Enter password"
+                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 pr-12 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowLoginPassword(!showLoginPassword)
+                          }
+                          className="absolute top-1/2 right-4 -translate-y-1/2 text-gray-400 hover:text-orange-600"
+                        >
+                          {showLoginPassword ? (
+                            <EyeOff className="w-5 h-5" />
+                          ) : (
+                            <Eye className="w-5 h-5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
                       <button
                         type="button"
-                        onClick={() => setShowLoginPassword(!showLoginPassword)}
-                        className="absolute top-1/2 right-4 -translate-y-1/2 text-gray-400 hover:text-orange-400"
+                        className="text-sm text-orange-600 hover:text-orange-700 font-medium"
                       >
-                        {showLoginPassword ? (
-                          <EyeOff className="w-5 h-5" />
-                        ) : (
-                          <Eye className="w-5 h-5" />
-                        )}
+                        Forgot Password?
                       </button>
                     </div>
-                  </div>
 
-                  <div className="flex justify-end">
                     <button
-                      type="button"
-                      className="text-sm text-orange-400 hover:text-orange-300"
+                      type="submit"
+                      disabled={loading}
+                      className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
                     >
-                      Forgot Password?
+                      {loading ? "Signing In..." : "Sign In"}
+                      {!loading && <ArrowRight className="w-5 h-5" />}
                     </button>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white py-3 rounded-2xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-70"
-                  >
-                    {loading ? "Signing In..." : "Sign In"}
-                    {!loading && <ArrowRight className="w-5 h-5" />}
-                  </button>
-                </form>
-              ) : (
-                /* REGISTER */
-                <form onSubmit={handleRegister} className="space-y-4">
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-2">
-                      Restaurant Name
-                    </label>
-
-                    <input
-                      type="text"
-                      value={registerData.restaurantName}
-                      onChange={(e) =>
-                        setRegisterData({
-                          ...registerData,
-                          restaurantName: e.target.value,
-                        })
-                      }
-                      placeholder="Cafe Delight"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-2">
-                      Owner Name
-                    </label>
-
-                    <input
-                      type="text"
-                      value={registerData.name}
-                      onChange={(e) =>
-                        setRegisterData({
-                          ...registerData,
-                          name: e.target.value,
-                        })
-                      }
-                      placeholder="John Doe"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-2">
-                      Phone Number
-                    </label>
-
-                    <input
-                      type="text"
-                      value={registerData.phone}
-                      onChange={(e) =>
-                        setRegisterData({
-                          ...registerData,
-                          phone: e.target.value,
-                        })
-                      }
-                      placeholder="+91 9876543210"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-2">
-                      Email Address
-                    </label>
-
-                    <input
-                      type="email"
-                      value={registerData.email}
-                      onChange={(e) =>
-                        setRegisterData({
-                          ...registerData,
-                          email: e.target.value,
-                        })
-                      }
-                      placeholder="restaurant@example.com"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-2">
-                      Password
-                    </label>
-
-                    <div className="relative">
+                  </form>
+                ) : (
+                  /* REGISTER FORM */
+                  <form onSubmit={handleRegister} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Restaurant Name *
+                      </label>
                       <input
-                        type={showRegisterPassword ? "text" : "password"}
-                        value={registerData.password}
+                        type="text"
+                        value={registerData.restaurantName}
                         onChange={(e) =>
                           setRegisterData({
                             ...registerData,
-                            password: e.target.value,
+                            restaurantName: e.target.value,
                           })
                         }
-                        placeholder="Create password"
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-12 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="Cafe Delight"
+                        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                       />
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowRegisterPassword(!showRegisterPassword)
-                        }
-                        className="absolute top-1/2 right-4 -translate-y-1/2 text-gray-400 hover:text-orange-400"
-                      >
-                        {showRegisterPassword ? (
-                          <EyeOff className="w-5 h-5" />
-                        ) : (
-                          <Eye className="w-5 h-5" />
-                        )}
-                      </button>
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-2">
-                      Confirm Password
-                    </label>
-
-                    <div className="relative">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Owner Name *
+                      </label>
                       <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        value={registerData.confirmPassword}
+                        type="text"
+                        value={registerData.name}
                         onChange={(e) =>
                           setRegisterData({
                             ...registerData,
-                            confirmPassword: e.target.value,
+                            name: e.target.value,
                           })
                         }
-                        placeholder="Confirm password"
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-12 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="John Doe"
+                        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                       />
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowConfirmPassword(!showConfirmPassword)
-                        }
-                        className="absolute top-1/2 right-4 -translate-y-1/2 text-gray-400 hover:text-orange-400"
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="w-5 h-5" />
-                        ) : (
-                          <Eye className="w-5 h-5" />
-                        )}
-                      </button>
                     </div>
-                  </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white py-3 rounded-2xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-70"
-                  >
-                    {loading ? "Creating Account..." : "Create Account"}
-                    {!loading && <ArrowRight className="w-5 h-5" />}
-                  </button>
-                </form>
-              )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Phone Number *
+                      </label>
+                      <input
+                        type="tel"
+                        value={registerData.phone}
+                        onChange={(e) =>
+                          setRegisterData({
+                            ...registerData,
+                            phone: e.target.value,
+                          })
+                        }
+                        placeholder="+91 9876543210"
+                        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        value={registerData.email}
+                        onChange={(e) =>
+                          setRegisterData({
+                            ...registerData,
+                            email: e.target.value,
+                          })
+                        }
+                        placeholder="restaurant@example.com"
+                        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Password *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showRegisterPassword ? "text" : "password"}
+                          value={registerData.password}
+                          onChange={(e) =>
+                            setRegisterData({
+                              ...registerData,
+                              password: e.target.value,
+                            })
+                          }
+                          placeholder="Create password"
+                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 pr-12 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowRegisterPassword(!showRegisterPassword)
+                          }
+                          className="absolute top-1/2 right-4 -translate-y-1/2 text-gray-400 hover:text-orange-600"
+                        >
+                          {showRegisterPassword ? (
+                            <EyeOff className="w-5 h-5" />
+                          ) : (
+                            <Eye className="w-5 h-5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Confirm Password *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={registerData.confirmPassword}
+                          onChange={(e) =>
+                            setRegisterData({
+                              ...registerData,
+                              confirmPassword: e.target.value,
+                            })
+                          }
+                          placeholder="Confirm password"
+                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 pr-12 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowConfirmPassword(!showConfirmPassword)
+                          }
+                          className="absolute top-1/2 right-4 -translate-y-1/2 text-gray-400 hover:text-orange-600"
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="w-5 h-5" />
+                          ) : (
+                            <Eye className="w-5 h-5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
+                    >
+                      {loading ? "Creating Account..." : "Create Account"}
+                      {!loading && <ArrowRight className="w-5 h-5" />}
+                    </button>
+                  </form>
+                )}
+              </div>
+
+              {/* Additional info for mobile */}
+              <div className="lg:hidden mt-8 text-center text-sm text-gray-500">
+                <div className="flex justify-center gap-4 flex-wrap">
+                  <span className="flex items-center gap-1">
+                    ✓ No setup fee
+                  </span>
+                  <span className="flex items-center gap-1">✓ Free trial</span>
+                  <span className="flex items-center gap-1">
+                    ✓ Cloud hosted
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
