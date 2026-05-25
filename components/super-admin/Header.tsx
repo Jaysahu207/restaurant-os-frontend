@@ -9,8 +9,14 @@ import {
 import { useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useRouter } from "next/navigation";
-
-export default function Header() {
+interface HeaderProps {
+  collapsed: boolean;
+  setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+}
+export default function Header({
+  collapsed,
+  setCollapsed,
+}: HeaderProps) {
   const router = useRouter();
 
   const user = useAuthStore((state) => state.user);
