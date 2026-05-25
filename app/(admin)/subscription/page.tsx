@@ -154,7 +154,7 @@ export default function SubscriptionPage() {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: order.currency,
-        name: "Restaurant OS",
+        name: "QRasoi",
         description: `${plan.name} Subscription`,
         order_id: order.id,
         theme: { color: "#4f46e5" },
@@ -265,13 +265,12 @@ export default function SubscriptionPage() {
                   <div>
                     <span className="text-slate-500">Status:</span>
                     <span
-                      className={`ml-2 inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        subscription.status === "active"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : subscription.status === "trial"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-rose-100 text-rose-800"
-                      }`}
+                      className={`ml-2 inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${subscription.status === "active"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : subscription.status === "trial"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-rose-100 text-rose-800"
+                        }`}
                     >
                       {subscription.status === "trial" && "Trial"}
                       {subscription.status === "active" && "Active"}
@@ -430,11 +429,10 @@ export default function SubscriptionPage() {
             return (
               <div
                 key={plan.code}
-                className={`relative bg-white rounded-xl border shadow-sm transition-all hover:shadow-md ${
-                  isPro
-                    ? "border-indigo-300 ring-2 ring-indigo-100"
-                    : "border-slate-200"
-                } ${isCurrentPlan ? "ring-2 ring-emerald-500" : ""}`}
+                className={`relative bg-white rounded-xl border shadow-sm transition-all hover:shadow-md ${isPro
+                  ? "border-indigo-300 ring-2 ring-indigo-100"
+                  : "border-slate-200"
+                  } ${isCurrentPlan ? "ring-2 ring-emerald-500" : ""}`}
               >
                 {isPro && (
                   <div className="absolute -top-3 left-6 bg-indigo-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-sm">
@@ -473,12 +471,12 @@ export default function SubscriptionPage() {
                       </span>
                       <span className="text-slate-500 text-sm">/month</span>
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">
+                    {/* <div className="text-xs text-slate-500 mt-1">
                       + {plan.gstPercentage}% GST
                     </div>
                     <div className="text-sm font-semibold text-indigo-600 mt-1">
                       Total: ₹{plan.finalPrice}/month
-                    </div>
+                    </div> */}
                   </div>
 
                   <div className="space-y-2 mb-6">
@@ -504,13 +502,12 @@ export default function SubscriptionPage() {
                   <button
                     onClick={() => handleBuyPlan(plan.code)}
                     disabled={paymentLoading || isCurrentPlan}
-                    className={`w-full py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
-                      isCurrentPlan
-                        ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                        : isPro
-                          ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                          : "bg-slate-800 hover:bg-slate-900 text-white"
-                    }`}
+                    className={`w-full py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2 ${isCurrentPlan
+                      ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                      : isPro
+                        ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                        : "bg-slate-800 hover:bg-slate-900 text-white"
+                      }`}
                   >
                     {paymentLoading ? (
                       <>
@@ -630,10 +627,10 @@ export default function SubscriptionPage() {
       <div className="bg-white rounded-xl border border-slate-200 p-5 text-center text-sm text-slate-500">
         Need help? Contact our support team at{" "}
         <a
-          href="mailto:support@restaurantos.com"
+          href="mailto:support@qrasoi.com"
           className="text-indigo-600 hover:underline"
         >
-          support@restaurantos.com
+          support@qrasoi.com
         </a>
       </div>
 

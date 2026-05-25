@@ -11,6 +11,7 @@ import {
   Save,
   ChevronLeft,
   ChevronRight,
+  RefreshCcw,
 } from "lucide-react";
 
 import {
@@ -806,7 +807,6 @@ function SubscriptionModal({
   );
 }
 
-// ----------------------------------------------------------------------
 // Main Restaurants Page
 // ----------------------------------------------------------------------
 export default function RestaurantsPage() {
@@ -816,14 +816,15 @@ export default function RestaurantsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0); // ✅ added total count
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
 
   // Sorting state
   const [sortBy, setSortBy] = useState<"name" | "createdAt">("createdAt");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc"); // newest first by
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  // Modal states
+  // Modal states (unchanged)
   const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -831,39 +832,32 @@ export default function RestaurantsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<any>(null);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState<any>(null);
   const [showViewModal, setShowViewModal] = useState(false);
-
   const [detailLoading, setDetailLoading] = useState(false);
 
-  useEffect(() => {
-    getRestaurants();
-  }, [
-    currentPage,
-    pageSize,
-    sortBy,
-    sortOrder,
-    search,
-    planFilter,
-    statusFilter,
-  ]);
-
+  // Fetch restaurants with server-side filtering & pagination
+  // Updated getRestaurants – matches backend params
   const getRestaurants = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       params.append("page", currentPage.toString());
       params.append("limit", pageSize.toString());
-      params.append("sort", sortBy);
+      params.append("sortBy", sortBy);      // ✅ backend uses sortBy, not sort
       params.append("order", sortOrder);
       if (search) params.append("search", search);
-      if (planFilter !== "all") params.append("plan", planFilter);
+
+      // ✅ statusFilter now maps to subscription status
       if (statusFilter !== "all") params.append("status", statusFilter);
 
-      const response = await getAllRestaurants();
+      // ❌ planFilter removed – backend expects plan code, not status
+      // If you have real plan codes, you can add a separate dropdown for planFilter.
 
+      const response = await getAllRestaurants(params.toString());
       setRestaurants(response.restaurants);
-      setTotalPages(response.totalPages);
+      setTotalPages(response.pagination.pages);
+      setTotalCount(response.pagination.total);
     } catch (error) {
-      console.error("Error fetching restaurants:", error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -872,58 +866,49 @@ export default function RestaurantsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [search, planFilter, statusFilter, sortBy, sortOrder, pageSize]);
+
+  // Fetch data when dependencies change
+  useEffect(() => {
+    getRestaurants();
+  }, [currentPage, pageSize, sortBy, sortOrder, search, planFilter, statusFilter]);
+
   // Pagination controls
   const goToPage = (page: number) => {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
+
   const updateSubscription = async (id: string, newPlan: string) => {
     await API.patch(`/api/super-admin/restaurants/${id}/subscription`, {
       subscriptionStatus: newPlan,
     });
-    await getRestaurants(); // refresh list
+    await getRestaurants();
   };
 
   const handleDelete = async (id: string) => {
     try {
       await deleteRestaurantService(id);
-
       await getRestaurants();
-
       setShowDeleteConfirm(null);
     } catch (error) {
       console.error("Delete restaurant failed", error);
     }
   };
+
   const SortIndicator = ({ column }: { column: string }) => {
-    if (sortBy !== column)
-      return <span className="ml-1 text-slate-300">↕️</span>;
+    if (sortBy !== column) return <span className="ml-1 text-slate-300">↕️</span>;
     return <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>;
   };
+
   const handleSort = (column: "name" | "createdAt") => {
     if (sortBy === column) {
-      // toggle order
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
       setSortBy(column);
-      setSortOrder(column === "createdAt" ? "desc" : "asc"); // default: newest first for date, A-Z for name
+      setSortOrder(column === "createdAt" ? "desc" : "asc");
     }
   };
-  // Filter logic
-  const filtered = restaurants.filter((r) => {
-    const matchesSearch =
-      r.name?.toLowerCase().includes(search.toLowerCase()) ||
-      r.owner?.toLowerCase().includes(search.toLowerCase()) ||
-      (r.contactEmail || r.email || "")
-        .toLowerCase()
-        .includes(search.toLowerCase());
-    const matchesPlan =
-      planFilter === "all" || r.subscriptionStatus === planFilter;
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "active" && r.isActive) ||
-      (statusFilter === "inactive" && !r.isActive);
-    return matchesSearch && matchesPlan && matchesStatus;
-  });
+
+  // ❌ REMOVED client-side `filtered` – we now use `restaurants` directly
 
   const getStatusBadge = (isActive: boolean) =>
     isActive ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700";
@@ -931,7 +916,7 @@ export default function RestaurantsPage() {
   const formatDate = (dateStr: string) =>
     dateStr ? new Date(dateStr).toLocaleDateString() : "—";
 
-  // Handlers
+  // Handlers for modals (unchanged)
   const handleAddSave = async (data: any) => {
     await createRestaurantService(data);
     await getRestaurants();
@@ -955,11 +940,11 @@ export default function RestaurantsPage() {
   const openSubscriptionModal = (restaurant: any) => {
     setShowSubscriptionModal(restaurant);
   };
+
   const handleViewRestaurant = async (id: string) => {
     try {
       setDetailLoading(true);
       const response = await getRestaurantDetails(id);
-
       setSelectedRestaurant(response);
       setShowViewModal(true);
     } catch (error) {
@@ -969,22 +954,45 @@ export default function RestaurantsPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-6">
+        <div className="animate-pulse">
+          <div className="mb-6 h-10 w-48 rounded bg-slate-200" />
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((item) => (
+              <div key={item} className="h-36 rounded-2xl bg-white" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      {/* Header */}
+      {/* Header (unchanged) */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Restaurants</h1>
-          <p className="text-slate-500 text-sm">
-            Manage all partner restaurants
-          </p>
+          <p className="text-slate-500 text-sm">Manage all partner restaurants</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition text-sm font-medium"
-        >
-          <Plus size={16} /> Add Restaurant
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={getRestaurants}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-100 active:scale-95"
+          >
+            <RefreshCcw className="h-4 w-4" />
+            Refresh
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl shadow-sm transition text-sm font-medium"
+          >
+            <Plus size={16} />
+            Add Restaurant
+          </button>
+        </div>
       </div>
 
       {/* Search & Filters */}
@@ -993,32 +1001,26 @@ export default function RestaurantsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by name, owner or email..."
+            placeholder="Search by name or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg w-64 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg w-64 text-sm"
           />
         </div>
         <div className="flex gap-2">
-          <select
-            value={planFilter}
-            onChange={(e) => setPlanFilter(e.target.value)}
-            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="all">All Plans</option>
-            <option value="trial">Trial</option>
-            <option value="active">Active</option>
-            <option value="expired">Expired</option>
-          </select>
+          {/* Subscription status filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
           >
-            <option value="all">All Status</option>
+            <option value="all">All Subscriptions</option>
+            <option value="trial">Trial</option>
             <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
+            <option value="expired">Expired</option>
+            <option value="cancelled">Cancelled</option>
           </select>
+
           <select
             value={pageSize}
             onChange={(e) => setPageSize(Number(e.target.value))}
@@ -1030,7 +1032,6 @@ export default function RestaurantsPage() {
           </select>
         </div>
       </div>
-
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
@@ -1064,11 +1065,9 @@ export default function RestaurantsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map((restaurant) => (
-                <tr
-                  key={restaurant._id}
-                  className="hover:bg-slate-50 transition"
-                >
+              {/* ✅ Use `restaurants` directly – already filtered by backend */}
+              {restaurants.map((restaurant) => (
+                <tr key={restaurant._id} className="hover:bg-slate-50 transition">
                   <td className="px-5 py-3 font-medium text-slate-800">
                     {restaurant.name}
                   </td>
@@ -1124,15 +1123,12 @@ export default function RestaurantsPage() {
             </tbody>
           </table>
         </div>
+
         {!loading && (
           <div className="px-5 py-4 border-t border-slate-200 flex items-center justify-between">
             <div className="text-sm text-slate-500">
               Showing {(currentPage - 1) * pageSize + 1} to{" "}
-              {Math.min(
-                currentPage * pageSize,
-                restaurants.length + (currentPage - 1) * pageSize,
-              )}{" "}
-              of {totalPages * pageSize} restaurants
+              {Math.min(currentPage * pageSize, totalCount)} of {totalCount} restaurants
             </div>
             <div className="flex gap-2 items-center">
               <button
@@ -1166,7 +1162,7 @@ export default function RestaurantsPage() {
         )}
       </div>
 
-      {/* Modals */}
+      {/* All modals – unchanged */}
       {showViewModal &&
         (detailLoading ? (
           <div className="fixed inset-0 flex items-center justify-center bg-black/50">
@@ -1237,9 +1233,8 @@ function RestaurantDetailModal({
   // Helper to render status badge
   const StatusBadge = ({ active }: { active: boolean }) => (
     <span
-      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-        active ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-      }`}
+      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${active ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+        }`}
     >
       {active ? "Active" : "Inactive"}
     </span>
@@ -1341,49 +1336,103 @@ function RestaurantDetailModal({
             </div>
           </div>
 
-          {/* ========== 2. Owner Information (only if owner exists) ========== */}
-          {(restaurant.owner || restaurant.ownerId) && (
-            <div className="border border-slate-200 rounded-lg overflow-hidden">
-              <div className="bg-slate-50 px-5 py-3 border-b">
-                <h3 className="font-semibold text-slate-800">
-                  👤 Owner Information
-                </h3>
+          {/* ========== Owner Information ========== */}
+          {restaurant.owner && (
+            <div className="rounded-2xl overflow-hidden border border-indigo-100 shadow-sm bg-white">
+
+              {/* Header */}
+              <div className="bg-gray-500 px-6 py-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    👤 Owner Information
+                  </h3>
+                  <p className="text-indigo-100 text-sm mt-1">
+                    Restaurant owner profile details
+                  </p>
+                </div>
+
+                <div className="h-12 w-12 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white text-xl font-bold uppercase shadow">
+                  {restaurant.owner?.name?.charAt(0) || "O"}
+                </div>
               </div>
-              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                {restaurant.owner?.name && (
-                  <div>
-                    <span className="text-slate-500 font-medium">Name:</span>{" "}
-                    {restaurant.owner.name}
+
+              {/* Content */}
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                  {/* Name */}
+                  <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 hover:shadow-md transition">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-indigo-500 mb-1">
+                      Full Name
+                    </p>
+
+                    <h4 className="text-slate-800 font-semibold text-base">
+                      {restaurant.owner?.name || "—"}
+                    </h4>
                   </div>
-                )}
-                {restaurant.owner?.email && (
-                  <div>
-                    <span className="text-slate-500 font-medium">Email:</span>{" "}
-                    {restaurant.owner.email}
+
+                  {/* Email */}
+                  <div className="bg-sky-50 border border-sky-100 rounded-xl p-4 hover:shadow-md transition">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-sky-500 mb-1">
+                      Email Address
+                    </p>
+
+                    <h4 className="text-slate-800 font-semibold text-base break-all">
+                      {restaurant.owner?.email || "—"}
+                    </h4>
                   </div>
-                )}
-                {restaurant.owner?.phone && (
-                  <div>
-                    <span className="text-slate-500 font-medium">Phone:</span>{" "}
-                    {restaurant.owner.phone}
+
+                  {/* Phone */}
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 hover:shadow-md transition">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500 mb-1">
+                      Phone Number
+                    </p>
+
+                    <h4 className="text-slate-800 font-semibold text-base">
+                      {restaurant.owner?.phone || "—"}
+                    </h4>
                   </div>
-                )}
-                {restaurant.owner?.role && (
-                  <div>
-                    <span className="text-slate-500 font-medium">Role:</span>{" "}
-                    {restaurant.owner.role}
-                  </div>
-                )}
-                {!restaurant.owner?.name && !restaurant.owner?.email && (
-                  <div className="col-span-2">
-                    <span className="text-slate-500 font-medium">
-                      Owner ID:
-                    </span>{" "}
-                    <span className="font-mono text-xs">
-                      {restaurant.owner || restaurant.ownerId}
+
+                  {/* Role */}
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 hover:shadow-md transition">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-500 mb-2">
+                      Role
+                    </p>
+
+                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-sm font-semibold capitalize">
+                      {restaurant.owner?.role || "Owner"}
                     </span>
                   </div>
-                )}
+
+                </div>
+
+                {/* Status + ID */}
+                <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t pt-5">
+
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">
+                      Owner ID
+                    </p>
+
+                    <p className="font-mono text-xs bg-slate-100 px-3 py-2 rounded-lg text-slate-700 break-all">
+                      {restaurant.owner?._id}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold ${restaurant.owner?.isActive
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-rose-100 text-rose-700"
+                        }`}
+                    >
+                      <span className="h-2 w-2 rounded-full bg-current"></span>
+
+                      {restaurant.owner?.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+
+                </div>
               </div>
             </div>
           )}
@@ -1585,6 +1634,259 @@ function RestaurantDetailModal({
             )}
           </div>
 
+
+          {/* ==================== Subscription Details ==================== */}
+
+
+
+          {/* ==================== Subscription Details ==================== */}
+          <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 bg-slate-50 border-b border-slate-200">
+              <div>
+                <h3 className="text-base font-semibold text-slate-800">
+                  💳 Subscription Details
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Current subscription information & billing details
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Plan Badge */}
+                <span className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold uppercase tracking-wide">
+                  {restaurant.subscriptionId?.plan || "N/A"}
+                </span>
+
+                {/* Status Badge */}
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-semibold capitalize
+        ${restaurant.subscriptionId?.status === "active"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-rose-100 text-rose-700"
+                    }`}
+                >
+                  {restaurant.subscriptionId?.status || "inactive"}
+                </span>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+                {/* Base Price */}
+                <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+                  <p className="text-xs font-medium text-slate-500 mb-1">
+                    Base Price
+                  </p>
+                  <h4 className="text-lg font-bold text-slate-800">
+                    ₹{restaurant.subscriptionId?.basePrice || 0}
+                  </h4>
+                </div>
+
+                {/* Final Price */}
+                <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+                  <p className="text-xs font-medium text-slate-500 mb-1">
+                    Final Price
+                  </p>
+                  <h4 className="text-lg font-bold text-slate-800">
+                    ₹{restaurant.subscriptionId?.finalPrice || 0}
+                  </h4>
+                </div>
+
+                {/* Expiry Date */}
+                <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+                  <p className="text-xs font-medium text-slate-500 mb-1">
+                    Expiry Date
+                  </p>
+                  <h4 className="text-sm font-semibold text-slate-800">
+                    {restaurant.subscriptionId?.expiryDate
+                      ? new Date(
+                        restaurant.subscriptionId.expiryDate
+                      ).toLocaleDateString()
+                      : "—"}
+                  </h4>
+                </div>
+
+                {/* Start Date */}
+                <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+                  <p className="text-xs font-medium text-slate-500 mb-1">
+                    Start Date
+                  </p>
+                  <h4 className="text-sm font-semibold text-slate-800">
+                    {restaurant.subscriptionId?.startDate
+                      ? new Date(
+                        restaurant.subscriptionId.startDate
+                      ).toLocaleDateString()
+                      : "—"}
+                  </h4>
+                </div>
+
+                {/* Subscription ID */}
+                <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+                  <p className="text-xs font-medium text-slate-500 mb-1">
+                    Subscription ID
+                  </p>
+                  <h4 className="text-xs font-mono text-slate-700 break-all">
+                    {restaurant.subscriptionId?._id || "—"}
+                  </h4>
+                </div>
+
+                {/* Features Count */}
+                <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+                  <p className="text-xs font-medium text-slate-500 mb-1">
+                    Enabled Features
+                  </p>
+                  <h4 className="text-lg font-bold text-slate-800">
+                    {restaurant.subscriptionId?.features
+                      ? Object.values(
+                        restaurant.subscriptionId.features
+                      ).filter(Boolean).length
+                      : 0}
+                  </h4>
+                </div>
+              </div>
+
+              {/* Features */}
+              {restaurant.subscriptionId?.features && (
+                <div className="mt-6">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3">
+                    Included Features
+                  </h4>
+
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(restaurant.subscriptionId.features)
+                      .filter(([_, value]) => value)
+                      .map(([feature]) => (
+                        <span
+                          key={feature}
+                          className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium capitalize"
+                        >
+                          {feature}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ================= Restaurant Analytics ================= */}
+          {/* ================= Restaurant Analytics ================= */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+              <h2 className="text-lg font-semibold text-slate-800">
+                📊 Restaurant Analytics
+              </h2>
+
+              <p className="text-sm text-slate-500 mt-1">
+                Business overview & performance insights
+              </p>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="p-6 grid grid-cols-2 lg:grid-cols-5 gap-4">
+
+              {/* Menu Items */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 hover:shadow-sm transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">🍽️</span>
+
+                  <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-slate-200 text-slate-700">
+                    MENUS
+                  </span>
+                </div>
+
+                <h3 className="text-3xl font-bold text-slate-800 mt-4">
+                  {restaurant.analytics?.totalMenuItems || 0}
+                </h3>
+
+                <p className="text-sm text-slate-500 mt-1">
+                  Total Menu Items
+                </p>
+              </div>
+
+              {/* Customers */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 hover:shadow-sm transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">👥</span>
+
+                  <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-slate-200 text-slate-700">
+                    CUSTOMERS
+                  </span>
+                </div>
+
+                <h3 className="text-3xl font-bold text-slate-800 mt-4">
+                  {restaurant.analytics?.totalCustomers || 0}
+                </h3>
+
+                <p className="text-sm text-slate-500 mt-1">
+                  Registered Customers
+                </p>
+              </div>
+
+              {/* Orders */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 hover:shadow-sm transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">🧾</span>
+
+                  <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-slate-200 text-slate-700">
+                    ORDERS
+                  </span>
+                </div>
+
+                <h3 className="text-3xl font-bold text-slate-800 mt-4">
+                  {restaurant.analytics?.totalOrders || 0}
+                </h3>
+
+                <p className="text-sm text-slate-500 mt-1">
+                  Total Orders
+                </p>
+              </div>
+
+              {/* Staff */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 hover:shadow-sm transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">👨‍🍳</span>
+
+                  <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-slate-200 text-slate-700">
+                    STAFF
+                  </span>
+                </div>
+
+                <h3 className="text-3xl font-bold text-slate-800 mt-4">
+                  {restaurant.analytics?.totalStaff || 0}
+                </h3>
+
+                <p className="text-sm text-slate-500 mt-1">
+                  Staff Members
+                </p>
+              </div>
+
+              {/* Active Staff */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 hover:shadow-sm transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">✅</span>
+
+                  <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-slate-200 text-slate-700">
+                    ACTIVE
+                  </span>
+                </div>
+
+                <h3 className="text-3xl font-bold text-slate-800 mt-4">
+                  {restaurant.analytics?.activeStaffCount || 0}
+                </h3>
+
+                <p className="text-sm text-slate-500 mt-1">
+                  Active Staff
+                </p>
+              </div>
+
+            </div>
+          </div>
           {/* ========== 7. Staff Section ========== */}
           {totalStaff > 0 && (
             <div className="border border-slate-200 rounded-lg overflow-hidden">

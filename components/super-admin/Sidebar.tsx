@@ -13,7 +13,9 @@ import {
   Menu,
   ChevronLeft,
   Crown,
+  LogOut,
 } from "lucide-react";
+import { useAuthStore } from "@/store/useAuthStore";
 // optional, you can implement simple div on hover
 
 const menuItems = [
@@ -31,13 +33,20 @@ const menuItems = [
 ];
 
 export default function Sidebar({ collapsed, setCollapsed }: any) {
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
   const pathname = usePathname();
+  // console.log("Current User in Sidebar:", user); // Debugging line
+  const handleLogout = () => {
+    logout();
+
+    window.location.href = "/";  // redirect
+  };
 
   return (
     <aside
-      className={`bg-white border-r border-slate-200 shadow-sm transition-all duration-300 flex flex-col ${
-        collapsed ? "w-20" : "w-64"
-      }`}
+      className={`bg-white border-r border-slate-200 shadow-sm transition-all duration-300 flex flex-col ${collapsed ? "w-20" : "w-64"
+        }`}
     >
       {/* Logo Area */}
       <div className="flex items-center justify-between p-4 border-b border-slate-100 h-16">
@@ -67,11 +76,10 @@ export default function Sidebar({ collapsed, setCollapsed }: any) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
-                isActive
-                  ? "bg-indigo-50 text-indigo-700 shadow-sm"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              } ${collapsed ? "justify-center" : ""}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${isActive
+                ? "bg-indigo-50 text-indigo-700 shadow-sm"
+                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                } ${collapsed ? "justify-center" : ""}`}
             >
               <item.icon size={20} className="shrink-0" />
               {!collapsed && (
@@ -88,8 +96,27 @@ export default function Sidebar({ collapsed, setCollapsed }: any) {
       </nav>
 
       {/* Footer (optional) */}
-      <div className="p-3 border-t border-slate-100 text-xs text-slate-400 text-center">
-        {!collapsed ? "v2.0 · Secure Admin" : "v2"}
+      {/* Footer */}
+      <div className="p-3 border-t border-slate-100 space-y-2">
+
+        {/* Logout Button */}
+        <button
+          onClick={handleLogout}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl 
+  text-red-600 hover:bg-red-50 transition
+  ${collapsed ? "justify-center" : ""}`}
+        >
+          <LogOut size={20} />
+          {!collapsed && (
+            <span className="text-sm font-medium">Logout</span>
+          )}
+        </button>
+
+        {/* Version */}
+        <div className="text-xs text-slate-400 text-center">
+          {!collapsed ? "v2.0 · Secure Admin" : "v2"}
+        </div>
+
       </div>
     </aside>
   );

@@ -15,6 +15,7 @@ import {
   DollarSign,
   Clock,
   Printer,
+  IndianRupee,
   Calendar,
 } from "lucide-react";
 import DatePicker from "react-datepicker";
@@ -290,7 +291,7 @@ export default function CustomersPage() {
         <StatCard
           label="Total Revenue"
           value={`₹${customerStats.totalSpent.toFixed(2)}`}
-          icon={DollarSign}
+          icon={IndianRupee}
           color="bg-green-500"
         />
         <StatCard

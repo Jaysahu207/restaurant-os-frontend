@@ -1,5 +1,6 @@
-// app/super-admin/analytics/page.tsx
 "use client";
+
+import { useEffect } from "react";
 
 import {
   TrendingUp,
@@ -10,7 +11,9 @@ import {
   ArrowDown,
   Eye,
   Calendar,
+  Loader2,
 } from "lucide-react";
+
 import {
   LineChart,
   Line,
@@ -27,295 +30,578 @@ import {
   Cell,
 } from "recharts";
 
-// Mock data for charts
-const revenueData = [
-  { name: "Jan", revenue: 42000, orders: 320 },
-  { name: "Feb", revenue: 45800, orders: 380 },
-  { name: "Mar", revenue: 49200, orders: 410 },
-  { name: "Apr", revenue: 51800, orders: 450 },
-  { name: "May", revenue: 55200, orders: 490 },
-  { name: "Jun", revenue: 58900, orders: 530 },
-];
+import { useAnalyticsStore } from "@/store/useAnalyticsStore";
+import toast from "react-hot-toast";
 
-const trafficSources = [
-  { name: "Direct", value: 35, color: "#6366f1" },
-  { name: "Organic", value: 28, color: "#10b981" },
-  { name: "Social", value: 22, color: "#f59e0b" },
-  { name: "Referral", value: 15, color: "#ef4444" },
-];
-
-const recentActivities = [
-  {
-    id: 1,
-    user: "John Doe",
-    action: "Added new restaurant",
-    time: "2 min ago",
-    icon: "➕",
-  },
-  {
-    id: 2,
-    user: "Emma Lee",
-    action: "Updated subscription plan",
-    time: "15 min ago",
-    icon: "🔄",
-  },
-  {
-    id: 3,
-    user: "Mike Ross",
-    action: "Processed refund",
-    time: "1 hour ago",
-    icon: "💰",
-  },
-  {
-    id: 4,
-    user: "Sarah Kim",
-    action: "Generated report",
-    time: "3 hours ago",
-    icon: "📊",
-  },
-];
-
-const stats = [
-  {
-    title: "Total Revenue",
-    value: "$58,920",
-    change: "+12.5%",
-    trend: "up",
-    icon: DollarSign,
-    color: "emerald",
-  },
-  {
-    title: "Total Orders",
-    value: "2,847",
-    change: "+8.2%",
-    trend: "up",
-    icon: ShoppingBag,
-    color: "blue",
-  },
-  {
-    title: "Active Users",
-    value: "1,203",
-    change: "+5.1%",
-    trend: "up",
-    icon: Users,
-    color: "purple",
-  },
-  {
-    title: "Conversion Rate",
-    value: "3.24%",
-    change: "-0.5%",
-    trend: "down",
-    icon: TrendingUp,
-    color: "amber",
-  },
-];
+// ======================================================
+// COLORS
+// ======================================================
 
 const colorMap = {
-  emerald: "bg-emerald-50 border-emerald-200 text-emerald-700",
-  blue: "bg-blue-50 border-blue-200 text-blue-700",
-  purple: "bg-purple-50 border-purple-200 text-purple-700",
-  amber: "bg-amber-50 border-amber-200 text-amber-700",
+  emerald:
+    "bg-emerald-50 border-emerald-200 text-emerald-700",
+  blue:
+    "bg-blue-50 border-blue-200 text-blue-700",
+  purple:
+    "bg-purple-50 border-purple-200 text-purple-700",
+  amber:
+    "bg-amber-50 border-amber-200 text-amber-700",
 };
 
+const pieColors = [
+  "#6366f1",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#06b6d4",
+];
+
+// ======================================================
+// PAGE
+// ======================================================
+
 export default function AnalyticsPage() {
+  const {
+    analytics,
+    loading,
+    fetchAnalytics,
+  } = useAnalyticsStore();
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
+
+  // ======================================================
+  // SAFE FALLBACKS
+  // ======================================================
+
+  const statsData = [
+    {
+      title: "Subscription Revenue",
+      value: `₹${(
+        analytics?.stats?.subscriptionRevenue || 0
+      ).toLocaleString()}`,
+
+      change: `${analytics?.stats?.revenueGrowth || 0}%`,
+
+      trend: "up",
+
+      icon: DollarSign,
+
+      color: "emerald",
+    },
+
+    {
+      title: "Active Subscriptions",
+
+      value:
+        analytics?.stats?.activeSubscriptions || 0,
+
+      change: `${analytics?.stats?.orderGrowth || 0}%`,
+
+      trend: "up",
+
+      icon: ShoppingBag,
+
+      color: "purple",
+    },
+
+    {
+      title: "Monthly Recurring Revenue",
+
+      value: `₹${(
+        analytics?.stats?.monthlyRecurringRevenue || 0
+      ).toLocaleString()}`,
+
+      change: `${analytics?.stats?.userGrowth || 0}%`,
+
+      trend: "up",
+
+      icon: TrendingUp,
+
+      color: "amber",
+    },
+
+    {
+      title: "Restaurants",
+
+      value:
+        analytics?.stats?.totalRestaurants || 0,
+
+      change: `${analytics?.stats?.restaurantGrowth || 0}%`,
+
+      trend: "up",
+
+      icon: Users,
+
+      color: "blue",
+    },
+  ];
+
+  const revenueData =
+    analytics?.revenueChart || [];
+
+  const planDistribution =
+    analytics?.planDistribution || [];
+
+  const recentActivities =
+    analytics?.recentActivities || [];
+
+  // ======================================================
+  // LOADING
+  // ======================================================
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="flex items-center gap-3 text-slate-600">
+          <Loader2 className="h-6 w-6 animate-spin" />
+
+          <span className="text-lg font-medium">
+            Loading analytics...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ======================================================
+  // EMPTY STATE
+  // ======================================================
+
+  if (!analytics) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-slate-800">
+            No Analytics Found
+          </h2>
+
+          <p className="mt-2 text-slate-500">
+            Analytics data is currently unavailable.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ======================================================
+  // UI
+  // ======================================================
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 p-6">
-      {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-extrabold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
-          Analytics Dashboard
-        </h1>
-        <p className="text-slate-500 mt-1">
-          Real-time insights & performance metrics
-        </p>
+      {/* ====================================================== */}
+      {/* HEADER */}
+      {/* ====================================================== */}
+
+      <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
+        <div>
+          <h1 className="bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-3xl font-extrabold text-transparent">
+            Analytics Dashboard
+          </h1>
+
+          <p className="mt-1 text-slate-500">
+            Real-time insights & business
+            performance metrics
+          </p>
+        </div>
+
+        <button
+          onClick={fetchAnalytics}
+          className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+        >
+          Refresh Analytics
+        </button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-        {stats.map((stat) => (
-          <div
-            key={stat.title}
-            className={`rounded-xl border p-5 shadow-sm hover:shadow-md transition-all duration-200 ${colorMap[stat.color as keyof typeof colorMap]}`}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium">{stat.title}</p>
-                <p className="text-2xl font-bold mt-1">{stat.value}</p>
-              </div>
-              <div className="p-2 rounded-full bg-white/60">
-                <stat.icon className="h-5 w-5" />
-              </div>
-            </div>
-            <div className="flex items-center gap-1 mt-3">
-              {stat.trend === "up" ? (
-                <ArrowUp size={14} className="text-emerald-600" />
-              ) : (
-                <ArrowDown size={14} className="text-rose-600" />
-              )}
-              <span
-                className={`text-xs font-semibold ${
-                  stat.trend === "up" ? "text-emerald-600" : "text-rose-600"
+      {/* ====================================================== */}
+      {/* STATS */}
+      {/* ====================================================== */}
+
+      <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {statsData.map((stat, index) => {
+          const Icon = stat.icon;
+
+          return (
+            <div
+              key={index}
+              className={`rounded-2xl border p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md ${colorMap[
+                stat.color as keyof typeof colorMap
+              ]
                 }`}
-              >
-                {stat.change}
-              </span>
-              <span className="text-xs text-slate-500">vs last month</span>
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium">
+                    {stat.title}
+                  </p>
+
+                  <p className="mt-2 text-3xl font-bold">
+                    {stat.value}
+                  </p>
+                </div>
+
+                <div className="rounded-full bg-white/70 p-3">
+                  <Icon className="h-5 w-5" />
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center gap-1">
+                {stat.trend === "up" ? (
+                  <ArrowUp
+                    size={14}
+                    className="text-emerald-600"
+                  />
+                ) : (
+                  <ArrowDown
+                    size={14}
+                    className="text-rose-600"
+                  />
+                )}
+
+                <span
+                  className={`text-xs font-semibold ${stat.trend === "up"
+                    ? "text-emerald-600"
+                    : "text-rose-600"
+                    }`}
+                >
+                  {stat.change}
+                </span>
+
+                <span className="text-xs text-slate-500">
+                  vs last month
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Revenue & Orders Line Chart */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="font-semibold text-slate-800">
-              Revenue & Orders Trend
-            </h2>
+      {/* ====================================================== */}
+      {/* CHARTS */}
+      {/* ====================================================== */}
+
+      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* ====================================================== */}
+        {/* REVENUE TREND */}
+        {/* ====================================================== */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">
+                Revenue & Orders Trend
+              </h2>
+
+              <p className="text-sm text-slate-500">
+                Monthly business growth overview
+              </p>
+            </div>
+
             <div className="flex gap-3 text-xs">
               <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-full bg-indigo-500"></span>{" "}
+                <span className="h-3 w-3 rounded-full bg-indigo-500"></span>
                 Revenue
               </span>
+
               <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-full bg-emerald-500"></span>{" "}
+                <span className="h-3 w-3 rounded-full bg-emerald-500"></span>
                 Orders
               </span>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
+
+          <ResponsiveContainer
+            width="100%"
+            height={320}
+          >
             <LineChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="name" stroke="#64748b" />
-              <YAxis yAxisId="left" stroke="#64748b" />
-              <YAxis yAxisId="right" orientation="right" stroke="#64748b" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#e2e8f0"
+              />
+
+              <XAxis
+                dataKey="month"
+                stroke="#64748b"
+              />
+
+              <YAxis
+                yAxisId="left"
+                stroke="#64748b"
+              />
+
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                stroke="#64748b"
+              />
+
               <Tooltip
                 contentStyle={{
                   backgroundColor: "white",
-                  borderRadius: "8px",
-                  border: "1px solid #e2e8f0",
+                  borderRadius: "12px",
+                  border:
+                    "1px solid #e2e8f0",
                 }}
               />
+
               <Legend />
+
               <Line
                 yAxisId="left"
                 type="monotone"
                 dataKey="revenue"
                 stroke="#6366f1"
-                strokeWidth={2}
-                dot={{ fill: "#6366f1", r: 4 }}
-                activeDot={{ r: 6 }}
-                name="Revenue ($)"
+                strokeWidth={3}
+                dot={{
+                  fill: "#6366f1",
+                  r: 4,
+                }}
+                activeDot={{ r: 7 }}
+                name="Revenue"
               />
+
               <Line
                 yAxisId="right"
                 type="monotone"
                 dataKey="orders"
                 stroke="#10b981"
-                strokeWidth={2}
-                dot={{ fill: "#10b981", r: 4 }}
+                strokeWidth={3}
+                dot={{
+                  fill: "#10b981",
+                  r: 4,
+                }}
+                activeDot={{ r: 7 }}
                 name="Orders"
               />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Traffic Sources Pie Chart */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <h2 className="font-semibold text-slate-800 mb-4">Traffic Sources</h2>
-          <ResponsiveContainer width="100%" height={300}>
+        {/* ====================================================== */}
+        {/* PLAN DISTRIBUTION */}
+        {/* ====================================================== */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-5">
+            <h2 className="text-lg font-bold text-slate-800">
+              Subscription Plan Distribution
+            </h2>
+
+            <p className="text-sm text-slate-500">
+              Restaurant distribution by plans
+            </p>
+          </div>
+
+          <ResponsiveContainer
+            width="100%"
+            height={320}
+          >
             <PieChart>
               <Pie
-                data={trafficSources}
+                data={planDistribution}
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
-                outerRadius={90}
-                paddingAngle={2}
+                innerRadius={70}
+                outerRadius={100}
+                paddingAngle={3}
                 dataKey="value"
-                label={({ name, percent }) =>
-                  `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
+                nameKey="name"
+                label={({
+                  name,
+                  percent,
+                }) =>
+                  `${name} ${(
+                    (percent || 0) * 100
+                  ).toFixed(0)}%`
                 }
                 labelLine={false}
               >
-                {trafficSources.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
+                {planDistribution.map(
+                  (_item, index) => (
+                    <Cell
+                      key={index}
+                      fill={
+                        pieColors[
+                        index %
+                        pieColors.length
+                        ]
+                      }
+                    />
+                  )
+                )}
               </Pie>
+
               <Tooltip
-                formatter={(value) => `${value}%`}
+                formatter={(value: any) => [
+                  value,
+                  "Restaurants",
+                ]}
                 contentStyle={{
                   backgroundColor: "white",
-                  borderRadius: "8px",
-                  border: "1px solid #e2e8f0",
+                  borderRadius: "12px",
+                  border:
+                    "1px solid #e2e8f0",
                 }}
               />
             </PieChart>
           </ResponsiveContainer>
-          <div className="flex justify-center gap-4 mt-2">
-            {trafficSources.map((source) => (
-              <div key={source.name} className="flex items-center gap-1">
-                <span
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: source.color }}
-                ></span>
-                <span className="text-xs text-slate-600">{source.name}</span>
-              </div>
-            ))}
+
+          <div className="mt-4 flex flex-wrap justify-center gap-4">
+            {planDistribution.map(
+              (item: any, index: number) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2"
+                >
+                  <span
+                    className="h-3 w-3 rounded-full"
+                    style={{
+                      backgroundColor:
+                        pieColors[
+                        index %
+                        pieColors.length
+                        ],
+                    }}
+                  />
+
+                  <span className="text-xs text-slate-600">
+                    {item.name}
+                  </span>
+                </div>
+              )
+            )}
           </div>
         </div>
       </div>
 
-      {/* Bottom Row: Monthly Bar Chart & Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Monthly Revenue Bar Chart */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <h2 className="font-semibold text-slate-800 mb-4">
-            Monthly Revenue Breakdown
-          </h2>
-          <ResponsiveContainer width="100%" height={280}>
+      {/* ====================================================== */}
+      {/* BOTTOM */}
+      {/* ====================================================== */}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* ====================================================== */}
+        {/* BAR CHART */}
+        {/* ====================================================== */}
+
+        <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-5">
+            <h2 className="text-lg font-bold text-slate-800">
+              Monthly Revenue Breakdown
+            </h2>
+
+            <p className="text-sm text-slate-500">
+              Revenue generated month-wise
+            </p>
+          </div>
+
+          <ResponsiveContainer
+            width="100%"
+            height={320}
+          >
             <BarChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="name" stroke="#64748b" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#e2e8f0"
+              />
+
+              <XAxis
+                dataKey="month"
+                stroke="#64748b"
+              />
+
               <YAxis stroke="#64748b" />
+
               <Tooltip
+                formatter={(value: any) => [
+                  `₹${value}`,
+                  "Revenue",
+                ]}
                 contentStyle={{
                   backgroundColor: "white",
-                  borderRadius: "8px",
-                  border: "1px solid #e2e8f0",
+                  borderRadius: "12px",
+                  border:
+                    "1px solid #e2e8f0",
                 }}
-                formatter={(value) => [`$${value}`, "Revenue"]}
               />
-              <Bar dataKey="revenue" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+
+              <Bar
+                dataKey="revenue"
+                fill="#8b5cf6"
+                radius={[8, 8, 0, 0]}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Recent Activity */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="font-semibold text-slate-800">Recent Activity</h2>
-            <Eye size={16} className="text-slate-400" />
+        {/* ====================================================== */}
+        {/* RECENT ACTIVITY */}
+        {/* ====================================================== */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">
+                Recent Activity
+              </h2>
+
+              <p className="text-sm text-slate-500">
+                Latest platform actions
+              </p>
+            </div>
+
+            <Eye
+              size={18}
+              className="text-slate-400"
+            />
           </div>
-          <div className="space-y-4">
-            {recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-start gap-3">
-                <div className="text-lg">{activity.icon}</div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-slate-800">
-                    {activity.user}
-                  </p>
-                  <p className="text-xs text-slate-500">{activity.action}</p>
-                  <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                    <Calendar size={10} /> {activity.time}
-                  </p>
-                </div>
+
+          <div className="space-y-5">
+            {recentActivities.length > 0 ? (
+              recentActivities.map(
+                (
+                  activity: any,
+                  index: number
+                ) => (
+                  <div
+                    key={index}
+                    className="flex items-start gap-3"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-lg">
+                      {activity.icon || "📌"}
+                    </div>
+
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-800">
+                        {activity.user}
+                      </p>
+
+                      <p className="text-xs text-slate-500">
+                        {activity.action}
+                      </p>
+
+                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-400">
+                        <Calendar size={11} />
+
+                        {activity.time}
+                      </p>
+                    </div>
+                  </div>
+                )
+              )
+            ) : (
+              <div className="py-10 text-center text-sm text-slate-500">
+                No recent activities found
               </div>
-            ))}
+            )}
           </div>
-          <button className="w-full mt-4 text-center text-sm text-indigo-600 hover:text-indigo-800 font-medium">
-            View all activity →
+
+          <button className="mt-6 w-full rounded-xl border border-indigo-200 bg-indigo-50 py-2.5 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
+            onClick={() => toast("View all activity coming soon 🚧")} >
+            View all activity
           </button>
         </div>
       </div>

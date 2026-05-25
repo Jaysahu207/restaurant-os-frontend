@@ -34,7 +34,7 @@ interface Staff {
   role: string;
   shift?: string;
   status?: string;
-  permissions: string[];
+  permissions: StaffPermissions;
   isActive: boolean;
   password?: string;
   restaurantId?: string;
@@ -50,48 +50,96 @@ interface StaffFormData {
   shift: string;
   status: string;
   joinDate: string;
-  permissions: string[];
+  permissions: StaffPermissions;
   password: string;
   confirmPassword: string;
   restaurantId: string;
 }
 
+interface StaffPermissions {
+  canCreateOrder: boolean;
+  canUpdateOrder: boolean;
+  canViewCustomers: boolean;
+  canManageMenu: boolean;
+  canManageStaff: boolean;
+  canViewAnalytics: boolean;
+}
 // ==================== Constants ====================
 const PERMISSIONS = [
-  { label: "View Orders", value: "view_orders" },
-  { label: "Create Orders", value: "create_orders" },
-  { label: "Update Order Status", value: "update_order_status" },
-  { label: "Manage Menu", value: "manage_menu" },
-  { label: "View Customers", value: "view_customers" },
-  { label: "Manage Customers", value: "manage_customers" },
-  { label: "Manage Staff", value: "manage_staff" },
-  { label: "View Reports", value: "view_reports" },
+  {
+    label: "Create Orders",
+    value: "canCreateOrder",
+  },
+  {
+    label: "Update Order Status",
+    value: "canUpdateOrder",
+  },
+  {
+    label: "View Customers",
+    value: "canViewCustomers",
+  },
+  {
+    label: "Manage Menu",
+    value: "canManageMenu",
+  },
+  {
+    label: "Manage Staff",
+    value: "canManageStaff",
+  },
+  {
+    label: "View Analytics",
+    value: "canViewAnalytics",
+  },
 ];
+const defaultPermissions: StaffPermissions = {
+  canCreateOrder: true,
+  canUpdateOrder: true,
+  canViewCustomers: true,
+  canManageMenu: false,
+  canManageStaff: false,
+  canViewAnalytics: false,
+};
 
-const ROLE_PERMISSIONS: Record<string, string[]> = {
-  Admin: [
-    "view_orders",
-    "create_orders",
-    "update_order_status",
-    "manage_menu",
-    "view_customers",
-    "manage_customers",
-    "manage_staff",
-    "view_reports",
-  ],
-  Manager: [
-    "view_orders",
-    "update_order_status",
-    "manage_menu",
-    "view_customers",
-    "view_reports",
-  ],
-  Chef: ["view_orders", "update_order_status"],
-  Waiter: ["view_orders", "create_orders"],
+const ROLE_PERMISSIONS: Record<string, StaffPermissions> = {
+  Admin: {
+    canCreateOrder: true,
+    canUpdateOrder: true,
+    canViewCustomers: true,
+    canManageMenu: true,
+    canManageStaff: true,
+    canViewAnalytics: true,
+  },
+
+  Manager: {
+    canCreateOrder: true,
+    canUpdateOrder: true,
+    canViewCustomers: true,
+    canManageMenu: true,
+    canManageStaff: false,
+    canViewAnalytics: true,
+  },
+
+  Chef: {
+    canCreateOrder: false,
+    canUpdateOrder: true,
+    canViewCustomers: false,
+    canManageMenu: false,
+    canManageStaff: false,
+    canViewAnalytics: false,
+  },
+
+  Waiter: {
+    canCreateOrder: true,
+    canUpdateOrder: false,
+    canViewCustomers: true,
+    canManageMenu: false,
+    canManageStaff: false,
+    canViewAnalytics: false,
+  },
 };
 
 const ROLES = ["All", "Chef", "Waiter", "Manager", "Admin"];
-const SHIFTS = ["morning ", "evening ", "general ", "night "];
+const SHIFTS = ["morning", "evening", "general", "night"];
 
 const initialFormData: StaffFormData = {
   name: "",
@@ -101,7 +149,7 @@ const initialFormData: StaffFormData = {
   shift: "morning",
   status: "active",
   joinDate: new Date().toISOString().split("T")[0],
-  permissions: [],
+  permissions: defaultPermissions,
   password: "",
   confirmPassword: "",
   restaurantId: "",
@@ -135,10 +183,7 @@ export default function StaffPage() {
     try {
       setLoading(true);
       const data = await getStaffList(restaurant._id);
-      const normalized = data.map((s: any) => ({
-        ...s,
-        permissions: Array.isArray(s.permissions) ? s.permissions : [],
-      }));
+
       setStaff(data);
     } catch (err) {
       toast.error("Failed to load staff members");
@@ -163,7 +208,8 @@ export default function StaffPage() {
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.email.toLowerCase().includes(search.toLowerCase()) ||
       s.phone.includes(search);
-    const matchesRole = roleFilter === "All" || s.role === roleFilter;
+    const matchesRole =
+      roleFilter === "All" || s.role.toLowerCase() === roleFilter.toLowerCase();
     const matchesStatus =
       statusFilter === "All" ||
       (statusFilter === "active" && s.isActive) ||
@@ -177,7 +223,7 @@ export default function StaffPage() {
     setFormData({
       ...initialFormData,
       restaurantId: restaurant?._id || "",
-      permissions: ROLE_PERMISSIONS["Waiter"] || [],
+      permissions: defaultPermissions,
     });
     setIsModalOpen(true);
   };
@@ -192,9 +238,7 @@ export default function StaffPage() {
       shift: staffMember.shift || "morning",
       status: staffMember.isActive ? "active" : "inactive",
       joinDate: staffMember.joinDate || new Date().toISOString().split("T")[0],
-      permissions: Array.isArray(staffMember.permissions)
-        ? staffMember.permissions
-        : [],
+      permissions: staffMember.permissions,
       password: "",
       confirmPassword: "",
       restaurantId: staffMember.restaurantId || restaurant?._id || "",
@@ -278,7 +322,7 @@ export default function StaffPage() {
           // Only include password if provided (for edit)
           ...(formData.password ? { password: formData.password } : {}),
         };
-        console.log("Editing Staff id - >> ", editingStaff._id, payload);
+        // console.log("Editing Staff id - >> ", editingStaff._id, payload);
         await updateStaff(editingStaff._id, payload);
         toast.success("Staff member updated successfully");
       } else {
@@ -286,13 +330,13 @@ export default function StaffPage() {
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
-          role: formData.role.toLowerCase(),
+          role: formData.role,
           shift: formData.shift,
           joinDate: formData.joinDate,
           status: formData.status,
           permissions: formData.permissions,
           restaurantId: formData.restaurantId,
-          password: formData.password, // Password is required for new staff
+          password: formData.password,
         };
         await createStaff(payload);
         console.log("Create new staff ->>", payload);
@@ -562,12 +606,13 @@ function StaffFormModal({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handlePermissionChange = (permission: string) => {
+  const handlePermissionChange = (permission: keyof StaffPermissions) => {
     setFormData((prev) => ({
       ...prev,
-      permissions: prev.permissions.includes(permission)
-        ? prev.permissions.filter((p) => p !== permission)
-        : [...prev.permissions, permission],
+      permissions: {
+        ...prev.permissions,
+        [permission]: !prev.permissions[permission],
+      },
     }));
   };
 
@@ -576,7 +621,7 @@ function StaffFormModal({
     if (!editingStaff && formData.role) {
       setFormData((prev) => ({
         ...prev,
-        permissions: ROLE_PERMISSIONS[formData.role] || [],
+        permissions: ROLE_PERMISSIONS[formData.role] || defaultPermissions,
       }));
     }
   }, [formData.role, editingStaff, setFormData]);
@@ -677,10 +722,10 @@ function StaffFormModal({
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              <option value="Chef">Chef</option>
-              <option value="Waiter">Waiter</option>
-              <option value="Manager">Manager</option>
-              <option value="Admin">Admin</option>
+              <option value="chef">Chef</option>
+              <option value="waiter">Waiter</option>
+              <option value="manager">Manager</option>
+              <option value="admin">Admin</option>
             </select>
           </div>
 
@@ -697,10 +742,13 @@ function StaffFormModal({
                   <input
                     type="checkbox"
                     checked={
-                      Array.isArray(formData.permissions) &&
-                      formData.permissions.includes(perm.value)
+                      formData.permissions[perm.value as keyof StaffPermissions]
                     }
-                    onChange={() => handlePermissionChange(perm.value)}
+                    onChange={() =>
+                      handlePermissionChange(
+                        perm.value as keyof StaffPermissions,
+                      )
+                    }
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   {perm.label}
@@ -852,20 +900,22 @@ function StaffViewModal({
             </div>
           </div>
 
-          {staff.permissions && staff.permissions.length > 0 && (
+          {staff.permissions && Object.keys(staff.permissions).length > 0 && (
             <div className="border-t pt-4">
               <p className="text-sm font-medium text-gray-700 mb-2">
                 Permissions
               </p>
               <div className="flex flex-wrap gap-1">
-                {staff.permissions.map((perm) => (
-                  <span
-                    key={perm}
-                    className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
-                  >
-                    {perm.replace(/_/g, " ")}
-                  </span>
-                ))}
+                {Object.entries(staff.permissions)
+                  .filter(([_, value]) => value)
+                  .map(([key]) => (
+                    <span
+                      key={key}
+                      className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
+                    >
+                      {key.replace(/([A-Z])/g, " $1")}
+                    </span>
+                  ))}
               </div>
             </div>
           )}

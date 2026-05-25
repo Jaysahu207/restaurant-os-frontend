@@ -69,7 +69,7 @@ export default function MenuPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { user, restaurant } = useAuthStore();
-  console.log("🟡 RESTAURANT ID:", restaurant._id);
+  // console.log("🟡 RESTAURANT ID:", restaurant._id);
 
   // Handle sorting
   const handleSort = (field: string) => {
@@ -97,8 +97,8 @@ export default function MenuPage() {
       // Availability filter
       const matchesAvailability =
         availabilityFilter === "All" ||
-        (availabilityFilter === "Available" && item.available) ||
-        (availabilityFilter === "Unavailable" && !item.available);
+        (availabilityFilter === "Available" && item.isAvailable) ||
+        (availabilityFilter === "Unavailable" && !item.isAvailable);
       return matchesSearch && matchesCategory && matchesAvailability;
     })
     .sort((a, b) => {
@@ -136,7 +136,7 @@ export default function MenuPage() {
   const fetchMenu = async () => {
     try {
       const data = await getMenuItems(restaurant._id as string);
-
+      // console.log("📡 Fetched Menu Data:", data);
       setMenuItems(data);
       console.log(data);
     } catch (err) {
@@ -282,11 +282,10 @@ export default function MenuPage() {
           <span>Sort by:</span>
           <button
             onClick={() => handleSort("name")}
-            className={`flex items-center gap-1 px-2 py-1 rounded ${
-              sortField === "name"
-                ? "bg-blue-100 text-blue-700"
-                : "hover:bg-gray-100"
-            }`}
+            className={`flex items-center gap-1 px-2 py-1 rounded ${sortField === "name"
+              ? "bg-blue-100 text-blue-700"
+              : "hover:bg-gray-100"
+              }`}
           >
             Name
             {sortField === "name" &&
@@ -298,11 +297,10 @@ export default function MenuPage() {
           </button>
           <button
             onClick={() => handleSort("category")}
-            className={`flex items-center gap-1 px-2 py-1 rounded ${
-              sortField === "category"
-                ? "bg-blue-100 text-blue-700"
-                : "hover:bg-gray-100"
-            }`}
+            className={`flex items-center gap-1 px-2 py-1 rounded ${sortField === "category"
+              ? "bg-blue-100 text-blue-700"
+              : "hover:bg-gray-100"
+              }`}
           >
             Category
             {sortField === "category" &&
@@ -314,11 +312,10 @@ export default function MenuPage() {
           </button>
           <button
             onClick={() => handleSort("price")}
-            className={`flex items-center gap-1 px-2 py-1 rounded ${
-              sortField === "price"
-                ? "bg-blue-100 text-blue-700"
-                : "hover:bg-gray-100"
-            }`}
+            className={`flex items-center gap-1 px-2 py-1 rounded ${sortField === "price"
+              ? "bg-blue-100 text-blue-700"
+              : "hover:bg-gray-100"
+              }`}
           >
             Price
             {sortField === "price" &&
@@ -370,28 +367,26 @@ export default function MenuPage() {
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full
-      ${
-        item.type === "veg"
-          ? "bg-green-50 text-green-700"
-          : item.type === "non-veg"
-            ? "bg-red-50 text-red-700"
-            : item.type === "egg"
-              ? "bg-yellow-50 text-yellow-700"
-              : "bg-gray-100 text-gray-600"
-      }
+      ${item.type === "veg"
+                            ? "bg-green-50 text-green-700"
+                            : item.type === "non-veg"
+                              ? "bg-red-50 text-red-700"
+                              : item.type === "egg"
+                                ? "bg-yellow-50 text-yellow-700"
+                                : "bg-gray-100 text-gray-600"
+                          }
     `}
                       >
                         <span
                           className={`w-2 h-2 rounded-full
-        ${
-          item.type === "veg"
-            ? "bg-green-600"
-            : item.type === "non-veg"
-              ? "bg-red-600"
-              : item.type === "egg"
-                ? "bg-yellow-500"
-                : "bg-gray-500"
-        }
+        ${item.type === "veg"
+                              ? "bg-green-600"
+                              : item.type === "non-veg"
+                                ? "bg-red-600"
+                                : item.type === "egg"
+                                  ? "bg-yellow-500"
+                                  : "bg-gray-500"
+                            }
       `}
                         ></span>
                         {item.type}
@@ -443,11 +438,10 @@ export default function MenuPage() {
 
                     <td className="px-4 py-3">
                       <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          item.isAvailable
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${item.isAvailable
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                          }`}
                       >
                         {item.isAvailable ? "Available" : "Unavailable"}
                       </span>
@@ -509,6 +503,7 @@ export default function MenuPage() {
 
 // Modal component for adding/editing menu items
 function MenuFormModal({ item, onSave, onClose, categories }: any) {
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: item?.name || "",
     description: item?.description || "",
@@ -560,31 +555,42 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
     setFormData({ ...formData, addons: updated });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const form = new FormData();
+    if (isSaving) return;
 
-    form.append("name", formData.name);
-    form.append("description", formData.description);
-    form.append("price", String(Number(formData.price))); // ✅ number fix
-    form.append("category", formData.category);
+    try {
+      setIsSaving(true);
 
-    form.append("type", formData.type);
-    form.append("variants", JSON.stringify(formData.variants || [])); // ✅ handle undefined
-    form.append("prepTime", String(Number(formData.prepTime))); // ✅ number fix
-    form.append("isPopular", String(formData.isPopular)); // ✅ boolean fix
-    form.append("available", String(formData.available)); // ✅ boolean fix
+      const form = new FormData();
 
-    // ✅ only send image if it's a file (not URL string)
-    if (formData.image && typeof formData.image !== "string") {
-      form.append("image", formData.image);
+      form.append("name", formData.name);
+      form.append("description", formData.description);
+      form.append("price", String(Number(formData.price)));
+      form.append("category", formData.category);
+
+      form.append("type", formData.type);
+      form.append("variants", JSON.stringify(formData.variants || []));
+      form.append("prepTime", String(Number(formData.prepTime)));
+      form.append("isPopular", String(formData.isPopular));
+      form.append("available", String(formData.available));
+
+      // only send image if file
+      if (formData.image && typeof formData.image !== "string") {
+        form.append("image", formData.image);
+      }
+
+      form.append("addons", JSON.stringify(formData.addons || []));
+
+      // WAIT until save completes
+      await onSave(form);
+
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSaving(false);
     }
-
-    // ✅ addons safe stringify
-    form.append("addons", JSON.stringify(formData.addons || []));
-    console.log(form);
-    onSave(form);
   };
 
   // Add Variant
@@ -912,19 +918,58 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
           </div>
 
           {/* Action Buttons */}
+          {/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+              disabled={isSaving}
+              className={`px-4 py-2 border border-gray-300 rounded-lg transition
+      ${isSaving
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "text-gray-700 hover:bg-gray-50"
+                }`}
             >
               Cancel
             </button>
+
             <button
               type="submit"
-              className="px-4 py-2 bg-gradient-to-br from-orange-400 to-amber-500 text-white rounded-lg hover:bg-gray-50 transition shadow-sm"
+              disabled={isSaving}
+              className={`px-4 py-2 rounded-lg text-white shadow-sm transition flex items-center gap-2
+    ${isSaving
+                  ? "bg-orange-300 cursor-not-allowed opacity-70"
+                  : "bg-gradient-to-br from-orange-400 to-amber-500 hover:opacity-90"
+                }`}
             >
-              Save Item
+              {isSaving ? (
+                <>
+                  <svg
+                    className="animate-spin h-4 w-4"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
+                  </svg>
+
+                  Saving...
+                </>
+              ) : (
+                "Save Item"
+              )}
             </button>
           </div>
         </form>

@@ -1,18 +1,26 @@
 import API from "../config/axios";
 
-
+interface StaffPermissions {
+    canCreateOrder: boolean;
+    canUpdateOrder: boolean;
+    canViewCustomers: boolean;
+    canManageMenu: boolean;
+    canManageStaff: boolean;
+    canViewAnalytics: boolean;
+}
 // ================= CREATE STAFF =================
 export const createStaff = async (data: {
     name: string;
     email: string;
     password: string;
-    permissions: string[];
+    permissions: StaffPermissions;
     restaurantId: string;
     phone: string;
     role: string;
     shift: string;
     joinDate: string;
     status: string;
+
 
 }) => {
     const res = await API.post("/api/auth/staff", data);

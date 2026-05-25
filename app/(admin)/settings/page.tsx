@@ -120,13 +120,7 @@ export default function SettingsPage() {
     timings: { openTime: "", closeTime: "" },
   });
 
-  // Other settings (QR, notifications, users, system)
-  const [qrSettings, setQrSettings] = useState({
-    baseUrl: "https://order.tastybites.com",
-    tablePrefix: "T",
-    autoGenerateOnAdd: true,
-    qrCodeSize: 200,
-  });
+
 
   const [paymentSettings, setPaymentSettings] = useState({
     stripeEnabled: true,
@@ -156,20 +150,15 @@ export default function SettingsPage() {
     { id: 3, name: "Staff", email: "staff@tastybites.com", role: "staff" },
   ]);
 
-  const [systemPrefs, setSystemPrefs] = useState({
-    currency: "USD",
-    taxRate: 8.5,
-    orderPrefix: "ORD",
-    autoAcceptOrders: false,
-  });
+
 
   const tabs = [
     { id: "restaurant", label: "Restaurant", icon: Store },
-    { id: "qr", label: "QR Codes", icon: QrCode },
+
     { id: "payment", label: "Payment", icon: CreditCard },
     { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "users", label: "Users", icon: Users },
-    { id: "system", label: "System", icon: SettingsIcon },
+
+
   ];
 
   // ----------------------------------------------------------------------
@@ -336,11 +325,10 @@ export default function SettingsPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition ${
-                  activeTab === tab.id
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === tab.id
+                  ? "border-blue-600 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
@@ -900,78 +888,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* -------------------- QR TAB -------------------- */}
-        {activeTab === "qr" && (
-          <div className="space-y-6">
-            <h3 className={sectionTitleClass}>QR Code Settings</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className={labelClass}>Base Order URL</label>
-                <input
-                  type="url"
-                  value={qrSettings.baseUrl}
-                  onChange={(e) =>
-                    setQrSettings({ ...qrSettings, baseUrl: e.target.value })
-                  }
-                  className={inputClass}
-                  placeholder="https://order.yourdomain.com"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  This URL will be used with ?table=TABLE_NUMBER
-                </p>
-              </div>
-              <div>
-                <label className={labelClass}>Table Number Prefix</label>
-                <input
-                  type="text"
-                  value={qrSettings.tablePrefix}
-                  onChange={(e) =>
-                    setQrSettings({
-                      ...qrSettings,
-                      tablePrefix: e.target.value,
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="T"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>QR Code Size (px)</label>
-                <input
-                  type="number"
-                  value={qrSettings.qrCodeSize}
-                  onChange={(e) =>
-                    setQrSettings({
-                      ...qrSettings,
-                      qrCodeSize: parseInt(e.target.value),
-                    })
-                  }
-                  className={inputClass}
-                  min="100"
-                  max="500"
-                />
-              </div>
-              <div className="flex items-center">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={qrSettings.autoGenerateOnAdd}
-                    onChange={(e) =>
-                      setQrSettings({
-                        ...qrSettings,
-                        autoGenerateOnAdd: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">
-                    Auto-generate QR when adding table
-                  </span>
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* -------------------- PAYMENT TAB -------------------- */}
         {activeTab === "payment" && (
@@ -1065,7 +982,7 @@ export default function SettingsPage() {
                         ...notificationSettings,
                         [item.key]:
                           !notificationSettings[
-                            item.key as keyof typeof notificationSettings
+                          item.key as keyof typeof notificationSettings
                           ],
                       })
                     }
@@ -1085,120 +1002,9 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* -------------------- USERS TAB -------------------- */}
-        {activeTab === "users" && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className={sectionTitleClass}>User Management</h3>
-              <button className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition">
-                Add User
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Name</th>
-                    <th className="px-4 py-2 text-left">Email</th>
-                    <th className="px-4 py-2 text-left">Role</th>
-                    <th className="px-4 py-2 text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {users.map((user) => (
-                    <tr key={user.id}>
-                      <td className="px-4 py-2">{user.name}</td>
-                      <td className="px-4 py-2">{user.email}</td>
-                      <td className="px-4 py-2 capitalize">{user.role}</td>
-                      <td className="px-4 py-2">
-                        <button className="text-blue-600 hover:text-blue-800 mr-2">
-                          Edit
-                        </button>
-                        <button className="text-red-600 hover:text-red-800">
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
-        {/* -------------------- SYSTEM TAB -------------------- */}
-        {activeTab === "system" && (
-          <div className="space-y-6">
-            <h3 className={sectionTitleClass}>System Preferences</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className={labelClass}>Currency</label>
-                <select
-                  value={systemPrefs.currency}
-                  onChange={(e) =>
-                    setSystemPrefs({ ...systemPrefs, currency: e.target.value })
-                  }
-                  className={inputClass}
-                >
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
-                  <option value="INR">INR (₹)</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Tax Rate (%)</label>
-                <input
-                  type="number"
-                  value={systemPrefs.taxRate}
-                  onChange={(e) =>
-                    setSystemPrefs({
-                      ...systemPrefs,
-                      taxRate: parseFloat(e.target.value),
-                    })
-                  }
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Order Number Prefix</label>
-                <input
-                  type="text"
-                  value={systemPrefs.orderPrefix}
-                  onChange={(e) =>
-                    setSystemPrefs({
-                      ...systemPrefs,
-                      orderPrefix: e.target.value,
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="ORD"
-                />
-              </div>
-              <div className="flex items-center">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={systemPrefs.autoAcceptOrders}
-                    onChange={(e) =>
-                      setSystemPrefs({
-                        ...systemPrefs,
-                        autoAcceptOrders: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">
-                    Auto-accept orders
-                  </span>
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
+
+
       </div>
     </div>
   );

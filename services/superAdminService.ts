@@ -5,20 +5,17 @@ import API from "../config/axios";
 // 🏢 RESTAURANTS
 // =============================
 
-export const getAllRestaurants = async (
-    page = 1,
-    search = ""
-) => {
+export const getAllRestaurants = async (params: string) => {
     const response = await API.get(
-        `api/super-admin/restaurants?page=${page}&search=${search}`
+        `/api/super-admin/restaurants?${params}`
     );
-    console.log("🚀 ~ file: superAdminService.ts ~ line 14 ~ getAllRestaurants ~ response", response)
+
     return response.data;
 };
 
 export const getRestaurantDetails = async (id: string) => {
     const res = await API.get(`/api/super-admin/restaurants/${id}`);
-    console.log("Fetched restaurant details for ID:", id, res.data);
+    // console.log("Fetched restaurant details for ID:", id, res.data);
     return res.data.data;
 };
 
@@ -89,6 +86,24 @@ export const getAllPlans = async () => {
 
     return response.data;
 };
+export const getPlanByCode = async (
+    code: string
+) => {
+    const res = await API.get(
+        `/api/super-admin/plans/${code}`
+    );
+
+    return res.data;
+};
+export const deletePlan = async (
+    planId: string
+) => {
+    const res = await API.delete(
+        `/api/super-admin/plans/${planId}`
+    );
+
+    return res.data;
+};
 
 export const createPlan = async (
     planData: any
@@ -106,11 +121,24 @@ export const updatePlan = async (
     planData: any
 ) => {
     const response = await API.put(
-        `/super-admin/plans/${planId}`,
+        `/api/super-admin/plans/${planId}`,
         planData
     );
 
     return response.data;
+};
+export const assignSubscriptionPlan = async (
+    restaurantId: string,
+    data: {
+        planCode: string;
+    }
+) => {
+    const res = await API.put(
+        `/api/super-admin/restaurants/${restaurantId}/subscription`,
+        data
+    );
+
+    return res.data;
 };
 // =============================
 // 💳 SUBSCRIPTIONS & BILLING
@@ -149,6 +177,7 @@ export const getRevenueStats = async () => {
 
 export const getDashboardStats = async () => {
     const res = await API.get("/api/super-admin/dashboard");
+    // console.log("Dashboard stats fetched:", res.data);
     return res.data;
 };
 
@@ -169,7 +198,13 @@ export const getTopRestaurants = async () => {
     return res.data;
 };
 
-
+export const getAnalyticsData = async () => {
+    const response = await API.get(
+        "/api/super-admin/analytics"
+    );
+    // console.log("Fetched analytics data:", response.data);
+    return response.data;
+};
 // =============================
 // 🎫 SUPPORT TICKETS
 // =============================
