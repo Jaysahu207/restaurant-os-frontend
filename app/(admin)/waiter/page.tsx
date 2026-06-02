@@ -50,11 +50,13 @@ interface OrderItem {
   price: number;
   quantity: number;
   specialInstructions?: string;
+
 }
 
 interface Order {
   _id: string;
   tableNumber: number;
+  orderType: "dine_in" | "takeaway" | "delivery";
   items: OrderItem[];
   status: "pending" | "preparing" | "ready" | "served" | "completed";
   totalAmount: number;
@@ -88,7 +90,7 @@ export default function WaiterPage() {
   const playSound = useCallback(() => {
     if (!soundEnabled || !audioRef.current) return;
     audioRef.current.currentTime = 0;
-    audioRef.current.play().catch(() => {});
+    audioRef.current.play().catch(() => { });
   }, [soundEnabled]);
 
   // Load orders and menu
@@ -203,10 +205,12 @@ export default function WaiterPage() {
     customerName?: string;
     customerPhone?: string;
     specialInstructions?: string;
+    orderType?: "dine_in" | "takeaway";
   }) => {
     try {
       const payload = {
         restaurantId: restaurant._id,
+        orderType: orderData.orderType ?? "dine_in",
         ...orderData,
       };
       await placeOrder(payload);
@@ -254,11 +258,10 @@ export default function WaiterPage() {
             {/* Sound Toggle */}
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2 rounded-full transition-all ${
-                soundEnabled
-                  ? "bg-orange-100 text-orange-600"
-                  : "bg-gray-200 text-gray-500"
-              }`}
+              className={`p-2 rounded-full transition-all ${soundEnabled
+                ? "bg-orange-100 text-orange-600"
+                : "bg-gray-200 text-gray-500"
+                }`}
               title={soundEnabled ? "Sound On" : "Sound Off"}
             >
               {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
@@ -431,9 +434,8 @@ function StatCard({
 }) {
   return (
     <div
-      className={`bg-white rounded-xl shadow-sm p-4 border ${
-        highlight ? "border-green-300 ring-1 ring-green-200" : "border-gray-100"
-      }`}
+      className={`bg-white rounded-xl shadow-sm p-4 border ${highlight ? "border-green-300 ring-1 ring-green-200" : "border-gray-100"
+        }`}
     >
       <div className="flex items-center justify-between">
         <div>
@@ -538,9 +540,8 @@ function OrderCard({
 
   return (
     <div
-      className={`bg-white rounded-xl shadow-sm border ${
-        highlight ? "border-green-300 ring-1 ring-green-200" : "border-gray-200"
-      } p-4 hover:shadow-md transition`}
+      className={`bg-white rounded-xl shadow-sm border ${highlight ? "border-green-300 ring-1 ring-green-200" : "border-gray-200"
+        } p-4 hover:shadow-md transition`}
     >
       <div className="flex justify-between items-start mb-2">
         <div>
@@ -929,33 +930,33 @@ function OrderDetailModal({
 }) {
   const getStatusColor = (status: string) => {
     const colors: Record<string, { bg: string; text: string; border: string }> =
-      {
-        pending: {
-          bg: "bg-yellow-100",
-          text: "text-yellow-700",
-          border: "border-yellow-300",
-        },
-        preparing: {
-          bg: "bg-blue-100",
-          text: "text-blue-700",
-          border: "border-blue-300",
-        },
-        ready: {
-          bg: "bg-green-100",
-          text: "text-green-700",
-          border: "border-green-300",
-        },
-        served: {
-          bg: "bg-purple-100",
-          text: "text-purple-700",
-          border: "border-purple-300",
-        },
-        completed: {
-          bg: "bg-gray-100",
-          text: "text-gray-700",
-          border: "border-gray-300",
-        },
-      };
+    {
+      pending: {
+        bg: "bg-yellow-100",
+        text: "text-yellow-700",
+        border: "border-yellow-300",
+      },
+      preparing: {
+        bg: "bg-blue-100",
+        text: "text-blue-700",
+        border: "border-blue-300",
+      },
+      ready: {
+        bg: "bg-green-100",
+        text: "text-green-700",
+        border: "border-green-300",
+      },
+      served: {
+        bg: "bg-purple-100",
+        text: "text-purple-700",
+        border: "border-purple-300",
+      },
+      completed: {
+        bg: "bg-gray-100",
+        text: "text-gray-700",
+        border: "border-gray-300",
+      },
+    };
     return colors[status] || colors.pending;
   };
 
