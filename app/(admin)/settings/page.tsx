@@ -11,12 +11,15 @@ import {
   Upload,
   ToggleLeft,
   ToggleRight,
+  Loader2,
 } from "lucide-react";
 import {
   getRestaurant,
   updateRestaurant,
   connectGmail,
   disconnectGmail,
+  uploadRestaurantLogo,
+  removeRestaurantLogo,
 } from "@/services/restaurantService";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -89,6 +92,13 @@ export default function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [uploadingLogo, setUploadingLogo] =
+    useState(false);
+
+
+  const authStore = useAuthStore();
+
+
 
   // Main restaurant form state
   const [restaurantForm, setRestaurantForm] = useState<RestaurantForm>({
@@ -120,8 +130,6 @@ export default function SettingsPage() {
     timings: { openTime: "", closeTime: "" },
   });
 
-
-
   const [paymentSettings, setPaymentSettings] = useState({
     stripeEnabled: true,
     stripePublicKey: process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY,
@@ -150,15 +158,11 @@ export default function SettingsPage() {
     { id: 3, name: "Staff", email: "staff@tastybites.com", role: "staff" },
   ]);
 
-
-
   const tabs = [
     { id: "restaurant", label: "Restaurant", icon: Store },
 
     { id: "payment", label: "Payment", icon: CreditCard },
     { id: "notifications", label: "Notifications", icon: Bell },
-
-
   ];
 
   // ----------------------------------------------------------------------
@@ -241,11 +245,7 @@ export default function SettingsPage() {
     setIsSaving(true);
     try {
       const res = await updateRestaurant(restaurantForm);
-      setAuth({
-        user,
-        token,
-        restaurant: res.restaurant,
-      });
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
       toast.success("Restaurant updated successfully!");
@@ -256,6 +256,72 @@ export default function SettingsPage() {
       setIsSaving(false);
     }
   };
+  const handleLogoUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+    const updatedRestaurant = await getRestaurant();
+
+    try {
+      // ✅ Local Preview
+      const preview = URL.createObjectURL(file);
+
+      setRestaurantForm((prev) => ({
+        ...prev,
+        logo: preview,
+      }));
+
+      // ✅ Create FormData
+      const formData = new FormData();
+
+      formData.append("logo", file);
+
+      // ✅ Upload API
+      const res = await uploadRestaurantLogo(formData);
+      const updatedRestaurant = await getRestaurant();
+
+      // ✅ Update auth state
+      setAuth({
+        user,
+        token,
+        restaurant: updatedRestaurant,
+      });
+
+      // ✅ Update local form
+      setRestaurantForm((prev) => ({
+        ...prev,
+        logo: res.logo,
+      }));
+      // console.log("UPLOAD RESPONSE", res);
+      toast.success("Logo uploaded successfully!");
+    } catch (err) {
+      console.error(err);
+
+      toast.error("Failed to upload logo.");
+    }
+  };
+  const handleRemoveLogo = async () => {
+    try {
+      await removeRestaurantLogo();
+
+      setRestaurantForm((prev) => ({
+        ...prev,
+        logo: "",
+      }));
+
+
+
+      toast.success("Logo removed successfully");
+    } catch (error) {
+      console.error(error);
+
+      toast.error("Failed to remove logo");
+    }
+  };
+
+
 
   const handleSaveUPI = async () => {
     // Update restaurantForm with latest UPI ID and save
@@ -793,7 +859,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Currency & Logo */}
-              <div>
+              {/* <div>
                 <label className={labelClass}>Currency</label>
                 <select
                   value={restaurantForm.currency}
@@ -808,32 +874,8 @@ export default function SettingsPage() {
                   <option value="INR">INR (₹)</option>
                   <option value="USD">USD ($)</option>
                 </select>
-              </div>
-              <div className="md:col-span-2">
-                <label className={labelClass}>Logo</label>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center border">
-                    {restaurantForm.logo ? (
-                      <img
-                        src={restaurantForm.logo}
-                        alt="logo"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Store className="w-8 h-8 text-gray-400" />
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition flex items-center gap-2"
-                    onClick={() =>
-                      toast.error("Upload not implemented in demo")
-                    }
-                  >
-                    <Upload className="w-4 h-4" /> Upload
-                  </button>
-                </div>
-              </div>
+              </div> */}
+
             </div>
 
             {/* SAVE BUTTON */}
@@ -847,6 +889,101 @@ export default function SettingsPage() {
               </button>
             </div>
 
+
+            {/* Logo & Currency */}
+            <div className="md:col-span-2">
+              <label className={labelClass}>
+                Restaurant Branding
+              </label>
+
+              <div className="mt-2 bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+
+                  {/* Logo Preview */}
+                  <div className="relative group">
+
+                    {restaurantForm.logo ? (
+                      <img
+                        src={restaurantForm.logo}
+                        alt="Restaurant Logo"
+                        className="w-24 h-24 rounded-2xl object-cover border-2 border-orange-100 shadow-md"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
+                        <Store className="w-10 h-10 text-white" />
+                      </div>
+                    )}
+
+                    <div className="absolute -bottom-2 -right-2 bg-green-500 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center">
+                      <span className="text-white text-[10px]">✓</span>
+                    </div>
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1">
+
+                    <h3 className="font-semibold text-gray-900">
+                      Restaurant Logo
+                    </h3>
+
+                    <p className="text-sm text-gray-500 mt-1">
+                      Upload your restaurant logo to personalize
+                      your menu, QR ordering page and invoices.
+                    </p>
+
+                    <div className="flex flex-wrap gap-3 mt-4">
+
+                      <button
+                        disabled={uploadingLogo}
+                        type="button"
+                        onClick={() =>
+                          document.getElementById("logoUpload")?.click()
+                        }
+                        className="px-4 py-2 bg-orange-500 text-white rounded-xl"
+                      >
+                        {uploadingLogo ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            Upload Logo
+                          </>
+                        )}
+                      </button>
+
+                      {restaurantForm.logo && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveLogo}
+                          className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl transition"
+                        >
+                          Remove Logo
+                        </button>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-gray-400 mt-3">
+                      PNG, JPG or WEBP • Recommended:
+                      512×512px
+                    </p>
+
+                  </div>
+
+                </div>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="logoUpload"
+                  className="hidden"
+                  onChange={handleLogoUpload}
+                />
+              </div>
+            </div>
             {/* Marketing Email Section */}
             <div className="mt-8 border-t pt-6">
               <h3 className={sectionTitleClass}>Marketing Email</h3>
@@ -887,8 +1024,6 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
-
-
 
         {/* -------------------- PAYMENT TAB -------------------- */}
         {activeTab === "payment" && (
@@ -1001,10 +1136,6 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
-
-
-
-
       </div>
     </div>
   );

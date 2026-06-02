@@ -1,7 +1,8 @@
 import "./globals.css";
 import QueryProvider from "@/providers/QueryProvider";
 import { Toaster } from "react-hot-toast";
-
+import AuthInitializer from "@/components/AuthInitializer";
+import "@/styles/print.css";
 export default function RootLayout({
   children,
 }: {
@@ -11,6 +12,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="bg-gray-50 text-gray-900">
         <QueryProvider>
+          <AuthInitializer />
           {children}
 
           <Toaster

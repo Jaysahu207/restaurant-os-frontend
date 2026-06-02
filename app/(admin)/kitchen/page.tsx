@@ -35,6 +35,7 @@ interface Order {
   _id: string;
   tableNumber: number;
   items: OrderItem[];
+  orderType: "dine_in" | "takeaway";
   status: "pending" | "preparing" | "ready" | "served" | "completed";
   createdAt: string;
   specialInstructions?: string;
@@ -66,7 +67,7 @@ export default function KitchenPage() {
             audio.pause();
             audio.currentTime = 0;
           })
-          .catch(() => {});
+          .catch(() => { });
       }
 
       window.removeEventListener("click", unlockAudio);
@@ -274,11 +275,10 @@ export default function KitchenPage() {
             {/* Sound Toggle */}
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2 rounded-full transition-all ${
-                soundEnabled
-                  ? "bg-orange-100 text-orange-600"
-                  : "bg-gray-200 text-gray-500"
-              }`}
+              className={`p-2 rounded-full transition-all ${soundEnabled
+                ? "bg-orange-100 text-orange-600"
+                : "bg-gray-200 text-gray-500"
+                }`}
               title={soundEnabled ? "Sound On" : "Sound Off"}
             >
               {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
@@ -527,7 +527,9 @@ function OrderCard({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-gray-800">
-                Table {order.tableNumber}
+                {order.orderType === "dine_in"
+                  ? `🍽️ Table ${order.tableNumber}`
+                  : "🥡 Takeaway"}
               </span>
               <span className="text-xs bg-gray-200 px-2 py-0.5 rounded-full">
                 #{order._id.slice(-6)}

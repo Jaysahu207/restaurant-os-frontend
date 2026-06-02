@@ -81,7 +81,7 @@ export default function AuthPage() {
         restaurant: data.restaurant,
         token: data.token,
       });
-
+      console.log("Login successful, user data:", data.user, "restaurant data:", data.restaurant);
       const role = data?.user?.role?.toUpperCase();
 
       toast.success(`Welcome back ${data?.user?.name || ""}`);
@@ -193,7 +193,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50">
+    <div className="min-h-screen bg-white-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="container mx-auto px-4 py-8 lg:py-12">
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center max-w-7xl mx-auto">
           {/* ========================================= */}
@@ -202,10 +202,10 @@ export default function AuthPage() {
           <div className="hidden lg:block space-y-8">
             {/* Logo */}
             <Image
-              src="/logo.svg"
+              src="/final.png"
               alt="QRasoi Logo"
-              width={250}
-              height={50}
+              width={120}
+              height={60}
               className="mb-6"
             />
 
@@ -290,10 +290,10 @@ export default function AuthPage() {
               {/* Mobile Logo */}
               <div className="lg:hidden flex justify-center mb-8">
                 <Image
-                  src="/logo.svg"
+                  src="/final.png"
                   alt="QRasoi Logo"
-                  width={250}
-                  height={100}
+                  width={120}
+                  height={120}
                 />
               </div>
 
@@ -303,21 +303,19 @@ export default function AuthPage() {
                 <div className="flex bg-gray-100 rounded-2xl p-1 mb-8">
                   <button
                     onClick={() => setActiveTab("login")}
-                    className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                      activeTab === "login"
-                        ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
+                    className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 ${activeTab === "login"
+                      ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md"
+                      : "text-gray-600 hover:text-gray-900"
+                      }`}
                   >
                     Login
                   </button>
                   <button
                     onClick={() => setActiveTab("register")}
-                    className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                      activeTab === "register"
-                        ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
+                    className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 ${activeTab === "register"
+                      ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md"
+                      : "text-gray-600 hover:text-gray-900"
+                      }`}
                   >
                     Register
                   </button>

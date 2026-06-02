@@ -138,7 +138,7 @@ export default function MenuPage() {
       const data = await getMenuItems(restaurant._id as string);
       // console.log("📡 Fetched Menu Data:", data);
       setMenuItems(data);
-      console.log(data);
+      // console.log(data);
     } catch (err) {
       console.error(err);
     }
@@ -282,10 +282,11 @@ export default function MenuPage() {
           <span>Sort by:</span>
           <button
             onClick={() => handleSort("name")}
-            className={`flex items-center gap-1 px-2 py-1 rounded ${sortField === "name"
-              ? "bg-blue-100 text-blue-700"
-              : "hover:bg-gray-100"
-              }`}
+            className={`flex items-center gap-1 px-2 py-1 rounded ${
+              sortField === "name"
+                ? "bg-blue-100 text-blue-700"
+                : "hover:bg-gray-100"
+            }`}
           >
             Name
             {sortField === "name" &&
@@ -297,10 +298,11 @@ export default function MenuPage() {
           </button>
           <button
             onClick={() => handleSort("category")}
-            className={`flex items-center gap-1 px-2 py-1 rounded ${sortField === "category"
-              ? "bg-blue-100 text-blue-700"
-              : "hover:bg-gray-100"
-              }`}
+            className={`flex items-center gap-1 px-2 py-1 rounded ${
+              sortField === "category"
+                ? "bg-blue-100 text-blue-700"
+                : "hover:bg-gray-100"
+            }`}
           >
             Category
             {sortField === "category" &&
@@ -312,10 +314,11 @@ export default function MenuPage() {
           </button>
           <button
             onClick={() => handleSort("price")}
-            className={`flex items-center gap-1 px-2 py-1 rounded ${sortField === "price"
-              ? "bg-blue-100 text-blue-700"
-              : "hover:bg-gray-100"
-              }`}
+            className={`flex items-center gap-1 px-2 py-1 rounded ${
+              sortField === "price"
+                ? "bg-blue-100 text-blue-700"
+                : "hover:bg-gray-100"
+            }`}
           >
             Price
             {sortField === "price" &&
@@ -367,26 +370,28 @@ export default function MenuPage() {
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full
-      ${item.type === "veg"
-                            ? "bg-green-50 text-green-700"
-                            : item.type === "non-veg"
-                              ? "bg-red-50 text-red-700"
-                              : item.type === "egg"
-                                ? "bg-yellow-50 text-yellow-700"
-                                : "bg-gray-100 text-gray-600"
-                          }
+      ${
+        item.type === "veg"
+          ? "bg-green-50 text-green-700"
+          : item.type === "non-veg"
+            ? "bg-red-50 text-red-700"
+            : item.type === "egg"
+              ? "bg-yellow-50 text-yellow-700"
+              : "bg-gray-100 text-gray-600"
+      }
     `}
                       >
                         <span
                           className={`w-2 h-2 rounded-full
-        ${item.type === "veg"
-                              ? "bg-green-600"
-                              : item.type === "non-veg"
-                                ? "bg-red-600"
-                                : item.type === "egg"
-                                  ? "bg-yellow-500"
-                                  : "bg-gray-500"
-                            }
+        ${
+          item.type === "veg"
+            ? "bg-green-600"
+            : item.type === "non-veg"
+              ? "bg-red-600"
+              : item.type === "egg"
+                ? "bg-yellow-500"
+                : "bg-gray-500"
+        }
       `}
                         ></span>
                         {item.type}
@@ -438,10 +443,11 @@ export default function MenuPage() {
 
                     <td className="px-4 py-3">
                       <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${item.isAvailable
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
-                          }`}
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          item.isAvailable
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
                       >
                         {item.isAvailable ? "Available" : "Unavailable"}
                       </span>
@@ -585,7 +591,6 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
 
       // WAIT until save completes
       await onSave(form);
-
     } catch (error) {
       console.error(error);
     } finally {
@@ -925,10 +930,11 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
               onClick={onClose}
               disabled={isSaving}
               className={`px-4 py-2 border border-gray-300 rounded-lg transition
-      ${isSaving
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "text-gray-700 hover:bg-gray-50"
-                }`}
+      ${
+        isSaving
+          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+          : "text-gray-700 hover:bg-gray-50"
+      }`}
             >
               Cancel
             </button>
@@ -937,10 +943,11 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
               type="submit"
               disabled={isSaving}
               className={`px-4 py-2 rounded-lg text-white shadow-sm transition flex items-center gap-2
-    ${isSaving
-                  ? "bg-orange-300 cursor-not-allowed opacity-70"
-                  : "bg-gradient-to-br from-orange-400 to-amber-500 hover:opacity-90"
-                }`}
+    ${
+      isSaving
+        ? "bg-orange-300 cursor-not-allowed opacity-70"
+        : "bg-gradient-to-br from-orange-400 to-amber-500 hover:opacity-90"
+    }`}
             >
               {isSaving ? (
                 <>
@@ -964,7 +971,6 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
                       d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
                     />
                   </svg>
-
                   Saving...
                 </>
               ) : (

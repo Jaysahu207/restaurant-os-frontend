@@ -1,0 +1,101 @@
+/* ================= THERMAL PRINT ================= */
+
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+    font-family: Arial, sans-serif !important;
+  }
+
+  /* Hide everything */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show invoice & KOT only */
+  #invoice-print,
+  #invoice-print *,
+  #kot-print,
+  #kot-print * {
+    visibility: visible;
+  }
+
+  /* Main print container */
+  #invoice-print,
+  #kot-print {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+
+    width: 80mm !important;
+    max-width: 80mm !important;
+    min-width: 80mm !important;
+
+    margin: 0 !important;
+    padding: 2mm !important;
+
+    background: #fff !important;
+
+    box-sizing: border-box !important;
+
+    overflow: visible !important;
+
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  /* Tables */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+  }
+
+  th,
+  td {
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    font-size: 11px !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+
+  /* Images */
+  img {
+    max-width: 100% !important;
+    display: block !important;
+  }
+
+  /* Remove buttons */
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Prevent extra blank pages */
+  #invoice-print:last-child,
+  #kot-print:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* Prevent content cutting */
+  tr,
+  td,
+  th,
+  div,
+  p {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}

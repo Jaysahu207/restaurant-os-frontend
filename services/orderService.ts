@@ -16,7 +16,8 @@ type CustomerInfo = {
 
 type OrderPayload = {
   restaurantId: string;
-  tableNumber: number;
+  orderType: "dine_in" | "takeaway";
+  tableNumber?: number | null;
   items: OrderItem[];
   customer?: CustomerInfo;
 };
@@ -34,7 +35,7 @@ export const placeOrder = async (orderData: OrderPayload) => {
 
 // 🔥 GET ORDERS (✅ FIXED)
 export const getOrders = async (restaurantId: string, date?: string) => {
-  console.log(" Get Order -->> ", restaurantId, date)
+  // console.log(" Get Order -->> ", restaurantId, date)
   try {
     const res = await PublicAPI.get(
       `/api/orders?restaurantId=${restaurantId}&date=${date}`

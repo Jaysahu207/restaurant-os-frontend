@@ -1,7 +1,7 @@
 import { PublicAPI } from "@/config/axios";
 
 export const fetchCustomerMenu = async (slug: string) => {
-  console.log("🌐 BASE URL:", process.env.NEXT_PUBLIC_API_URL);
+  // console.log("🌐 BASE URL:", process.env.NEXT_PUBLIC_API_URL);
 
   try {
     const res = await PublicAPI.get(`/api/customers/menu/${slug}`);

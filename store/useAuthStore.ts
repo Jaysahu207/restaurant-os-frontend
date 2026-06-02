@@ -26,7 +26,6 @@ export const useAuthStore = create<AuthState>()(
             restaurant: null,
             token: null,
 
-            // ✅ login
             setAuth: ({ user, restaurant, token }) =>
                 set({
                     user,
@@ -34,12 +33,10 @@ export const useAuthStore = create<AuthState>()(
                     token,
                 }),
 
-            // ✅ granular setters
             setUser: (user) => set({ user }),
             setRestaurant: (restaurant) => set({ restaurant }),
             setToken: (token) => set({ token }),
 
-            // ✅ logout
             logout: () => {
                 set({
                     user: null,
@@ -47,11 +44,24 @@ export const useAuthStore = create<AuthState>()(
                     token: null,
                 });
 
-                localStorage.removeItem("auth-storage"); // 👈 important fix
+                localStorage.removeItem("auth-storage");
             },
         }),
         {
-            name: "auth-storage", // 🔥 localStorage key
+            name: "auth-storage",
+
+            onRehydrateStorage: () => {
+                // console.log("🔥 Zustand hydration started");
+
+                return (state, error) => {
+                    if (error) {
+                        console.error("❌ Hydration failed:", error);
+                    } else {
+                        // console.log("✅ Hydration completed");
+                        // console.log("📦 Hydrated state:", state);
+                    }
+                };
+            },
         }
     )
 );

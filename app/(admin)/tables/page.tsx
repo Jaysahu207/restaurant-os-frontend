@@ -86,6 +86,9 @@ export default function TablesPage() {
   const getQRUrl = (tableNumber: number) => {
     return `${process.env.NEXT_PUBLIC_FRONTEND_URL}/menu/${slug}?table=${tableNumber}`;
   };
+  const getTakeawayQRUrl = () => {
+    return `${process.env.NEXT_PUBLIC_FRONTEND_URL}/menu/${slug}?mode=takeaway`;
+  };
   // Download QR as PNG
   const downloadQR = useCallback(async (id: string, tableNumber: number) => {
     const element = document.getElementById(`qr-${id}`);
@@ -362,6 +365,44 @@ export default function TablesPage() {
             ))}
           </div>
         )}
+
+
+        <div className="bg-white rounded-2xl shadow-md p-6">
+          <h2 className="text-xl font-bold mb-4">
+            Takeaway QR
+          </h2>
+
+          <div
+            id="takeaway-qr"
+            className="bg-white p-4 rounded-xl inline-block"
+          >
+            <QRCode
+              value={getTakeawayQRUrl()}
+              size={160}
+              bgColor="#FFFFFF"
+              fgColor="#111827"
+              level="H"
+            />
+          </div>
+
+          <div className="mt-4 flex gap-3">
+            <button
+              // onClick={() => downloadTakeawayQR()}
+              className="flex-1 bg-orange-500 text-white py-2 rounded-xl"
+            >
+              Download
+            </button>
+
+            <button
+              onClick={() =>
+                navigator.clipboard.writeText(getTakeawayQRUrl())
+              }
+              className="flex-1 border py-2 rounded-xl"
+            >
+              Copy URL
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Modal for Add/Edit */}

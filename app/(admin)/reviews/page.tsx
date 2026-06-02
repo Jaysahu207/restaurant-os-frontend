@@ -4,15 +4,18 @@ import { useState } from "react";
 import {
     Star,
     StarHalf,
-    ThumbsUp,
     MessageCircle,
-    Filter,
     Search,
-    Calendar,
     ExternalLink,
-    X,
+    Save,
+    Download,
 } from "lucide-react";
 
+import QRCode from "react-qr-code";
+import toast from "react-hot-toast";
+import { useAuthStore } from "@/store/useAuthStore";
+
+import { GoogleReviewSection } from "@/components/reviews/GoogleReviewSection";
 // Mock reviews data (replace with API)
 const initialReviews = [
     {
@@ -72,8 +75,7 @@ const initialReviews = [
         id: 6,
         customer: "Ananya Reddy",
         rating: 4,
-        comment:
-            "Loved the pasta and the dessert. Good value for money.",
+        comment: "Loved the pasta and the dessert. Good value for money.",
         date: "2025-03-14T13:45:00",
         source: "App",
         replied: false,
@@ -82,6 +84,7 @@ const initialReviews = [
 
 // Source options
 const sources = ["All", "App", "Google", "Zomato", "Swiggy"];
+
 
 // Helper to render stars
 const renderStars = (rating: number) => {
@@ -92,9 +95,14 @@ const renderStars = (rating: number) => {
     return (
         <div className="flex items-center gap-0.5">
             {[...Array(fullStars)].map((_, i) => (
-                <Star key={`full-${i}`} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                <Star
+                    key={`full-${i}`}
+                    className="w-4 h-4 fill-yellow-400 text-yellow-400"
+                />
             ))}
-            {halfStar && <StarHalf className="w-4 h-4 fill-yellow-400 text-yellow-400" />}
+            {halfStar && (
+                <StarHalf className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+            )}
             {[...Array(emptyStars)].map((_, i) => (
                 <Star key={`empty-${i}`} className="w-4 h-4 text-gray-300" />
             ))}
@@ -110,12 +118,17 @@ export default function ReviewsPage() {
     const [replyingTo, setReplyingTo] = useState<number | null>(null);
     const [replyText, setReplyText] = useState("");
 
+    const restaurant = useAuthStore((state) => state.restaurant);
+
+
+    // console.log("Restaurant from store in Reviews Page:", restaurant);
     // Filter reviews
     const filteredReviews = reviews.filter((review) => {
         const matchesSearch =
             review.customer.toLowerCase().includes(search.toLowerCase()) ||
             review.comment.toLowerCase().includes(search.toLowerCase());
-        const matchesSource = sourceFilter === "All" || review.source === sourceFilter;
+        const matchesSource =
+            sourceFilter === "All" || review.source === sourceFilter;
         const matchesRating =
             ratingFilter === "All" || review.rating === parseInt(ratingFilter);
         return matchesSearch && matchesSource && matchesRating;
@@ -126,7 +139,7 @@ export default function ReviewsPage() {
     const averageRating =
         reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews || 0;
     const ratingCounts = [5, 4, 3, 2, 1].map(
-        (star) => reviews.filter((r) => Math.floor(r.rating) === star).length
+        (star) => reviews.filter((r) => Math.floor(r.rating) === star).length,
     );
 
     // Reply handler
@@ -134,8 +147,10 @@ export default function ReviewsPage() {
         if (replyText.trim()) {
             setReviews(
                 reviews.map((r) =>
-                    r.id === id ? { ...r, replied: true, replyText: replyText.trim() } : r
-                )
+                    r.id === id
+                        ? { ...r, replied: true, replyText: replyText.trim() }
+                        : r,
+                ),
             );
             setReplyingTo(null);
             setReplyText("");
@@ -194,9 +209,7 @@ export default function ReviewsPage() {
                         <div className="text-3xl font-bold text-gray-800">4.3</div>
                         <div className="text-sm text-gray-500">(128 reviews)</div>
                     </div>
-                    <div className="flex items-center gap-1 mt-1">
-                        {renderStars(4.3)}
-                    </div>
+                    <div className="flex items-center gap-1 mt-1">{renderStars(4.3)}</div>
                     <p className="text-xs text-gray-400 mt-2">Last updated today</p>
                 </div>
             </div>
@@ -245,7 +258,12 @@ export default function ReviewsPage() {
                     </div>
                 </div>
             </div>
-
+            {restaurant && (
+                <GoogleReviewSection
+                    restaurantId={restaurant._id}
+                    existingLink={restaurant.googleReviewLink}
+                />
+            )}
             {/* Reviews list */}
             <div className="space-y-4">
                 {filteredReviews.length === 0 ? (
@@ -263,7 +281,9 @@ export default function ReviewsPage() {
                                 <div className="flex-1">
                                     <div className="flex items-center justify-between mb-2">
                                         <div>
-                                            <h3 className="font-semibold text-gray-800">{review.customer}</h3>
+                                            <h3 className="font-semibold text-gray-800">
+                                                {review.customer}
+                                            </h3>
                                             <div className="flex items-center gap-2 mt-1">
                                                 {renderStars(review.rating)}
                                                 <span className="text-sm text-gray-500">
@@ -283,40 +303,38 @@ export default function ReviewsPage() {
                                             <p className="font-medium text-gray-700">Your reply:</p>
                                             <p className="text-gray-600 mt-1">{review.replyText}</p>
                                         </div>
-                                    ) : (
-                                        replyingTo === review.id ? (
-                                            <div className="mt-3">
-                                                <textarea
-                                                    value={replyText}
-                                                    onChange={(e) => setReplyText(e.target.value)}
-                                                    placeholder="Write your reply..."
-                                                    rows={2}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                                                />
-                                                <div className="flex justify-end gap-2 mt-2">
-                                                    <button
-                                                        onClick={() => setReplyingTo(null)}
-                                                        className="px-3 py-1 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50"
-                                                    >
-                                                        Cancel
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleReply(review.id)}
-                                                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                                    >
-                                                        Send Reply
-                                                    </button>
-                                                </div>
+                                    ) : replyingTo === review.id ? (
+                                        <div className="mt-3">
+                                            <textarea
+                                                value={replyText}
+                                                onChange={(e) => setReplyText(e.target.value)}
+                                                placeholder="Write your reply..."
+                                                rows={2}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                            />
+                                            <div className="flex justify-end gap-2 mt-2">
+                                                <button
+                                                    onClick={() => setReplyingTo(null)}
+                                                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={() => handleReply(review.id)}
+                                                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                                >
+                                                    Send Reply
+                                                </button>
                                             </div>
-                                        ) : (
-                                            <button
-                                                onClick={() => setReplyingTo(review.id)}
-                                                className="mt-3 flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
-                                            >
-                                                <MessageCircle className="w-4 h-4" />
-                                                Reply
-                                            </button>
-                                        )
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => setReplyingTo(review.id)}
+                                            className="mt-3 flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+                                        >
+                                            <MessageCircle className="w-4 h-4" />
+                                            Reply
+                                        </button>
                                     )}
                                 </div>
 
@@ -347,3 +365,5 @@ function StatBox({ label, value, icon: Icon, color, suffix = "" }: any) {
         </div>
     );
 }
+
+

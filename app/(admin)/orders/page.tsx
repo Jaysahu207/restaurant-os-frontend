@@ -24,7 +24,9 @@ import { io, Socket } from "socket.io-client";
 import { useAuthStore } from "@/store/useAuthStore";
 import toast from "react-hot-toast";
 import InvoiceTemplate from "@/components/invoice/InvoiceTemplate";
-import { printInvoice } from "@/components/invoice/PrintInvoice";
+
+import { useReactToPrint } from "react-to-print";
+
 
 // ==================== Types ====================
 interface OrderItem {
@@ -43,7 +45,8 @@ interface Order {
     email?: string;
   };
   orderNumber: string;
-  table: number;
+  table: string;
+  orderType: "dine_in" | "takeaway";
   items: OrderItem[];
   total: number; // Grand total after all taxes (final amount)
   subtotal: number; // Subtotal before taxes
@@ -102,6 +105,7 @@ export default function OrdersPage() {
   const [refreshing, setRefreshing] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0],
@@ -115,6 +119,7 @@ export default function OrdersPage() {
       const dateParam = selectedDate || undefined;
       const data = await getOrders(restaurant._id, dateParam);
       const formatted: Order[] = data.map((o: any) => mapOrder(o));
+      // console.log("Fetched orders -->>  ", formatted);
       setOrders(formatted);
     } catch (error) {
       console.error("Failed to load orders:", error);
@@ -145,7 +150,7 @@ export default function OrdersPage() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("🟢 Admin socket connected:", socket.id);
+      // console.log("🟢 Admin socket connected:", socket.id);
       socket.emit("joinRestaurant", restaurant._id);
     });
 
@@ -182,10 +187,10 @@ export default function OrdersPage() {
         prev.map((order) =>
           order.id === updatedOrder._id
             ? {
-                ...order,
-                paymentStatus: updatedOrder.paymentStatus,
-                paymentMethod: updatedOrder.paymentMethod,
-              }
+              ...order,
+              paymentStatus: updatedOrder.paymentStatus,
+              paymentMethod: updatedOrder.paymentMethod,
+            }
             : order,
         ),
       );
@@ -202,6 +207,7 @@ export default function OrdersPage() {
   const mapOrder = (o: any): Order => ({
     id: o._id,
     table: o.tableNumber,
+    orderType: o.orderType,
     items: [...o.items],
     total: o.finalAmount ?? o.totalAmount, // finalAmount is the grand total after taxes
     subtotal: o.subtotal ?? o.totalAmount,
@@ -283,7 +289,7 @@ export default function OrdersPage() {
         audioRef.current
           .play()
           .then(() => audioRef.current?.pause())
-          .catch(() => {});
+          .catch(() => { });
       }
       window.removeEventListener("click", unlockAudio);
     };
@@ -422,11 +428,10 @@ export default function OrdersPage() {
               <button
                 key={status}
                 onClick={() => setFilter(status)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition flex items-center gap-2 ${
-                  filter === status
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition flex items-center gap-2 ${filter === status
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
               >
                 {statusLabels[status]}
                 {status !== "all" && (
@@ -442,13 +447,13 @@ export default function OrdersPage() {
           {(search ||
             filter !== "all" ||
             selectedDate !== new Date().toISOString().split("T")[0]) && (
-            <button
-              onClick={clearFilters}
-              className="ml-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
-            >
-              <X className="w-4 h-4" /> Clear
-            </button>
-          )}
+              <button
+                onClick={clearFilters}
+                className="ml-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
+              >
+                <X className="w-4 h-4" /> Clear
+              </button>
+            )}
         </div>
       </div>
 
@@ -465,8 +470,8 @@ export default function OrdersPage() {
               </h3>
               <p className="text-gray-500">
                 {search ||
-                filter !== "all" ||
-                selectedDate !== new Date().toISOString().split("T")[0]
+                  filter !== "all" ||
+                  selectedDate !== new Date().toISOString().split("T")[0]
                   ? "Try adjusting your filters or search criteria."
                   : "Waiting for new orders to arrive."}
               </p>
@@ -746,16 +751,20 @@ function OrderDetailModal({
   onUpdateStatus: (status: OrderStatus) => void;
   restaurantName?: string;
 }) {
-  const handlePrint = () => {
-    printInvoice("order-detail-print", order.invoiceNumber);
-  };
+
+
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `Invoice-${order.invoiceNumber}`,
+  });
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 no-print"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
@@ -769,7 +778,8 @@ function OrderDetailModal({
         </div>
         <div id="order-detail-print" className="p-6 space-y-6">
           <InvoiceTemplate
-            order={{ ...order, table: String(order.table) }}
+            ref={printRef}
+            order={order}
             restaurantName={restaurantName}
           />
         </div>
@@ -803,9 +813,11 @@ function KOTModal({
   onClose: () => void;
   restaurantName?: string;
 }) {
-  const handlePrint = () => {
-    printInvoice("kot-print", `KOT-${order.orderNumber}`);
-  };
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `KOT-${order.orderNumber}`,
+  });
   console.log(order);
 
   return (
@@ -814,7 +826,7 @@ function KOTModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl max-w-md w-full"
+        className="bg-white rounded-xl max-w-sm w-full"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 border-b flex justify-between items-center">
@@ -828,8 +840,7 @@ function KOTModal({
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
-
-        <div id="kot-print" className="p-6 space-y-4">
+        <div ref={printRef} id="kot-print" className="p-6 space-y-4">
           <div className="text-center">
             <h2 className="font-bold text-xl">{restaurantName}</h2>
             <p className="text-sm text-gray-500 font-mono">
@@ -838,7 +849,15 @@ function KOTModal({
             <p className="text-sm text-gray-500">
               {new Date(order.createdAt).toLocaleString()}
             </p>
-            <p className="text-sm font-medium mt-1">Table: {order.table}</p>
+            <p className="text-sm uppercase font-semibold mt-1">
+              {order.orderType || "dine_in"}
+            </p>
+
+            {order.orderType === "dine_in" && order.table && (
+              <p className="text-sm font-medium mt-1">
+                Table: {order.table}
+              </p>
+            )}
           </div>
           <div className="border-t border-b border-dashed py-3 space-y-2">
             {order.items.map((item, idx) => (

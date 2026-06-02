@@ -351,7 +351,7 @@ export default function DashboardPage() {
       try {
         setLoading(true);
         const res = await getDashboardData(restaurant._id);
-        console.log("📦 Dashboard Data:", res.data);
+        // console.log("📦 Dashboard Data:", res.data);
         setData(res.data);
       } catch (err) {
         console.error(err);

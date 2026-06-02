@@ -22,6 +22,8 @@ import {
   Loader2,
   Volume2,
   VolumeX,
+
+
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { fetchCustomerMenu } from "@/services/customerMenu";
@@ -37,6 +39,8 @@ import toast from "react-hot-toast";
 import API from "@/config/axios";
 import QRCode from "react-qr-code";
 import { sendInvoice } from "@/services/invoiceService";
+import ReviewPopup from "@/components/reviews/ReviewPopup";
+import BannerCarousel from "@/components/customer/BannerCarousel";
 
 // ------------------------------------------------------------
 // Types
@@ -78,6 +82,9 @@ interface Restaurant {
     takeaway: boolean;
     delivery: boolean;
   };
+
+  googleReviewLink?: string;
+
   logo?: string;
   coverImage?: string;
   isActive?: boolean;
@@ -173,10 +180,13 @@ function CustomerMenuContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const restaurantId = params?.restaurantId as string;
-  const table = searchParams.get("table");
 
+
+  const table = searchParams.get("table");
+  const mode = searchParams.get("mode");
   // --- State ---
   const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [banners, setBanners] = useState([]);
   const [categories, setCategories] = useState<string[]>(["All"]);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -199,6 +209,9 @@ function CustomerMenuContent() {
   const [selectedAddons, setSelectedAddons] = useState<
     { name: string; price: number }[]
   >([]);
+  const [orderType, setOrderType] = useState<
+    "dine_in" | "takeaway"
+  >("dine_in");
   const [modalQuantity, setModalQuantity] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
@@ -215,7 +228,17 @@ function CustomerMenuContent() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
 
+  const [showReviewPopup, setShowReviewPopup] =
+    useState(false);
+  useEffect(() => {
+    if (table) {
+      setOrderType("dine_in");
+    } else if (mode === "takeaway") {
+      setOrderType("takeaway");
+    }
+  }, [table, mode]);
   // --- Cart Store ---
   const {
     items: cartItems,
@@ -249,6 +272,7 @@ function CustomerMenuContent() {
         const restaurantData = data?.restaurant || null;
         setMenu(menuItems);
         setRestaurant(restaurantData);
+        setBanners(data.banners || []);
         const uniqueCategories: string[] = [
           "All",
           ...(Array.from(
@@ -270,6 +294,40 @@ function CustomerMenuContent() {
     };
     loadMenu();
   }, [restaurantId]);
+  useEffect(() => {
+    if (!restaurant?._id) return;
+
+    const seen = sessionStorage.getItem(
+      `welcome_seen_${restaurant._id}`
+    );
+
+    if (!seen) {
+      setShowWelcome(true);
+
+      const timer = setTimeout(() => {
+        sessionStorage.setItem(
+          `welcome_seen_${restaurant._id}`,
+          "true"
+        );
+
+        setShowWelcome(false);
+      }, 8000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [restaurant?._id]);
+
+
+  const dismissWelcome = () => {
+    if (!restaurant?._id) return;
+
+    sessionStorage.setItem(
+      `welcome_seen_${restaurant._id}`,
+      "true"
+    );
+
+    setShowWelcome(false);
+  };
 
   // Restore order from localStorage
   useEffect(() => {
@@ -279,7 +337,7 @@ function CustomerMenuContent() {
         const parsed = JSON.parse(saved);
         setCurrentOrder(parsed);
         setOrderPlaced(true);
-      } catch (e) {}
+      } catch (e) { }
     }
   }, []);
 
@@ -287,7 +345,9 @@ function CustomerMenuContent() {
   useEffect(() => {
     if (currentOrder) {
       localStorage.setItem("currentOrder", JSON.stringify(currentOrder));
+
     }
+
   }, [currentOrder]);
 
   // Socket connection for real-time updates
@@ -323,8 +383,16 @@ function CustomerMenuContent() {
     socket.on("ORDER_COMPLETED", (order: Order) => {
       if (currentOrder?._id === order._id) {
         playSound();
+
         setCurrentOrder(order);
-        toast.success("✅ Order completed! Thanks for dining with us.");
+
+        if (order.status === "completed") {
+          setShowReviewPopup(true);
+        }
+
+        toast.success(
+          "✅ Order completed! Thanks for dining with us."
+        );
       }
     });
 
@@ -414,7 +482,7 @@ function CustomerMenuContent() {
       audioRef.current
         ?.play()
         .then(() => audioRef.current?.pause())
-        .catch(() => {});
+        .catch(() => { });
       window.removeEventListener("click", unlockAudio);
     };
     window.addEventListener("click", unlockAudio);
@@ -507,7 +575,12 @@ function CustomerMenuContent() {
     try {
       const payload = {
         restaurantId,
-        tableNumber: table ? parseInt(table, 10) : 0,
+        orderType,
+
+        tableNumber:
+          orderType === "dine_in" && table
+            ? parseInt(table, 10)
+            : null,
         customer: {
           name: customerName,
           phone: customerPhone,
@@ -549,7 +622,14 @@ function CustomerMenuContent() {
       setSubmitting(false);
     }
   };
-
+  useEffect(() => {
+    if (
+      currentOrder?.status === "completed" &&
+      restaurant?.googleReviewLink
+    ) {
+      setShowReviewPopup(true);
+    }
+  }, [currentOrder?.status, restaurant?.googleReviewLink]);
   const generateUPILink = (
     amount: number,
     upiId: string,
@@ -671,6 +751,8 @@ function CustomerMenuContent() {
     );
   }
 
+
+
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 gap-4">
@@ -685,14 +767,17 @@ function CustomerMenuContent() {
       </div>
     );
   }
-
-  if (!table) {
+  const isTakeaway = mode === "takeaway";
+  if (!table && !isTakeaway) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600">Invalid QR Code</h1>
+          <h1 className="text-2xl font-bold text-red-600">
+            Invalid QR Code
+          </h1>
+
           <p className="text-gray-500 mt-2">
-            Please scan a valid table QR code.
+            Please scan a valid QR code.
           </p>
         </div>
       </div>
@@ -740,11 +825,10 @@ function CustomerMenuContent() {
                       className="flex flex-col items-center flex-1"
                     >
                       <div
-                        className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                          isActive
-                            ? "bg-gradient-to-r from-orange-500 to-orange-600 shadow-md"
-                            : "bg-gray-200"
-                        }`}
+                        className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all ${isActive
+                          ? "bg-gradient-to-r from-orange-500 to-orange-600 shadow-md"
+                          : "bg-gray-200"
+                          }`}
                       >
                         {isActive ? (
                           <CheckCircle className="w-4 h-4 text-white" />
@@ -931,11 +1015,10 @@ function CustomerMenuContent() {
                     <button
                       onClick={() => handlePayment("qr")}
                       disabled={isPaying}
-                      className={`rounded-2xl py-3 text-sm font-bold text-white shadow-md transition-all active:scale-95 ${
-                        selectedPayment === "qr"
-                          ? "bg-gradient-to-r from-green-500 to-emerald-600"
-                          : "bg-gradient-to-r from-orange-500 to-orange-600"
-                      }`}
+                      className={`rounded-2xl py-3 text-sm font-bold text-white shadow-md transition-all active:scale-95 ${selectedPayment === "qr"
+                        ? "bg-gradient-to-r from-green-500 to-emerald-600"
+                        : "bg-gradient-to-r from-orange-500 to-orange-600"
+                        }`}
                     >
                       📱 QR Pay
                     </button>
@@ -958,11 +1041,10 @@ function CustomerMenuContent() {
                     {/* QR */}
                     <div className="relative mt-3 flex justify-center">
                       <div
-                        className={`rounded-2xl bg-white p-2 shadow-md transition-all duration-500 ${
-                          selectedPayment !== "qr"
-                            ? "blur-sm opacity-40"
-                            : "blur-0 opacity-100"
-                        }`}
+                        className={`rounded-2xl bg-white p-2 shadow-md transition-all duration-500 ${selectedPayment !== "qr"
+                          ? "blur-sm opacity-40"
+                          : "blur-0 opacity-100"
+                          }`}
                       >
                         <QRCode value={baseUPI} size={135} />
                       </div>
@@ -1044,52 +1126,131 @@ function CustomerMenuContent() {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-20">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              {restaurant?.name || "Restaurant"}
-            </h1>
-            <p className="text-xs text-gray-500">Table {table}</p>
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+
+          {/* Restaurant Info */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative">
+              <div className="relative">
+                {restaurant?.logo ? (
+                  <img
+                    src={restaurant.logo}
+                    alt={restaurant.name}
+                    className="w-14 h-14 rounded-2xl object-cover border border-gray-200 shadow-sm"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
+                    <span className="text-white font-bold text-xl">
+                      {restaurant?.name?.charAt(0)?.toUpperCase() || "R"}
+                    </span>
+                  </div>
+                )}
+
+                <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full" />
+              </div>
+
+              <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></span>
+            </div>
+
+            <div className="min-w-0">
+              <h1 className="font-bold text-lg text-gray-900 truncate">
+                {restaurant?.name || "Restaurant"}
+              </h1>
+
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span className="px-2 py-1 bg-orange-50 text-orange-600 rounded-full font-medium">
+                  {orderType === "dine_in"
+                    ? `Table ${table}`
+                    : "Takeaway"}
+                </span>
+
+                <span>•</span>
+
+                <span>Digital Menu</span>
+              </div>
+            </div>
           </div>
+
+          {/* Actions */}
           <div className="flex items-center gap-2">
-            <button
+            {/* <button
               onClick={() => setSoundEnabled((s) => !s)}
-              className="p-2 text-gray-600"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition"
             >
               {soundEnabled ? (
-                <Volume2 className="w-5 h-5" />
+                <Volume2 className="w-5 h-5 text-gray-700" />
               ) : (
-                <VolumeX className="w-5 h-5" />
+                <VolumeX className="w-5 h-5 text-gray-700" />
               )}
-            </button>
+            </button> */}
+
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative p-2 bg-orange-50 text-orange-500 rounded-full"
+              className="relative w-11 h-11 flex items-center justify-center rounded-xl bg-orange-500 text-white shadow-lg shadow-orange-200"
             >
-              <ShoppingCart className="w-6 h-6" />
+              <ShoppingCart className="w-5 h-5" />
+
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
                   {cartCount}
                 </span>
               )}
             </button>
           </div>
         </div>
+        {showWelcome && (
+          <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 text-white relative animate-in slide-in-from-top duration-500">
+
+            <button
+              onClick={dismissWelcome}
+              className="absolute top-3 right-3 p-1 rounded-full hover:bg-white/20 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="max-w-4xl mx-auto px-4 py-5">
+
+              <div className="flex items-center gap-3">
+
+                <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2">
+                  🍽️
+                </div>
+
+                <div>
+                  <h2 className="font-bold text-lg">
+                    Welcome to {restaurant?.name}
+                  </h2>
+
+                  <p className="text-orange-100 text-sm">
+                    Browse our menu and place your order in seconds.
+                  </p>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+        )}
       </header>
 
+
+      <div className="max-w-2xl mx-auto px-4 py-4">
+        <BannerCarousel banners={banners} />
+      </div>
+
+
       {/* Categories */}
-      <div className="bg-white border-b sticky top-[57px] z-10 overflow-x-auto">
-        <div className="flex gap-2 px-4 py-2 max-w-2xl mx-auto">
+      <div className="sticky top-[60px] z-20 bg-white/95 backdrop-blur-md border-b shadow-sm overflow-x-auto">
+        <div className="flex gap-2 px-4 py-3 max-w-2xl mx-auto">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap font-medium transition ${
-                selectedCategory === cat
-                  ? "bg-orange-500 text-white shadow-sm"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-all ${selectedCategory === cat
+                ? "bg-orange-500 text-white shadow-md"
+                : "bg-gray-100 text-gray-700"
+                }`}
             >
               {cat}
             </button>
@@ -1184,11 +1345,10 @@ function CustomerMenuContent() {
                             addToCartSimple(item);
                           }}
                           disabled={!isAvailable}
-                          className={`px-4 py-1.5 rounded-lg text-sm font-medium ${
-                            isAvailable
-                              ? "bg-orange-500 text-white hover:bg-orange-600"
-                              : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          }`}
+                          className={`px-4 py-1.5 rounded-lg text-sm font-medium ${isAvailable
+                            ? "bg-orange-500 text-white hover:bg-orange-600"
+                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            }`}
                         >
                           Add
                         </button>
@@ -1395,7 +1555,15 @@ function CustomerMenuContent() {
           </div>
         </div>
       )}
-
+      <ReviewPopup
+        open={
+          showReviewPopup &&
+          !!restaurant?.googleReviewLink
+        }
+        onClose={() => setShowReviewPopup(false)}
+        onFinish={resetCustomerSession}
+        googleReviewLink={restaurant?.googleReviewLink}
+      />
       {/* Item Detail Modal */}
       {selectedItem && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
@@ -1442,11 +1610,10 @@ function CustomerMenuContent() {
                             price: variant.price,
                           })
                         }
-                        className={`px-4 py-2 rounded-full text-sm border ${
-                          selectedVariant?.name === variant.name
-                            ? "bg-orange-500 text-white border-orange-500"
-                            : "bg-white text-gray-700 border-gray-300"
-                        }`}
+                        className={`px-4 py-2 rounded-full text-sm border ${selectedVariant?.name === variant.name
+                          ? "bg-orange-500 text-white border-orange-500"
+                          : "bg-white text-gray-700 border-gray-300"
+                          }`}
                       >
                         {variant.name} (₹{variant.price})
                       </button>
@@ -1463,11 +1630,10 @@ function CustomerMenuContent() {
                       <button
                         key={addon.name}
                         onClick={() => toggleAddon(addon)}
-                        className={`px-3 py-1.5 rounded-full text-xs border ${
-                          selectedAddons.find((a) => a.name === addon.name)
-                            ? "bg-orange-100 border-orange-500 text-orange-700"
-                            : "bg-white border-gray-300 text-gray-600"
-                        }`}
+                        className={`px-3 py-1.5 rounded-full text-xs border ${selectedAddons.find((a) => a.name === addon.name)
+                          ? "bg-orange-100 border-orange-500 text-orange-700"
+                          : "bg-white border-gray-300 text-gray-600"
+                          }`}
                       >
                         {addon.name} (+₹{addon.price})
                       </button>
@@ -1519,3 +1685,5 @@ function CustomerMenuContent() {
     </div>
   );
 }
+
+
