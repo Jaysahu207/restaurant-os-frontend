@@ -427,6 +427,26 @@ export default function AuthPage() {
                     </button>
                   </form>
                 )}
+                <div className="mt-6 text-center text-xs text-gray-500">
+                  By continuing, you agree to our{" "}
+                  <a
+                    href="https://qrasoi.in/terms-of-service"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-orange-600 underline"
+                  >
+                    Terms of Service
+                  </a>
+                  {" "}and{" "}
+                  <a
+                    href="https://qrasoi.in/privacy-policy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-orange-600 underline"
+                  >
+                    Privacy Policy
+                  </a>.
+                </div>
               </div>
             </div>
           </div>
@@ -526,6 +546,43 @@ export default function AuthPage() {
           </div>
         </div>
       </div>
+      {/* Footer - Required For Google Verification */}
+      <footer className="border-t border-gray-200 bg-white mt-12">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-sm">
+
+            <a
+              href="https://qrasoi.in/privacy-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-orange-600 hover:text-orange-700 underline font-medium"
+            >
+              Privacy Policy
+            </a>
+
+            <a
+              href="https://qrasoi.in/terms-of-service"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-orange-600 hover:text-orange-700 underline font-medium"
+            >
+              Terms of Service
+            </a>
+
+            <a
+              href="mailto:support@qrasoi.in"
+              className="text-orange-600 hover:text-orange-700 underline font-medium"
+            >
+              Contact Support
+            </a>
+
+          </div>
+
+          <p className="text-center text-gray-500 text-xs mt-6">
+            © {new Date().getFullYear()} QRasoi. All rights reserved.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
