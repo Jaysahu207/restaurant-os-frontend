@@ -5,9 +5,13 @@ import { useSearchParams } from "next/navigation";
 
 interface Props {
     setActiveTab: (tab: "login" | "register" | "forgot" | "reset") => void;
+    setToken: (token: string) => void;
 }
 
-export default function ResetDetector({ setActiveTab }: Props) {
+export default function ResetDetector({
+    setActiveTab,
+    setToken,
+}: Props) {
     const searchParams = useSearchParams();
 
     useEffect(() => {
@@ -15,9 +19,10 @@ export default function ResetDetector({ setActiveTab }: Props) {
         const token = searchParams.get("token");
 
         if (mode === "reset" && token) {
+            setToken(token);
             setActiveTab("reset");
         }
-    }, [searchParams, setActiveTab]);
+    }, [searchParams, setActiveTab, setToken]);
 
     return null;
 }

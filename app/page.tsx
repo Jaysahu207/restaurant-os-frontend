@@ -31,6 +31,7 @@ export default function AuthPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [loginData, setLoginData] = useState({ email: "", password: "" });
+  const [token, setToken] = useState("");
   const [registerData, setRegisterData] = useState({
     restaurantName: "",
     name: "",
@@ -44,9 +45,7 @@ export default function AuthPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const searchParams = useSearchParams();
 
-  const token = searchParams.get("token");
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -225,7 +224,10 @@ export default function AuthPage() {
                 </div>
               </div>
               <Suspense fallback={null}>
-                <ResetDetector setActiveTab={setActiveTab} />
+                <ResetDetector
+                  setActiveTab={setActiveTab}
+                  setToken={setToken}
+                />
               </Suspense>
               {/* Form Card */}
               <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-orange-100/50 p-5 sm:p-6 md:p-8 transition-all duration-300 hover:shadow-2xl">
