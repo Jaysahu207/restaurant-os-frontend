@@ -20,6 +20,7 @@ type OrderPayload = {
   tableNumber?: number | null;
   items: OrderItem[];
   customer?: CustomerInfo;
+  specialInstructions?: string;
 };
 
 // 🔥 PLACE ORDER

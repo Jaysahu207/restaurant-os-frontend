@@ -1,11 +1,17 @@
 /* ================= THERMAL PRINT ================= */
 
 @media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
   @page {
     size: 80mm auto;
     margin: 0;
   }
-
+  #print-root {
+    display: block !important;
+  }
   html,
   body {
     width: 80mm !important;
@@ -18,8 +24,9 @@
   }
 
   /* Hide everything */
+
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
   }
 
   /* Show invoice & KOT only */
@@ -27,19 +34,18 @@
   #invoice-print *,
   #kot-print,
   #kot-print * {
-    visibility: visible;
+    visibility: visible !important;
   }
 
   /* Main print container */
   #invoice-print,
   #kot-print {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: static !important;
+    margin: 0 auto !important;
 
-    width: 80mm !important;
-    max-width: 80mm !important;
-    min-width: 80mm !important;
+    width: 72mm !important;
+    max-width: 72mm !important;
+    min-width: 72mm !important;
 
     margin: 0 !important;
     padding: 2mm !important;
@@ -58,14 +64,15 @@
   table {
     width: 100% !important;
     border-collapse: collapse !important;
-    table-layout: fixed !important;
+    table-layout: auto;
   }
 
   th,
   td {
     word-break: break-word !important;
     overflow-wrap: break-word !important;
-    font-size: 11px !important;
+    font-size: 10px;
+    line-height: 1.2;
     padding-top: 2px !important;
     padding-bottom: 2px !important;
   }
@@ -97,5 +104,11 @@
   p {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+  img,
+  svg,
+  canvas {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }

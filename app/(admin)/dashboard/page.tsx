@@ -17,11 +17,14 @@ import {
   Eye,
   MoreHorizontal,
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getDashboardData } from "@/services/dashboardService";
 import { useAuthStore } from "@/store/useAuthStore";
 import { io } from "socket.io-client";
 import { redirect } from "next/navigation";
+import TableManagement from "@/components/super-admin/TableManagement";
+import { getRestaurant } from "@/services/restaurantService";
+import toast from "react-hot-toast";
 
 interface DashboardData {
   revenue: { total: number; trend: number };
@@ -341,7 +344,11 @@ const TopItemsList = ({ items }: { items: TopItem[] }) => {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const { restaurant } = useAuthStore();
+  const setAuth = useAuthStore((state) => state.setAuth);
+  const user = useAuthStore((state) => state.user);
+  const restaurant = useAuthStore((state) => state.restaurant);
+  const token = useAuthStore((state) => state.token);
+  // const { restaurant } = useAuthStore();
   const socketRef = useRef<any>(null);
 
   useEffect(() => {
@@ -362,7 +369,32 @@ export default function DashboardPage() {
 
     load();
   }, [restaurant?._id]);
+  console.log("🚀 Dashboard Rendered with restaurant:", data);
 
+  useEffect(() => {
+    loadRestaurant();
+  }, []);
+
+  const loadRestaurant = async () => {
+    try {
+      const data = await getRestaurant();
+
+      setAuth({
+        user,
+        token,
+        restaurant: data,
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load restaurant");
+    }
+  };
+
+  const refreshDashboard = useCallback(async () => {
+    if (!restaurant?._id) return;
+    const res = await getDashboardData(restaurant._id);
+    setData(res.data);
+  }, [restaurant?._id]);
   useEffect(() => {
     if (!restaurant?._id) return;
 
@@ -373,42 +405,23 @@ export default function DashboardPage() {
 
     socketRef.current = socket;
 
-    socket.on("connect", () => {
-      // console.log("🟢 Dashboard connected:", socket.id);
-      socket.emit("joinRestaurant", restaurant._id);
-    });
+    socket.emit("joinRestaurant", restaurant._id);
 
-    socket.on("disconnect", () => {
-      console.log("🔴 Dashboard disconnected:", socket.id);
-    });
+    const handleUpdate = () => refreshDashboard();
 
-    // 🔥 IMPORTANT: LISTEN TO EVENTS
-    socket.on("ORDER_UPDATED", (order) => {
-      console.log("📦 ORDER UPDATED", order._id);
-      refreshDashboard(); // 🔥 re-fetch dashboard
-    });
-
-    socket.on("ORDER_READY", (order) => {
-      console.log("🍽️ ORDER READY", order._id);
-      refreshDashboard();
-    });
-
-    socket.on("ORDER_COMPLETED", (order) => {
-      console.log("✅ ORDER COMPLETED", order._id);
-      refreshDashboard();
-    });
+    socket.on("ORDER_UPDATED", handleUpdate);
+    socket.on("ORDER_READY", handleUpdate);
+    socket.on("ORDER_COMPLETED", handleUpdate);
 
     return () => {
+      socket.off("ORDER_UPDATED", handleUpdate);
+      socket.off("ORDER_READY", handleUpdate);
+      socket.off("ORDER_COMPLETED", handleUpdate);
       socket.disconnect();
     };
-  }, [restaurant?._id]);
+  }, [restaurant?._id, refreshDashboard]);
 
-  const refreshDashboard = async () => {
-    if (!restaurant?._id) return;
 
-    const res = await getDashboardData(restaurant._id);
-    setData(res.data);
-  };
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -469,6 +482,11 @@ export default function DashboardPage() {
         {stats.map((stat) => (
           <StatCard key={stat.title} {...stat} />
         ))}
+      </div>
+
+      {/* Sales & Orders Row */}
+      <div className="  p-4 md:p-6">
+        <TableManagement restaurantId={restaurant._id} />
       </div>
 
       {/* Charts & Breakdowns Row */}

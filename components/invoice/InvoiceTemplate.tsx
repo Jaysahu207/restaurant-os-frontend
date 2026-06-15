@@ -92,13 +92,13 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
               <img
                 src={restaurant.logo}
                 alt={restaurantName}
-                className="h-16 w-16 object-cover rounded-full border"
+                className="h-10 w-10 object-cover rounded-full border"
               />
             </div>
           )}
 
           {/* NAME */}
-          <h1 className="text-2xl font-bold uppercase tracking-wide">
+          <h1 className="text-lg font-bold uppercase">
             {restaurantName}
           </h1>
 
@@ -136,7 +136,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
         </div>
 
         {/* ================= ORDER INFORMATION ================= */}
-        <div className="grid grid-cols-2 gap-6 py-4 border-b border-dashed">
+        <div className="flex justify-between gap-6 py-4 border-b border-dashed">
           <div className="space-y-1">
             <p>
               <span className="font-semibold">Invoice No:</span>{" "}
@@ -214,7 +214,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
 
                 <th className="py-2 text-right font-bold w-14">Rate</th>
 
-                <th className="py-2 text-right font-bold w-16">Amount</th>
+                <th className="py-2 text-right font-bold w-14">Amount</th>
               </tr>
             </thead>
 
@@ -228,7 +228,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
 
                 return (
                   <tr key={index} className="border-b border-dashed align-top">
-                    <td className="py-3 pr-1 break-words">
+                    <td className="py-2 pr-1 break-all">
                       <div className="font-medium">{item.name}</div>
 
                       {item.variant && (

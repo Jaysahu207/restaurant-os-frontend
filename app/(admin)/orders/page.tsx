@@ -24,7 +24,7 @@ import { io, Socket } from "socket.io-client";
 import { useAuthStore } from "@/store/useAuthStore";
 import toast from "react-hot-toast";
 import InvoiceTemplate from "@/components/invoice/InvoiceTemplate";
-
+import { generateInvoicePDF } from "@/utils/pdf/generateInvoicePDF";
 import { useReactToPrint } from "react-to-print";
 
 
@@ -606,18 +606,16 @@ function OrderCard({
   onKOT: () => void;
   onUpdateStatus: (status: OrderStatus) => void;
 }) {
-  const getNextStatuses = (current: OrderStatus): OrderStatus[] => {
-    const flow: Record<OrderStatus, OrderStatus[]> = {
-      pending: ["preparing", "cancelled"],
-      preparing: ["ready", "cancelled"],
-      ready: ["served", "cancelled"],
-      served: ["paid"],
-      paid: ["completed"],
-      completed: [],
-      cancelled: [],
-    };
-    return flow[current] || [];
-  };
+
+  const allStatuses: OrderStatus[] = [
+    "pending",
+    "preparing",
+    "ready",
+    "served",
+    "paid",
+    "completed",
+    "cancelled",
+  ];
 
   return (
     <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition p-4 border border-gray-100 group">
@@ -704,21 +702,15 @@ function OrderCard({
             <div className="relative">
               <select
                 value={order.status}
-                onChange={(e) => onUpdateStatus(e.target.value as OrderStatus)}
-                className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white cursor-pointer"
+                onChange={(e) =>
+                  onUpdateStatus(e.target.value as OrderStatus)
+                }
               >
-                <option value={order.status}>
-                  {statusLabels[order.status]}
-                </option>
-                {getNextStatuses(order.status).map((status) => {
-                  if (order.status === "paid" && status !== "completed")
-                    return null;
-                  return (
-                    <option key={status} value={status}>
-                      Mark as {statusLabels[status]}
-                    </option>
-                  );
-                })}
+                {allStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {statusLabels[status]}
+                  </option>
+                ))}
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
@@ -758,6 +750,14 @@ function OrderDetailModal({
     contentRef: printRef,
     documentTitle: `Invoice-${order.invoiceNumber}`,
   });
+  const handleDownloadPDF = async () => {
+    if (!printRef.current) return;
+
+    await generateInvoicePDF(
+      printRef.current,
+      order.invoiceNumber
+    );
+  };
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 no-print"
@@ -791,6 +791,12 @@ function OrderDetailModal({
           >
             Close
           </button>
+          {/* <button
+            onClick={handleDownloadPDF}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg"
+          >
+            Download PDF
+          </button> */}
           <button
             onClick={handlePrint}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center gap-2"
@@ -840,7 +846,7 @@ function KOTModal({
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
-        <div ref={printRef} id="kot-print" className="p-6 space-y-4">
+        <div ref={printRef} id="kot-print" className="px-2 py-2 space-y-2">
           <div className="text-center">
             <h2 className="font-bold text-xl">{restaurantName}</h2>
             <p className="text-sm text-gray-500 font-mono">
@@ -861,15 +867,14 @@ function KOTModal({
           </div>
           <div className="border-t border-b border-dashed py-3 space-y-2">
             {order.items.map((item, idx) => (
-              <div key={idx} className="flex justify-between text-sm">
-                <span className="font-medium">
-                  {item.quantity} × {item.name}
+              <div className="flex gap-2">
+                <span className="font-bold min-w-[24px]">
+                  {item.quantity}x
                 </span>
-                {item.specialInstructions && (
-                  <span className="text-xs text-gray-500 italic ml-2">
-                    ({item.specialInstructions})
-                  </span>
-                )}
+
+                <span className="flex-1 break-words">
+                  {item.name}
+                </span>
               </div>
             ))}
           </div>

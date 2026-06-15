@@ -3,11 +3,9 @@
 import { useEffect, useState } from "react";
 import {
   Store,
-  QrCode,
   CreditCard,
   Bell,
-  Users,
-  Settings as SettingsIcon,
+  Settings,
   Upload,
   ToggleLeft,
   ToggleRight,
@@ -92,13 +90,9 @@ export default function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [uploadingLogo, setUploadingLogo] =
-    useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
-
-  const authStore = useAuthStore();
-
-
+  // console.log(" Restaurant Data ->", restaurant);
 
   // Main restaurant form state
   const [restaurantForm, setRestaurantForm] = useState<RestaurantForm>({
@@ -168,6 +162,26 @@ export default function SettingsPage() {
   // ----------------------------------------------------------------------
   // Effects
   // ----------------------------------------------------------------------
+
+  useEffect(() => {
+    loadRestaurant();
+  }, []);
+
+  const loadRestaurant = async () => {
+    try {
+      const data = await getRestaurant();
+
+      setAuth({
+        user,
+        token,
+        restaurant: data,
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load restaurant");
+    }
+  };
+
   useEffect(() => {
     if (restaurant) {
       setRestaurantForm({
@@ -245,7 +259,11 @@ export default function SettingsPage() {
     setIsSaving(true);
     try {
       const res = await updateRestaurant(restaurantForm);
-
+      setAuth({
+        user,
+        token,
+        restaurant: res.restaurant,
+      });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
       toast.success("Restaurant updated successfully!");
@@ -256,9 +274,7 @@ export default function SettingsPage() {
       setIsSaving(false);
     }
   };
-  const handleLogoUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
 
     if (!file) return;
@@ -311,8 +327,6 @@ export default function SettingsPage() {
         logo: "",
       }));
 
-
-
       toast.success("Logo removed successfully");
     } catch (error) {
       console.error(error);
@@ -320,8 +334,6 @@ export default function SettingsPage() {
       toast.error("Failed to remove logo");
     }
   };
-
-
 
   const handleSaveUPI = async () => {
     // Update restaurantForm with latest UPI ID and save
@@ -875,7 +887,6 @@ export default function SettingsPage() {
                   <option value="USD">USD ($)</option>
                 </select>
               </div> */}
-
             </div>
 
             {/* SAVE BUTTON */}
@@ -889,20 +900,14 @@ export default function SettingsPage() {
               </button>
             </div>
 
-
             {/* Logo & Currency */}
             <div className="md:col-span-2">
-              <label className={labelClass}>
-                Restaurant Branding
-              </label>
+              <label className={labelClass}>Restaurant Branding</label>
 
               <div className="mt-2 bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-
                   {/* Logo Preview */}
                   <div className="relative group">
-
                     {restaurantForm.logo ? (
                       <img
                         src={restaurantForm.logo}
@@ -922,18 +927,16 @@ export default function SettingsPage() {
 
                   {/* Info */}
                   <div className="flex-1">
-
                     <h3 className="font-semibold text-gray-900">
                       Restaurant Logo
                     </h3>
 
                     <p className="text-sm text-gray-500 mt-1">
-                      Upload your restaurant logo to personalize
-                      your menu, QR ordering page and invoices.
+                      Upload your restaurant logo to personalize your menu, QR
+                      ordering page and invoices.
                     </p>
 
                     <div className="flex flex-wrap gap-3 mt-4">
-
                       <button
                         disabled={uploadingLogo}
                         type="button"
@@ -967,12 +970,9 @@ export default function SettingsPage() {
                     </div>
 
                     <p className="text-xs text-gray-400 mt-3">
-                      PNG, JPG or WEBP • Recommended:
-                      512×512px
+                      PNG, JPG or WEBP • Recommended: 512×512px
                     </p>
-
                   </div>
-
                 </div>
 
                 <input

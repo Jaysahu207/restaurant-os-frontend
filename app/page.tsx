@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Eye,
   EyeOff,
@@ -18,13 +18,15 @@ import {
 
 import API from "../config/axios";
 import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
 import Image from "next/image";
 
 export default function AuthPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
+  const [activeTab, setActiveTab] = useState<"login" | "register" | "forgot" | "reset">("login");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({
     restaurantName: "",
@@ -37,9 +39,18 @@ export default function AuthPage() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const setAuth = useAuthStore((state) => state.setAuth);
+  const searchParams = useSearchParams();
 
+  const mode = searchParams.get("mode");
+  const token = searchParams.get("token");
+  const setAuth = useAuthStore((state) => state.setAuth);
+  useEffect(() => {
+    if (mode === "reset" && token) {
+      setActiveTab("reset");
+    }
+  }, [mode, token]);
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -123,6 +134,78 @@ export default function AuthPage() {
       setLoading(false);
     }
   };
+  const handleForgotPassword = async (
+    e: React.FormEvent
+  ) => {
+    e.preventDefault();
+
+    if (!forgotEmail) {
+      return toast.error("Email is required");
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await API.post(
+        "/api/auth/forgot-password",
+        {
+          email: forgotEmail.trim().toLowerCase(),
+        }
+      );
+
+      toast.success(
+        response.data.message ||
+        "Password reset link sent"
+      );
+
+      setForgotEmail("");
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+        "Something went wrong"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleResetPassword = async (
+    e: React.FormEvent
+  ) => {
+    e.preventDefault();
+
+    if (newPassword !== confirmNewPassword) {
+      return toast.error("Passwords do not match");
+    }
+
+    try {
+      setLoading(true);
+
+      await API.post("/api/auth/reset-password", {
+        token,
+        password: newPassword,
+      });
+
+      toast.success(
+        "Password reset successful. Please login."
+      );
+
+      setNewPassword("");
+      setConfirmNewPassword("");
+
+      router.replace("/");
+
+      setTimeout(() => {
+        setActiveTab("login");
+      }, 100);
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+        "Password reset failed"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-white to-orange-50 overflow-x-hidden">
@@ -165,26 +248,29 @@ export default function AuthPage() {
               {/* Form Card */}
               <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-orange-100/50 p-5 sm:p-6 md:p-8 transition-all duration-300 hover:shadow-2xl">
                 {/* Tabs */}
-                <div className="flex bg-gray-100/80 rounded-2xl p-1 mb-6 sm:mb-8">
-                  <button
-                    onClick={() => setActiveTab("login")}
-                    className={`flex-1 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${activeTab === "login"
-                      ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md transform scale-[1.02]"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
-                      }`}
-                  >
-                    Login
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("register")}
-                    className={`flex-1 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${activeTab === "register"
-                      ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md transform scale-[1.02]"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
-                      }`}
-                  >
-                    Register
-                  </button>
-                </div>
+                {activeTab !== "forgot" && activeTab !== "reset" && (
+                  <div className="flex bg-gray-100/80 rounded-2xl p-1 mb-6 sm:mb-8">
+                    <button
+                      onClick={() => setActiveTab("login")}
+                      className={`flex-1 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${activeTab === "login"
+                        ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md transform scale-[1.02]"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                        }`}
+                    >
+                      Login
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab("register")}
+                      className={`flex-1 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${activeTab === "register"
+                        ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md transform scale-[1.02]"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                        }`}
+                    >
+                      Register
+                    </button>
+                  </div>
+                )}
 
                 {activeTab === "login" ? (
                   <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
@@ -239,7 +325,8 @@ export default function AuthPage() {
                     <div className="flex justify-end">
                       <button
                         type="button"
-                        className="text-xs sm:text-sm text-orange-600 hover:text-orange-700 font-medium transition-colors duration-200 hover:underline"
+                        onClick={() => setActiveTab("forgot")}
+                        className="text-xs sm:text-sm text-orange-600 hover:text-orange-700 font-medium"
                       >
                         Forgot Password?
                       </button>
@@ -265,169 +352,280 @@ export default function AuthPage() {
                       )}
                     </button>
                   </form>
-                ) : (
-                  <form onSubmit={handleRegister} className="space-y-3 sm:space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-                        Restaurant Name *
-                      </label>
-                      <input
-                        type="text"
-                        value={registerData.restaurantName}
-                        onChange={(e) =>
-                          setRegisterData({
-                            ...registerData,
-                            restaurantName: e.target.value,
-                          })
-                        }
-                        placeholder="Cafe Delight"
-                        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 sm:py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200"
-                        required
-                      />
+                ) : activeTab === "forgot" ? (
+                  <form
+                    onSubmit={handleForgotPassword}
+                    className="space-y-5"
+                  >
+                    <div className="text-center mb-4">
+                      <h3 className="text-xl font-bold text-gray-900">
+                        Forgot Password
+                      </h3>
+
+                      <p className="text-sm text-gray-500 mt-2">
+                        Enter your registered email address
+                        and we'll send you a password reset
+                        link.
+                      </p>
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-                        Owner Name *
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Email Address
                       </label>
-                      <input
-                        type="text"
-                        value={registerData.name}
-                        onChange={(e) =>
-                          setRegisterData({
-                            ...registerData,
-                            name: e.target.value,
-                          })
-                        }
-                        placeholder="John Doe"
-                        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 sm:py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-                        Phone Number *
-                      </label>
-                      <input
-                        type="tel"
-                        value={registerData.phone}
-                        onChange={(e) =>
-                          setRegisterData({
-                            ...registerData,
-                            phone: e.target.value,
-                          })
-                        }
-                        placeholder="+91 9876543210"
-                        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 sm:py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-                        Email Address *
-                      </label>
+
                       <input
                         type="email"
-                        value={registerData.email}
+                        value={forgotEmail}
                         onChange={(e) =>
-                          setRegisterData({
-                            ...registerData,
-                            email: e.target.value,
-                          })
+                          setForgotEmail(e.target.value)
                         }
-                        placeholder="restaurant@example.com"
-                        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 sm:py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200"
+                        placeholder="you@example.com"
+                        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3"
                         required
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-                        Password *
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showRegisterPassword ? "text" : "password"}
-                          value={registerData.password}
-                          onChange={(e) =>
-                            setRegisterData({
-                              ...registerData,
-                              password: e.target.value,
-                            })
-                          }
-                          placeholder="Create password"
-                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 sm:py-3 pr-12 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setShowRegisterPassword(!showRegisterPassword)
-                          }
-                          className="absolute top-1/2 right-4 -translate-y-1/2 text-gray-400 hover:text-orange-600 transition-colors duration-200"
-                        >
-                          {showRegisterPassword ? (
-                            <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" />
-                          ) : (
-                            <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-                        Confirm Password *
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showConfirmPassword ? "text" : "password"}
-                          value={registerData.confirmPassword}
-                          onChange={(e) =>
-                            setRegisterData({
-                              ...registerData,
-                              confirmPassword: e.target.value,
-                            })
-                          }
-                          placeholder="Confirm password"
-                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 sm:py-3 pr-12 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setShowConfirmPassword(!showConfirmPassword)
-                          }
-                          className="absolute top-1/2 right-4 -translate-y-1/2 text-gray-400 hover:text-orange-600 transition-colors duration-200"
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" />
-                          ) : (
-                            <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
+
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md hover:shadow-lg transform hover:scale-[1.02] active:scale-100"
+                      className="w-full bg-gradient-to-r from-orange-600 to-amber-600 text-white py-3 rounded-xl font-semibold"
                     >
-                      {loading ? (
-                        <>
-                          <svg className="animate-spin h-4 w-4 sm:h-5 sm:w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Creating Account...
-                        </>
-                      ) : (
-                        <>
-                          Create Account
-                          <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
-                        </>
-                      )}
+                      {loading
+                        ? "Sending..."
+                        : "Send Reset Link"}
                     </button>
-                  </form>
-                )}
-                <div className="mt-6 text-center text-xs text-gray-500">
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("login")}
+                      className="w-full text-sm text-orange-600 hover:underline"
+                    >
+                      Back to Login
+                    </button>
+                  </form>) : activeTab === "reset" ? (
+                    <form
+                      onSubmit={handleResetPassword}
+                      className="space-y-5"
+                    >
+                      <div className="text-center mb-4">
+                        <h3 className="text-xl font-bold text-gray-900">
+                          Reset Password
+                        </h3>
+
+                        <p className="text-sm text-gray-500 mt-2">
+                          Create a new password for your account.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          New Password
+                        </label>
+
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) =>
+                            setNewPassword(e.target.value)
+                          }
+                          placeholder="Enter new password"
+                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Confirm Password
+                        </label>
+
+                        <input
+                          type="password"
+                          value={confirmNewPassword}
+                          onChange={(e) =>
+                            setConfirmNewPassword(e.target.value)
+                          }
+                          placeholder="Confirm new password"
+                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3"
+                          required
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-gradient-to-r from-orange-600 to-amber-600 text-white py-3 rounded-xl font-semibold"
+                      >
+                        {loading
+                          ? "Updating Password..."
+                          : "Reset Password"}
+                      </button>
+                    </form>
+                  ) : activeTab === "register" ? (
+                    <form onSubmit={handleRegister} className="space-y-3 sm:space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                          Restaurant Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={registerData.restaurantName}
+                          onChange={(e) =>
+                            setRegisterData({
+                              ...registerData,
+                              restaurantName: e.target.value,
+                            })
+                          }
+                          placeholder="Cafe Delight"
+                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 sm:py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                          Owner Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={registerData.name}
+                          onChange={(e) =>
+                            setRegisterData({
+                              ...registerData,
+                              name: e.target.value,
+                            })
+                          }
+                          placeholder="John Doe"
+                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 sm:py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                          Phone Number *
+                        </label>
+                        <input
+                          type="tel"
+                          value={registerData.phone}
+                          onChange={(e) =>
+                            setRegisterData({
+                              ...registerData,
+                              phone: e.target.value,
+                            })
+                          }
+                          placeholder="+91 9876543210"
+                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 sm:py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                          Email Address *
+                        </label>
+                        <input
+                          type="email"
+                          value={registerData.email}
+                          onChange={(e) =>
+                            setRegisterData({
+                              ...registerData,
+                              email: e.target.value,
+                            })
+                          }
+                          placeholder="restaurant@example.com"
+                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 sm:py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                          Password *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showRegisterPassword ? "text" : "password"}
+                            value={registerData.password}
+                            onChange={(e) =>
+                              setRegisterData({
+                                ...registerData,
+                                password: e.target.value,
+                              })
+                            }
+                            placeholder="Create password"
+                            className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 sm:py-3 pr-12 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setShowRegisterPassword(!showRegisterPassword)
+                            }
+                            className="absolute top-1/2 right-4 -translate-y-1/2 text-gray-400 hover:text-orange-600 transition-colors duration-200"
+                          >
+                            {showRegisterPassword ? (
+                              <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" />
+                            ) : (
+                              <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                          Confirm Password *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showConfirmPassword ? "text" : "password"}
+                            value={registerData.confirmPassword}
+                            onChange={(e) =>
+                              setRegisterData({
+                                ...registerData,
+                                confirmPassword: e.target.value,
+                              })
+                            }
+                            placeholder="Confirm password"
+                            className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 sm:py-3 pr-12 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all duration-200"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setShowConfirmPassword(!showConfirmPassword)
+                            }
+                            className="absolute top-1/2 right-4 -translate-y-1/2 text-gray-400 hover:text-orange-600 transition-colors duration-200"
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" />
+                            ) : (
+                              <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md hover:shadow-lg transform hover:scale-[1.02] active:scale-100"
+                      >
+                        {loading ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4 sm:h-5 sm:w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Creating Account...
+                          </>
+                        ) : (
+                          <>
+                            Create Account
+                            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </>
+                        )}
+                      </button>
+                    </form>
+
+                  ) : null}
+                < div className="mt-6 text-center text-xs text-gray-500">
                   By continuing, you agree to our{" "}
                   <a
                     href="https://qrasoi.in/terms-of-service"
@@ -583,6 +781,6 @@ export default function AuthPage() {
           </p>
         </div>
       </footer>
-    </div>
+    </div >
   );
 }

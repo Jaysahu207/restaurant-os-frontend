@@ -22,11 +22,9 @@ import {
   Loader2,
   Volume2,
   VolumeX,
-
-
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
-import { fetchCustomerMenu } from "@/services/customerMenu";
+import { fetchCustomerMenu, checkTableStatus, releaseTable } from "@/services/customerMenu";
 import { useParams, useSearchParams } from "next/navigation";
 import {
   placeOrder,
@@ -41,6 +39,7 @@ import QRCode from "react-qr-code";
 import { sendInvoice } from "@/services/invoiceService";
 import ReviewPopup from "@/components/reviews/ReviewPopup";
 import BannerCarousel from "@/components/customer/BannerCarousel";
+import { v4 as uuidv4 } from "uuid";
 
 // ------------------------------------------------------------
 // Types
@@ -175,13 +174,10 @@ export default function CustomerMenuPage() {
     </Suspense>
   );
 }
-
 function CustomerMenuContent() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const restaurantId = params?.restaurantId as string;
-
-
+  const restaurantSlug = params?.restaurantId as string;
   const table = searchParams.get("table");
   const mode = searchParams.get("mode");
   // --- State ---
@@ -209,9 +205,7 @@ function CustomerMenuContent() {
   const [selectedAddons, setSelectedAddons] = useState<
     { name: string; price: number }[]
   >([]);
-  const [orderType, setOrderType] = useState<
-    "dine_in" | "takeaway"
-  >("dine_in");
+  const [orderType, setOrderType] = useState<"dine_in" | "takeaway">("dine_in");
   const [modalQuantity, setModalQuantity] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
@@ -224,14 +218,14 @@ function CustomerMenuContent() {
   const [selectedPayment, setSelectedPayment] = useState<"cash" | "qr" | null>(
     null,
   );
+  const [tableOccupied, setTableOccupied] = useState(false);
   const router = useRouter();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
 
-  const [showReviewPopup, setShowReviewPopup] =
-    useState(false);
+  const [showReviewPopup, setShowReviewPopup] = useState(false);
   useEffect(() => {
     if (table) {
       setOrderType("dine_in");
@@ -261,16 +255,53 @@ function CustomerMenuContent() {
   // ------------------------------------------------------------
   // Effects
   // ------------------------------------------------------------
+
+  useEffect(() => {
+    // Inside the verifyTable effect (around line 280)
+
+
+    verifyTable();
+  }, [restaurantSlug, table]);
+  const verifyTable = async () => {
+    if (!table || !restaurantSlug) return;
+
+    try {
+      let sessionId = localStorage.getItem("customerSessionId") ?? "";
+      if (!sessionId) {
+        sessionId = uuidv4();
+        localStorage.setItem("customerSessionId", sessionId);
+      }
+
+      const res = await checkTableStatus(
+        restaurantSlug,
+        Number(table),
+        sessionId
+      );
+
+      if (res.order) {
+        // Existing order → show order view (do NOT block)
+        setCurrentOrder(res.order);
+        setOrderPlaced(true);
+        setCustomerLocked(true);
+      } else if (res.allowed === false) {
+        // No order and table not allowed → occupied
+        setTableOccupied(true);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
   // Load menu & restaurant
   useEffect(() => {
-    if (!restaurantId) return;
+    if (!restaurantSlug) return;
     const loadMenu = async () => {
       try {
         setLoading(true);
-        const data = await fetchCustomerMenu(restaurantId);
+        const data = await fetchCustomerMenu(restaurantSlug);
         const menuItems = data?.items || [];
         const restaurantData = data?.restaurant || null;
         setMenu(menuItems);
+        console.log("Restaurant Data:", restaurantData);
         setRestaurant(restaurantData);
         setBanners(data.banners || []);
         const uniqueCategories: string[] = [
@@ -293,22 +324,15 @@ function CustomerMenuContent() {
       }
     };
     loadMenu();
-  }, [restaurantId]);
+  }, [restaurantSlug]);
   useEffect(() => {
     if (!restaurant?._id) return;
-
-    const seen = sessionStorage.getItem(
-      `welcome_seen_${restaurant._id}`
-    );
-
+    const seen = sessionStorage.getItem(`welcome_seen_${restaurant._id}`);
     if (!seen) {
       setShowWelcome(true);
 
       const timer = setTimeout(() => {
-        sessionStorage.setItem(
-          `welcome_seen_${restaurant._id}`,
-          "true"
-        );
+        sessionStorage.setItem(`welcome_seen_${restaurant._id}`, "true");
 
         setShowWelcome(false);
       }, 8000);
@@ -316,19 +340,40 @@ function CustomerMenuContent() {
       return () => clearTimeout(timer);
     }
   }, [restaurant?._id]);
-
+  useEffect(() => {
+    let sessionId = localStorage.getItem("customerSessionId");
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      localStorage.setItem("customerSessionId", sessionId);
+    }
+  }, []);
 
   const dismissWelcome = () => {
     if (!restaurant?._id) return;
 
-    sessionStorage.setItem(
-      `welcome_seen_${restaurant._id}`,
-      "true"
-    );
+    sessionStorage.setItem(`welcome_seen_${restaurant._id}`, "true");
 
     setShowWelcome(false);
   };
+  useEffect(() => {
+    if (!restaurantSlug || !table) return;
 
+    if (currentOrder?.status === "completed") {
+      const recheck = async () => {
+        const sessionId = localStorage.getItem("customerSessionId") || "";
+
+        const res = await checkTableStatus(
+          restaurantSlug,
+          Number(table),
+          sessionId
+        );
+
+        setTableOccupied(res.allowed === false);
+      };
+
+      recheck();
+    }
+  }, [currentOrder?.status]);
   // Restore order from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("currentOrder");
@@ -345,11 +390,14 @@ function CustomerMenuContent() {
   useEffect(() => {
     if (currentOrder) {
       localStorage.setItem("currentOrder", JSON.stringify(currentOrder));
-
     }
-
   }, [currentOrder]);
 
+  useEffect(() => {
+    if (currentOrder?.status === "completed") {
+      verifyTable();
+    }
+  }, [currentOrder?.status]);
   // Socket connection for real-time updates
   useEffect(() => {
     if (!restaurant?._id) return;
@@ -380,22 +428,32 @@ function CustomerMenuContent() {
       }
     });
 
-    socket.on("ORDER_COMPLETED", (order: Order) => {
-      if (currentOrder?._id === order._id) {
-        playSound();
+    socket.on("ORDER_COMPLETED", async (order: Order) => {
+      if (currentOrder?._id !== order._id) return;
 
-        setCurrentOrder(order);
+      playSound();
+      setCurrentOrder(order);
 
-        if (order.status === "completed") {
-          setShowReviewPopup(true);
+      try {
+        // ✅ Release table on backend
+        if (table && restaurantSlug) {
+          await releaseTable(restaurantSlug, Number(table));
+          console.log("Table released successfully");
         }
-
-        toast.success(
-          "✅ Order completed! Thanks for dining with us."
-        );
+      } catch (err) {
+        console.error("Failed to release table", err);
       }
-    });
 
+      // ✅ UI updates (always run)
+      setTableOccupied(false);
+
+      // ✅ Review popup only when completed
+      if (order.status === "completed") {
+        setShowReviewPopup(true);
+      }
+
+      toast.success("✅ Order completed! Thanks for dining with us.");
+    });
     socket.on("ORDER_CANCELLED", (order: Order) => {
       if (currentOrder?._id === order._id) {
         playSound();
@@ -532,7 +590,7 @@ function CustomerMenuContent() {
   const addToCartSimple = (item: MenuItem) => {
     addItem(
       { _id: item._id, name: item.name, price: item.price, quantity: 1 },
-      restaurantId,
+      restaurantSlug,
       table || "",
     );
     toast.success(`${item.name} added to cart`);
@@ -558,29 +616,44 @@ function CustomerMenuContent() {
           price: unitPrice,
           quantity: 1,
         },
-        restaurantId,
+        restaurantSlug,
         table || "",
       );
     }
     setSelectedItem(null);
     toast.success(`${finalName} added to cart`);
   };
+  useEffect(() => {
+    const saved = localStorage.getItem("customerInfo");
 
+    if (!saved) return;
+
+    const customer = JSON.parse(saved);
+
+    setCustomerName(customer.name || "");
+    setCustomerPhone(customer.phone || "");
+    setCustomerEmail(customer.email || "");
+  }, []);
   const handlePlaceOrder = async () => {
+    if (submitting) return;
     if (!customerName.trim() || !customerPhone.trim() || !cartItems.length) {
       toast.error("Please enter your name and phone number");
       return;
     }
     setSubmitting(true);
     try {
+      if (!restaurant?._id) {
+        toast.error("Unable to place order: restaurant not loaded.");
+        setSubmitting(false);
+        return;
+      }
+      const requestId = uuidv4();
       const payload = {
-        restaurantId,
+        restaurantId: restaurant._id,
         orderType,
-
+        requestId,
         tableNumber:
-          orderType === "dine_in" && table
-            ? parseInt(table, 10)
-            : null,
+          orderType === "dine_in" && table ? parseInt(table, 10) : null,
         customer: {
           name: customerName,
           phone: customerPhone,
@@ -614,6 +687,14 @@ function CustomerMenuContent() {
       setIsCartOpen(false);
       playSound();
       setCustomerLocked(true);
+      localStorage.setItem(
+        "customerInfo",
+        JSON.stringify({
+          name: customerName,
+          phone: customerPhone,
+          email: customerEmail,
+        }),
+      );
       toast.success("Order placed successfully!");
     } catch (err) {
       console.error(err);
@@ -623,10 +704,7 @@ function CustomerMenuContent() {
     }
   };
   useEffect(() => {
-    if (
-      currentOrder?.status === "completed" &&
-      restaurant?.googleReviewLink
-    ) {
+    if (currentOrder?.status === "completed" && restaurant?.googleReviewLink) {
       setShowReviewPopup(true);
     }
   }, [currentOrder?.status, restaurant?.googleReviewLink]);
@@ -751,8 +829,6 @@ function CustomerMenuContent() {
     );
   }
 
-
-
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 gap-4">
@@ -772,18 +848,30 @@ function CustomerMenuContent() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600">
-            Invalid QR Code
-          </h1>
+          <h1 className="text-2xl font-bold text-red-600">Invalid QR Code</h1>
 
-          <p className="text-gray-500 mt-2">
-            Please scan a valid QR code.
+          <p className="text-gray-500 mt-2">Please scan a valid QR code.</p>
+        </div>
+      </div>
+    );
+  }
+  if (tableOccupied) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md text-center">
+          <h1 className="text-3xl font-bold text-red-600">Table Occupied</h1>
+
+          <p className="mt-3 text-gray-600">
+            An active order already exists for this table.
+          </p>
+
+          <p className="mt-2 text-sm text-gray-500">
+            Please contact restaurant staff.
           </p>
         </div>
       </div>
     );
   }
-
   // --- Order Placed View ---
   if (orderPlaced && currentOrder) {
     const currentStepIndex = STATUS_FLOW.indexOf(currentOrder.status);
@@ -1128,7 +1216,6 @@ function CustomerMenuContent() {
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-
           {/* Restaurant Info */}
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative">
@@ -1160,9 +1247,7 @@ function CustomerMenuContent() {
 
               <div className="flex items-center gap-2 text-xs text-gray-500">
                 <span className="px-2 py-1 bg-orange-50 text-orange-600 rounded-full font-medium">
-                  {orderType === "dine_in"
-                    ? `Table ${table}`
-                    : "Takeaway"}
+                  {orderType === "dine_in" ? `Table ${table}` : "Takeaway"}
                 </span>
 
                 <span>•</span>
@@ -1201,7 +1286,6 @@ function CustomerMenuContent() {
         </div>
         {showWelcome && (
           <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 text-white relative animate-in slide-in-from-top duration-500">
-
             <button
               onClick={dismissWelcome}
               className="absolute top-3 right-3 p-1 rounded-full hover:bg-white/20 transition"
@@ -1210,9 +1294,7 @@ function CustomerMenuContent() {
             </button>
 
             <div className="max-w-4xl mx-auto px-4 py-5">
-
               <div className="flex items-center gap-3">
-
                 <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2">
                   🍽️
                 </div>
@@ -1226,19 +1308,15 @@ function CustomerMenuContent() {
                     Browse our menu and place your order in seconds.
                   </p>
                 </div>
-
               </div>
-
             </div>
           </div>
         )}
       </header>
 
-
       <div className="max-w-2xl mx-auto px-4 py-4">
         <BannerCarousel banners={banners} />
       </div>
-
 
       {/* Categories */}
       <div className="sticky top-[60px] z-20 bg-white/95 backdrop-blur-md border-b shadow-sm overflow-x-auto">
@@ -1556,10 +1634,7 @@ function CustomerMenuContent() {
         </div>
       )}
       <ReviewPopup
-        open={
-          showReviewPopup &&
-          !!restaurant?.googleReviewLink
-        }
+        open={showReviewPopup && !!restaurant?.googleReviewLink}
         onClose={() => setShowReviewPopup(false)}
         onFinish={resetCustomerSession}
         googleReviewLink={restaurant?.googleReviewLink}
@@ -1685,5 +1760,3 @@ function CustomerMenuContent() {
     </div>
   );
 }
-
-
