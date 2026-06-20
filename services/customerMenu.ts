@@ -52,8 +52,9 @@ export const releaseTable = async (
     });
 
     return res.data;
-  } catch (err: any) {
-    console.log("❌ RELEASE TABLE ERROR:", err);
-    throw err;
+  } catch (error: any) {
+    console.log("STATUS:", error.response?.status);
+    console.log("DATA:", error.response?.data);
+    throw error;
   }
 };

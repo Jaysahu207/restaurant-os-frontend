@@ -516,7 +516,7 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
     price: item?.price || "",
     category: item?.category || "",
     image: item?.image || null,
-    available: item?.available ?? true,
+    isAvailable: item?.isAvailable ?? true,
     type: item?.type || "veg",
     isPopular: item?.isPopular ?? false,
     variants: item?.variants || [], // ✅ FIX
@@ -580,7 +580,7 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
       form.append("variants", JSON.stringify(formData.variants || []));
       form.append("prepTime", String(Number(formData.prepTime)));
       form.append("isPopular", String(formData.isPopular));
-      form.append("available", String(formData.available));
+      form.append("isAvailable", String(formData.isAvailable));
 
       // only send image if file
       if (formData.image && typeof formData.image !== "string") {
@@ -901,8 +901,8 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                name="available"
-                checked={formData.available}
+                name="isAvailable"
+                checked={formData.isAvailable}
                 onChange={handleChange}
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
@@ -922,7 +922,6 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
             </label>
           </div>
 
-          {/* Action Buttons */}
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button
@@ -983,8 +982,6 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
     </div>
   );
 }
-
-// export default MenuFormModal;
 
 // Modal component for delete confirmation
 

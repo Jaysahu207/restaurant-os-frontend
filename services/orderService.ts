@@ -12,6 +12,7 @@ type OrderItem = {
 type CustomerInfo = {
   name: string;
   phone: string;
+  email?: string;
 };
 
 type OrderPayload = {
@@ -26,7 +27,9 @@ type OrderPayload = {
 // 🔥 PLACE ORDER
 export const placeOrder = async (orderData: OrderPayload) => {
   try {
+    console.log("ORDER DATA:", orderData);
     const res = await PublicAPI.post("/api/orders", orderData);
+    console.log("ORDER RESPONSE:", res.data);
     return res.data;
   } catch (error: any) {
     console.error("ORDER ERROR:", error?.response?.data || error.message);

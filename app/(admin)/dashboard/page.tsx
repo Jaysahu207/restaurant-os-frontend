@@ -260,7 +260,7 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
               <th className="px-5 py-3 font-medium">After Tax</th>
               <th className="px-5 py-3 font-medium">Status</th>
               <th className="px-5 py-3 font-medium">Time</th>
-              <th className="px-5 py-3 font-medium"></th>
+
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -292,11 +292,7 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
                 <td className="px-5 py-3 text-sm text-gray-500">
                   {order.time}
                 </td>
-                <td className="px-5 py-3">
-                  <button className="text-gray-400 hover:text-gray-600">
-                    <Eye className="w-4 h-4" />
-                  </button>
-                </td>
+
               </tr>
             ))}
           </tbody>
@@ -369,7 +365,7 @@ export default function DashboardPage() {
 
     load();
   }, [restaurant?._id]);
-  console.log("🚀 Dashboard Rendered with restaurant:", data);
+  // console.log("🚀 Dashboard Rendered with restaurant:", data);
 
   useEffect(() => {
     loadRestaurant();

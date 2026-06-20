@@ -31,16 +31,34 @@ import {
   UtensilsCrossed,
   Eye,
   LogOut,
+  CandyCaneIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import TableManagement from "@/components/super-admin/TableManagement";
 
 // ==================== Types ====================
-interface MenuItem {
+interface MenuVariant {
   _id: string;
   name: string;
   price: number;
-  category?: string;
+}
+
+interface MenuAddon {
+  _id: string;
+  name: string;
+  price: number;
+}
+
+interface MenuItem {
+  _id: string;
+  name: string;
   description?: string;
+  price: number;
+  image?: string;
+  category?: string;
+  type?: string;
+  variants?: MenuVariant[];
+  addons?: MenuAddon[];
   isAvailable?: boolean;
 }
 
@@ -50,20 +68,49 @@ interface OrderItem {
   price: number;
   quantity: number;
   specialInstructions?: string;
-
 }
+
+type SelectedItem = {
+  _id: string;
+  name: string;
+  quantity: number;
+  price: number;
+  selectedVariant?: {
+    _id: string;
+    name: string;
+    price: number;
+  };
+  selectedAddons?: {
+    _id: string;
+    name: string;
+    price: number;
+  }[];
+  specialInstructions?: string;
+};
 
 interface Order {
   _id: string;
   tableNumber: number;
   orderType: "dine_in" | "takeaway" | "delivery";
   items: OrderItem[];
-  status: "pending" | "preparing" | "ready" | "served" | "completed";
+  orderNumber: string;
+  status:
+    | "pending"
+    | "preparing"
+    | "ready"
+    | "served"
+    | "completed"
+    | "cancelled";
   totalAmount: number;
   createdAt: string;
-  customerName?: string;
-  customerPhone?: string;
+  customer?: CustomerInfo;
   specialInstructions?: string;
+}
+
+interface CustomerInfo {
+  name: string;
+  phone: string;
+  email?: string;
 }
 
 // ==================== Main Component ====================
@@ -80,6 +127,7 @@ export default function WaiterPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [selectedTable, setSelectedTable] = useState<any>(null);
 
   // Initialize audio
   useEffect(() => {
@@ -90,7 +138,7 @@ export default function WaiterPage() {
   const playSound = useCallback(() => {
     if (!soundEnabled || !audioRef.current) return;
     audioRef.current.currentTime = 0;
-    audioRef.current.play().catch(() => { });
+    audioRef.current.play().catch(() => {});
   }, [soundEnabled]);
 
   // Load orders and menu
@@ -102,7 +150,6 @@ export default function WaiterPage() {
       const today = new Date().toISOString().split("T")[0];
       const data = await getOrders(restaurant._id, today);
       setOrders(data);
-      console.log(menuData);
       setMenuItems(menuData);
     } catch (error) {
       console.error("Failed to load data:", error);
@@ -134,7 +181,6 @@ export default function WaiterPage() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("🟢 Waiter socket connected");
       setSocketConnected(true);
       socket.emit("joinRestaurant", restaurant._id);
     });
@@ -158,10 +204,16 @@ export default function WaiterPage() {
       });
     });
 
-    socket.on("ORDER_UPDATED", (updatedOrder: Order) => {
-      setOrders((prev) =>
-        prev.map((o) => (o._id === updatedOrder._id ? updatedOrder : o)),
-      );
+    socket.on("ORDER_UPDATED", (updatedOrder) => {
+      setOrders((prev) => {
+        const exists = prev.some((o) => o._id === updatedOrder._id);
+
+        if (!exists) {
+          return [updatedOrder, ...prev];
+        }
+
+        return prev.map((o) => (o._id === updatedOrder._id ? updatedOrder : o));
+      });
     });
 
     socket.on("NEW_ORDER", (newOrder: Order) => {
@@ -178,7 +230,6 @@ export default function WaiterPage() {
 
   // Update order status
   const updateStatus = async (orderId: string, newStatus: string) => {
-    // Optimistic update
     setOrders((prev) =>
       prev.map((o) =>
         o._id === orderId ? { ...o, status: newStatus as Order["status"] } : o,
@@ -189,21 +240,25 @@ export default function WaiterPage() {
       toast.success(`Order marked as ${newStatus}`);
     } catch (error) {
       toast.error("Failed to update status");
-      loadData(); // Revert on error
+      loadData();
     }
   };
+
   const handleLogout = () => {
-    // Clear auth state and redirect to login
     localStorage.removeItem("authToken");
     useAuthStore.setState({ user: null, token: null });
     window.location.href = "/";
   };
+
   // Create new order
   const handleCreateOrder = async (orderData: {
     tableNumber: number;
     items: OrderItem[];
-    customerName?: string;
-    customerPhone?: string;
+    customer?: {
+      name?: string;
+      phone?: string;
+      email?: string;
+    };
     specialInstructions?: string;
     orderType?: "dine_in" | "takeaway";
   }) => {
@@ -211,12 +266,21 @@ export default function WaiterPage() {
       const payload = {
         restaurantId: restaurant._id,
         orderType: orderData.orderType ?? "dine_in",
-        ...orderData,
+        tableNumber: orderData.tableNumber,
+        items: orderData.items,
+        specialInstructions: orderData.specialInstructions,
+        customer: orderData.customer
+          ? {
+              name: orderData.customer.name ?? "",
+              phone: orderData.customer.phone ?? "",
+              email: orderData.customer.email ?? "",
+            }
+          : undefined,
       };
       await placeOrder(payload);
       toast.success("Order created successfully");
       setCreateModalOpen(false);
-      loadData(); // Refresh orders
+      loadData();
     } catch (error) {
       toast.error("Failed to create order");
       throw error;
@@ -228,21 +292,35 @@ export default function WaiterPage() {
     setDetailModalOpen(true);
   };
 
-  // Filter orders for waiter view
-  const readyOrders = orders.filter((o) => o.status === "ready");
   const servedOrders = orders.filter((o) => o.status === "served");
-  const preparingOrders = orders.filter((o) => o.status === "preparing");
-  const pendingOrders = orders.filter((o) => o.status === "pending");
 
-  // Loading skeleton
+  const completedOrders = orders.filter((o) => o.status === "completed");
+  const cancelledOrders = orders.filter((o) => o.status === "cancelled");
+
+  const sortByTime = (orders: Order[]) =>
+    [...orders].sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+
+  const pendingOrders = sortByTime(
+    orders.filter((o) => o.status === "pending"),
+  );
+
+  const preparingOrders = sortByTime(
+    orders.filter((o) => o.status === "preparing"),
+  );
+
+  const readyOrders = sortByTime(orders.filter((o) => o.status === "ready"));
+
   if (loading && !refreshing) {
     return <WaiterSkeleton />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-6">
-        {/* Header with Restaurant, Waiter & Actions */}
+    <div className="min-h-screen ">
+      <div className="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-2 lg:px-8">
+        {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div className="flex-1 min-w-0">
             <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-orange-600 to-orange-800 bg-clip-text text-transparent truncate">
@@ -250,24 +328,23 @@ export default function WaiterPage() {
             </h1>
             <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
               <User className="w-3 h-3" />
-              <span>Waiter: {user?.name || "John Doe"}</span>
+              <span>Captain: {user?.name || "John Doe"}</span>
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Sound Toggle */}
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2 rounded-full transition-all ${soundEnabled
-                ? "bg-orange-100 text-orange-600"
-                : "bg-gray-200 text-gray-500"
-                }`}
+              className={`p-2 rounded-full transition-all ${
+                soundEnabled
+                  ? "bg-orange-100 text-orange-600"
+                  : "bg-gray-200 text-gray-500"
+              }`}
               title={soundEnabled ? "Sound On" : "Sound Off"}
             >
               {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
             </button>
 
-            {/* Refresh */}
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -279,9 +356,8 @@ export default function WaiterPage() {
               />
             </button>
 
-            {/* Logout */}
             <button
-              onClick={handleLogout} // ❗ Implement your logout logic
+              onClick={handleLogout}
               className="p-2 rounded-full bg-red-50 text-red-600 active:scale-95 transition"
               title="Logout"
             >
@@ -305,7 +381,7 @@ export default function WaiterPage() {
           )}
         </div>
 
-        {/* Stats Cards (2x2 grid on mobile, 4 columns on larger) */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <StatCard
             label="Ready to Serve"
@@ -332,47 +408,22 @@ export default function WaiterPage() {
             color="bg-gray-500"
             icon={CheckCircle2}
           />
+          <StatCard
+            label="Completed"
+            value={completedOrders.length}
+            color="bg-gray-500"
+            icon={CheckCircle2}
+          />
+          <StatCard
+            label="Cancelled"
+            value={cancelledOrders.length}
+            color="bg-gray-500"
+            icon={CandyCaneIcon}
+          />
         </div>
 
-        {/* Ready to Serve Section (most prominent) */}
-        <section className="mb-10">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              Ready to Serve
-              {readyOrders.length > 0 && (
-                <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">
-                  {readyOrders.length}
-                </span>
-              )}
-            </h2>
-          </div>
-          {readyOrders.length === 0 ? (
-            <EmptyState message="No orders ready" />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {readyOrders.map((order) => (
-                <OrderCard
-                  key={order._id}
-                  order={order}
-                  onServe={(id) => updateStatus(id, "served")}
-                  onViewDetail={openDetail}
-                  highlight
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Other Status Sections */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatusColumn
-            title="Preparing"
-            icon={ChefHat}
-            orders={preparingOrders}
-            statusColor="border-blue-400"
-            onViewDetail={openDetail}
-          />
+        {/* Order Status Columns */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           <StatusColumn
             title="Pending"
             icon={Clock}
@@ -380,16 +431,34 @@ export default function WaiterPage() {
             statusColor="border-amber-400"
             onViewDetail={openDetail}
           />
+
+          <StatusColumn
+            title="Preparing"
+            icon={ChefHat}
+            orders={preparingOrders}
+            statusColor="border-blue-400"
+            onViewDetail={openDetail}
+          />
+
+          <StatusColumn
+            title="Ready to Serve"
+            icon={CheckCircle2}
+            orders={readyOrders}
+            statusColor="border-emerald-400"
+            onViewDetail={openDetail}
+            // onServe={(id) => updateStatus(id, "served")}
+          />
+
           <StatusColumn
             title="Recently Served"
             icon={CheckCircle2}
-            orders={servedOrders.slice(0, 5)}
+            orders={servedOrders.slice(0, 10)}
             statusColor="border-gray-400"
             onViewDetail={openDetail}
           />
         </div>
 
-        {/* Floating Action Button for New Order */}
+        {/* Floating Action Button */}
         <button
           onClick={() => setCreateModalOpen(true)}
           className="fixed bottom-6 right-6 bg-orange-600 text-white p-4 rounded-full shadow-lg hover:bg-orange-700 active:scale-95 transition-all z-20 flex items-center justify-center"
@@ -397,11 +466,15 @@ export default function WaiterPage() {
           <Plus size={24} />
         </button>
 
-        {/* Modals (unchanged) */}
+        {/* Modals */}
         {createModalOpen && (
           <CreateOrderModal
             menuItems={menuItems}
-            onClose={() => setCreateModalOpen(false)}
+            selectedTable={selectedTable}
+            onClose={() => {
+              setCreateModalOpen(false);
+              setSelectedTable(null);
+            }}
             onSubmit={handleCreateOrder}
             restaurantId={restaurant?._id}
           />
@@ -413,6 +486,18 @@ export default function WaiterPage() {
             onUpdateStatus={(status) => updateStatus(selectedOrder._id, status)}
           />
         )}
+
+        <div className="mt-12">
+          <TableManagement
+            onTableClick={(table) => {
+              if (table.status !== "available") return;
+
+              setSelectedTable(table);
+              setCreateModalOpen(true);
+            }}
+            restaurantId={restaurant?._id}
+          />
+        </div>
       </div>
     </div>
   );
@@ -434,8 +519,9 @@ function StatCard({
 }) {
   return (
     <div
-      className={`bg-white rounded-xl shadow-sm p-4 border ${highlight ? "border-green-300 ring-1 ring-green-200" : "border-gray-100"
-        }`}
+      className={`bg-white rounded-xl shadow-sm p-4 border ${
+        highlight ? "border-green-300 ring-1 ring-green-200" : "border-gray-100"
+      }`}
     >
       <div className="flex items-center justify-between">
         <div>
@@ -524,126 +610,148 @@ function CompactOrderCard({
   );
 }
 
-// ==================== Full Order Card (for Ready section) ====================
-function OrderCard({
-  order,
-  onServe,
-  onViewDetail,
-  highlight = false,
-}: {
-  order: Order;
-  onServe: (id: string) => void;
-  onViewDetail: (order: Order) => void;
-  highlight?: boolean;
-}) {
-  const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+// // ==================== Full Order Card ====================
+// function OrderCard({
+//   order,
+//   onServe,
+//   onViewDetail,
+//   highlight = false,
+// }: {
+//   order: Order;
+//   onServe: (id: string) => void;
+//   onViewDetail: (order: Order) => void;
+//   highlight?: boolean;
+// }) {
+//   return (
+//     <div
+//       className={`bg-white rounded-xl shadow-sm border ${
+//         highlight ? "border-green-300 ring-1 ring-green-200" : "border-gray-200"
+//       } p-4 hover:shadow-md transition`}
+//     >
+//       <div className="flex justify-between items-start mb-2">
+//         <div>
+//           <div className="flex items-center gap-2">
+//             <span className="font-semibold text-gray-800 text-lg">
+//               Table {order.tableNumber}
+//             </span>
+//             <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
+//               #{order._id.slice(-6)}
+//             </span>
+//           </div>
+//           {order.customer?.name && (
+//             <p className="text-sm text-gray-600 flex items-center gap-1">
+//               <User className="w-3 h-3" />
+//               {order.customer.name}
+//             </p>
+//           )}
+//         </div>
+//         <button
+//           onClick={() => onViewDetail(order)}
+//           className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition"
+//         >
+//           <Eye className="w-4 h-4" />
+//         </button>
+//       </div>
 
-  return (
-    <div
-      className={`bg-white rounded-xl shadow-sm border ${highlight ? "border-green-300 ring-1 ring-green-200" : "border-gray-200"
-        } p-4 hover:shadow-md transition`}
-    >
-      <div className="flex justify-between items-start mb-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-gray-800 text-lg">
-              Table {order.tableNumber}
-            </span>
-            <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
-              #{order._id.slice(-6)}
-            </span>
-          </div>
-          {order.customerName && (
-            <p className="text-sm text-gray-600 flex items-center gap-1">
-              <User className="w-3 h-3" />
-              {order.customerName}
-            </p>
-          )}
-        </div>
-        <button
-          onClick={() => onViewDetail(order)}
-          className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition"
-        >
-          <Eye className="w-4 h-4" />
-        </button>
-      </div>
+//       <div className="mt-2 space-y-1">
+//         {order.items.slice(0, 3).map((item, idx) => (
+//           <div key={idx} className="flex justify-between text-sm">
+//             <span>
+//               {item.quantity}× {item.name}
+//             </span>
+//           </div>
+//         ))}
+//         {order.items.length > 3 && (
+//           <p className="text-xs text-gray-500">
+//             +{order.items.length - 3} more items
+//           </p>
+//         )}
+//       </div>
 
-      <div className="mt-2 space-y-1">
-        {order.items.slice(0, 3).map((item, idx) => (
-          <div key={idx} className="flex justify-between text-sm">
-            <span>
-              {item.quantity}× {item.name}
-            </span>
-          </div>
-        ))}
-        {order.items.length > 3 && (
-          <p className="text-xs text-gray-500">
-            +{order.items.length - 3} more items
-          </p>
-        )}
-      </div>
+//       {order.specialInstructions && (
+//         <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-1.5 rounded">
+//           Note: {order.specialInstructions}
+//         </div>
+//       )}
 
-      {order.specialInstructions && (
-        <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-1.5 rounded">
-          Note: {order.specialInstructions}
-        </div>
-      )}
-
-      <div className="mt-3 flex items-center justify-between">
-        <span className="text-sm font-semibold">
-          ₹{order.totalAmount.toFixed(2)}
-        </span>
-        <button
-          onClick={() => onServe(order._id)}
-          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition flex items-center gap-1"
-        >
-          <CheckCircle2 className="w-4 h-4" />
-          Mark Served
-        </button>
-      </div>
-    </div>
-  );
-}
+//       <div className="mt-3 flex items-center justify-between">
+//         <span className="text-sm font-semibold">
+//           ₹{order.totalAmount.toFixed(2)}
+//         </span>
+//         <button
+//           onClick={() => onServe(order._id)}
+//           className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition flex items-center gap-1"
+//         >
+//           <CheckCircle2 className="w-4 h-4" />
+//           Mark Served
+//         </button>
+//       </div>
+//     </div>
+//   );
+// }
 
 // ==================== Create Order Modal ====================
 function CreateOrderModal({
   menuItems,
+  selectedTable,
   onClose,
   onSubmit,
   restaurantId,
 }: {
   menuItems: MenuItem[];
+  selectedTable?: any;
   onClose: () => void;
   onSubmit: (data: any) => Promise<void>;
   restaurantId: string;
 }) {
-  const [tableNumber, setTableNumber] = useState<number>(1);
+  const [tableNumber, setTableNumber] = useState<number>(
+    selectedTable?.tableNumber || 1,
+  );
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [specialInstructions, setSpecialInstructions] = useState("");
-  const [selectedItems, setSelectedItems] = useState<
-    (MenuItem & { quantity: number; specialInstructions?: string })[]
-  >([]);
+  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  const filteredMenu = menuItems.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      item.isAvailable !== false,
-  );
-
-  const addItem = (item: MenuItem) => {
-    const existing = selectedItems.find((i) => i._id === item._id);
-    if (existing) {
-      setSelectedItems(
-        selectedItems.map((i) =>
-          i._id === item._id ? { ...i, quantity: i.quantity + 1 } : i,
-        ),
-      );
-    } else {
-      setSelectedItems([...selectedItems, { ...item, quantity: 1 }]);
+  const [variantModalOpen, setVariantModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const categories: string[] = [
+    "All",
+    ...Array.from(
+      new Set(
+        menuItems
+          .filter((item): item is MenuItem & { category: string } =>
+            Boolean(item.category),
+          )
+          .map((item) => item.category),
+      ),
+    ),
+  ];
+  useEffect(() => {
+    if (selectedTable) {
+      setTableNumber(selectedTable.tableNumber);
     }
+  }, [selectedTable]);
+
+  const [selectedCategory, setSelectedCategory] = useState("All");
+
+  const filteredMenu = menuItems.filter((item) => {
+    const matchesSearch = item.name
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+
+    const matchesCategory =
+      selectedCategory === "All" || item.category === selectedCategory;
+
+    return matchesSearch && matchesCategory && item.isAvailable !== false;
+  });
+
+  const calculateItemTotal = (item: SelectedItem) => {
+    const variantPrice = item.selectedVariant?.price ?? item.price;
+    const addonsPrice =
+      item.selectedAddons?.reduce((sum, a) => sum + a.price, 0) ?? 0;
+    return (variantPrice + addonsPrice) * item.quantity;
   };
 
   const updateQuantity = (id: string, delta: number) => {
@@ -658,8 +766,12 @@ function CreateOrderModal({
     );
   };
 
-  const calculateTotal = () =>
-    selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const calculateTotal = () => {
+    return selectedItems.reduce(
+      (sum, item) => sum + calculateItemTotal(item),
+      0,
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -676,11 +788,16 @@ function CreateOrderModal({
           name: item.name,
           price: item.price,
           quantity: item.quantity,
-          specialInstructions: item.specialInstructions,
+          // include addons if backend accepts them, otherwise remove
+          addons: item.selectedAddons || [],
+          specialInstructions: item.specialInstructions || "",
         })),
-        customerName: customerName || undefined,
-        customerPhone: customerPhone || undefined,
-        specialInstructions: specialInstructions || undefined,
+        customer: {
+          name: customerName,
+          phone: customerPhone,
+          email: customerEmail,
+        },
+        specialInstructions,
       });
     } catch (error) {
       // Error already handled in parent
@@ -689,10 +806,202 @@ function CreateOrderModal({
     }
   };
 
+  // Variant Selection Modal (nested)
+  function VariantSelectionModal({
+    item,
+    onClose,
+    onAddToCart,
+  }: {
+    item: MenuItem;
+    onClose: () => void;
+    onAddToCart: (customized: SelectedItem) => void;
+  }) {
+    const [selectedVariant, setSelectedVariant] = useState<
+      MenuVariant | undefined
+    >(undefined);
+    const [selectedAddons, setSelectedAddons] = useState<MenuAddon[]>([]);
+
+    const toggleAddon = (addon: MenuAddon) => {
+      setSelectedAddons((prev) =>
+        prev.some((a) => a._id === addon._id)
+          ? prev.filter((a) => a._id !== addon._id)
+          : [...prev, addon],
+      );
+    };
+
+    const handleAdd = () => {
+      onAddToCart({
+        _id: item._id,
+        name: item.name,
+        quantity: 1,
+        selectedVariant,
+        selectedAddons,
+        specialInstructions: "",
+        price: selectedVariant?.price ?? item.price,
+      });
+      onClose();
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center">
+        <div className="w-full sm:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[90vh] flex flex-col animate-in slide-in-from-bottom duration-300">
+          {/* Header */}
+          <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-3xl z-10">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">{item.name}</h3>
+
+              <p className="text-sm text-gray-500">Customize your order</p>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-5 py-4">
+            {/* Variants */}
+            {item.variants && item.variants.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                  Choose Size / Variant
+                </h4>
+
+                <div className="space-y-3">
+                  {item.variants.map((variant) => (
+                    <label
+                      key={variant._id}
+                      className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all duration-200
+                  ${
+                    selectedVariant?._id === variant._id
+                      ? "border-orange-500 bg-orange-50 shadow-sm"
+                      : "border-gray-200 hover:border-orange-300"
+                  }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="variant"
+                          checked={selectedVariant?._id === variant._id}
+                          onChange={() => setSelectedVariant(variant)}
+                          className="accent-orange-500"
+                        />
+
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {variant.name}
+                          </p>
+
+                          <p className="text-xs text-gray-500">
+                            Upgrade option
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="font-semibold text-orange-600">
+                        +₹{variant.price}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Addons */}
+            {item.addons && item.addons.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                  Add Extras
+                </h4>
+
+                <div className="space-y-3">
+                  {item.addons.map((addon) => {
+                    const selected = selectedAddons.some(
+                      (a) => a._id === addon._id,
+                    );
+
+                    return (
+                      <label
+                        key={addon._id}
+                        className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all duration-200
+                    ${
+                      selected
+                        ? "border-green-500 bg-green-50 shadow-sm"
+                        : "border-gray-200 hover:border-green-300"
+                    }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleAddon(addon)}
+                            className="accent-green-600"
+                          />
+
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {addon.name}
+                            </p>
+
+                            <p className="text-xs text-gray-500">
+                              Optional addon
+                            </p>
+                          </div>
+                        </div>
+
+                        <span className="font-semibold text-green-600">
+                          +₹{addon.price}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4 rounded-b-3xl">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-gray-500 text-sm">Total Price</span>
+
+              <span className="text-xl font-bold text-gray-900">
+                ₹
+                {(selectedVariant?.price ?? item.price) +
+                  selectedAddons.reduce((sum, addon) => sum + addon.price, 0)}
+              </span>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 h-12 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleAdd}
+                className="flex-1 h-12 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow-lg transition"
+              >
+                Add to Order
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-        {/* Header with gradient */}
+    <div className="fixed inset-0 z-[100] bg-white">
+      <div className="w-full h-screen flex flex-col bg-white">
+        {/* Header */}
         <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-white/20 p-2 rounded-xl">
@@ -708,67 +1017,113 @@ function CreateOrderModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-gray-50 to-white">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Table & Customer Info Card */}
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-gradient-to-b from-gray-50 to-white ">
+          <form
+            onSubmit={handleSubmit}
+            className="flex-1
+overflow-hidden
+lg:grid
+lg:grid-cols-3 "
+          >
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+              <div className="flex items-center gap-2 mb-4">
                 <div className="w-1 h-5 bg-gradient-to-b from-orange-500 to-pink-500 rounded-full" />
-                Customer & Table Details
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">
-                    Table Number *
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500">
-                      🪑
+                <h3 className="font-semibold text-gray-800">
+                  Customer Details
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* Table */}
+                <div className="bg-orange-50 border border-orange-200 rounded-2xl p-2">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-sm font-bold">
+                        Table No.{selectedTable?.tableNumber}
+                      </h3>
+                    </div>
+
+                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
+                      Available
                     </span>
-                    <input
-                      type="number"
-                      min="1"
-                      value={tableNumber}
-                      onChange={(e) => setTableNumber(parseInt(e.target.value))}
-                      className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-gray-50"
-                      required
-                    />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">
-                    Customer Name
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 w-4 h-4" />
-                    <input
-                      type="text"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
-                      placeholder="Optional"
-                    />
-                  </div>
+
+                {/* Name */}
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" />
+
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="Customer Name"
+                    className="
+          w-full
+          h-12
+          pl-10
+          pr-3
+          rounded-xl
+          border
+          border-gray-200
+          bg-gray-50
+          focus:ring-2
+          focus:ring-blue-500
+        "
+                  />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">
-                    Customer Phone
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-green-500 w-4 h-4" />
-                    <input
-                      type="tel"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50"
-                      placeholder="Optional"
-                    />
-                  </div>
+
+                {/* Phone */}
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+
+                  <input
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    placeholder="Phone Number"
+                    className="
+          w-full
+          h-12
+          pl-10
+          pr-3
+          rounded-xl
+          border
+          border-gray-200
+          bg-gray-50
+          focus:ring-2
+          focus:ring-green-500
+        "
+                  />
+                </div>
+
+                {/* Email */}
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-500" />
+
+                  <input
+                    type="email"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    placeholder="Email"
+                    className="
+          w-full
+          h-12
+          pl-10
+          pr-3
+          rounded-xl
+          border
+          border-gray-200
+          bg-gray-50
+          focus:ring-2
+          focus:ring-purple-500
+        "
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Menu Item Selection Card */}
+            {/* Menu Items */}
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
               <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                 <div className="w-1 h-5 bg-gradient-to-b from-green-500 to-emerald-500 rounded-full" />
@@ -784,7 +1139,33 @@ function CreateOrderModal({
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
                 />
               </div>
-              <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => setSelectedCategory(category)}
+                    className={`
+        whitespace-nowrap px-4 py-2 rounded-full
+        text-sm font-medium transition-all
+        ${
+          selectedCategory === category
+            ? "bg-orange-500 text-white shadow-lg"
+            : "bg-gray-100 text-gray-600"
+        }
+      `}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+              <div
+                className="grid
+  grid-cols-2
+  md:grid-cols-3
+  xl:grid-cols-4
+  gap-3 border border-gray-200 rounded-lg divide-y divide-gray-100"
+              >
                 {filteredMenu.length === 0 ? (
                   <div className="p-6 text-center text-gray-400">
                     <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -794,19 +1175,56 @@ function CreateOrderModal({
                   filteredMenu.map((item) => (
                     <div
                       key={item._id}
-                      className="flex items-center justify-between p-3 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 cursor-pointer transition-all group"
-                      onClick={() => addItem(item)}
+                      onClick={() => {
+                        setEditingItem(item);
+                        setVariantModalOpen(true);
+                      }}
+                      className="
+    bg-white
+    rounded-2xl
+    border
+    overflow-hidden
+    cursor-pointer
+    hover:shadow-lg
+    transition-all
+    group
+  "
                     >
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-800 group-hover:text-green-700 transition">
-                          {item.name}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          ₹{item.price.toFixed(2)}
-                        </p>
+                      <div className="aspect-square bg-gray-100">
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                      <div className="bg-green-100 group-hover:bg-green-200 rounded-full p-1.5 transition">
-                        <PlusIcon className="w-4 h-4 text-green-700" />
+
+                      <div className="p-3">
+                        <h4 className="font-semibold text-sm line-clamp-1">
+                          {item.name}
+                        </h4>
+
+                        <p>
+                          {item.isAvailable ? "Available" : "Not Available"}
+                        </p>
+
+                        <div className="flex justify-between items-center mt-2">
+                          <span className="font-bold text-orange-600">
+                            ₹{item.price}
+                          </span>
+
+                          <button
+                            type="button"
+                            className="
+          w-8 h-8
+          rounded-full
+          bg-green-500
+          text-white
+          flex items-center justify-center
+        "
+                          >
+                            <PlusIcon size={16} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -814,7 +1232,7 @@ function CreateOrderModal({
               </div>
             </div>
 
-            {/* Selected Items Card */}
+            {/* Selected Items */}
             {selectedItems.length > 0 && (
               <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
                 <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
@@ -829,8 +1247,16 @@ function CreateOrderModal({
                     >
                       <div className="flex-1">
                         <p className="font-medium text-gray-800">{item.name}</p>
-                        <p className="text-sm text-purple-600">
-                          ₹{item.price.toFixed(2)} each
+                        <p className="text-xs text-gray-500">
+                          {item.selectedVariant
+                            ? `Variant: ${item.selectedVariant.name}`
+                            : ""}
+                          {item.selectedAddons && item.selectedAddons.length > 0
+                            ? ` | Add‑ons: ${item.selectedAddons.map((a) => a.name).join(", ")}`
+                            : ""}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          ₹{calculateItemTotal(item).toFixed(2)}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
@@ -866,7 +1292,7 @@ function CreateOrderModal({
               </div>
             )}
 
-            {/* Special Instructions Card */}
+            {/* Special Instructions */}
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
               <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                 <div className="w-1 h-5 bg-gradient-to-b from-amber-500 to-orange-500 rounded-full" />
@@ -886,34 +1312,131 @@ function CreateOrderModal({
           </form>
         </div>
 
-        {/* Footer with gradient */}
-        <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-t border-gray-200 px-6 py-5 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            disabled={submitting}
-            className="px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-white hover:shadow-md transition disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting || selectedItems.length === 0}
-            className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-medium hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
-          >
-            {submitting ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                Creating Order...
-              </>
-            ) : (
-              <>
-                <ShoppingCart className="w-5 h-5" />
-                Place Order • ₹{calculateTotal().toFixed(0)}
-              </>
-            )}
-          </button>
+        {/* Footer */}
+        <div className="sticky bottom-0 z-20 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+          <div className="px-4 md:px-6 py-4">
+            {/* Order Summary */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">
+                  Order Total
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-3xl font-bold text-gray-900">
+                    ₹{calculateTotal().toFixed(0)}
+                  </span>
+
+                  <span className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-700 rounded-full">
+                    {selectedItems.length} Items
+                  </span>
+                </div>
+              </div>
+
+              {selectedTable && (
+                <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-xl">
+                  <span className="text-lg">🪑</span>
+                  <div>
+                    <p className="text-xs text-orange-600">Table</p>
+                    <p className="font-semibold text-orange-800">
+                      #{selectedTable.tableNumber}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                className="
+          h-12 md:h-14
+          rounded-2xl
+          border
+          border-gray-300
+          bg-white
+          font-semibold
+          text-gray-700
+          hover:bg-gray-50
+          transition-all
+          disabled:opacity-50
+        "
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={(e) => handleSubmit(e)}
+                type="button"
+                disabled={submitting || selectedItems.length === 0}
+                className="
+          h-12 md:h-14
+          rounded-2xl
+          bg-gradient-to-r
+          from-green-600
+          to-emerald-600
+          text-white
+          font-semibold
+          shadow-lg
+          hover:shadow-xl
+          active:scale-[0.98]
+          transition-all
+          disabled:opacity-50
+          disabled:cursor-not-allowed
+          flex
+          items-center
+          justify-center
+          gap-2
+        "
+              >
+                {submitting ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="w-5 h-5" />
+                    Place Order
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      {variantModalOpen && editingItem && (
+        <VariantSelectionModal
+          item={editingItem}
+          onClose={() => {
+            setVariantModalOpen(false);
+            setEditingItem(null);
+          }}
+          onAddToCart={(customizedItem) => {
+            setSelectedItems((prev) => {
+              const existing = prev.find(
+                (i) => i._id === customizedItem._id,
+                // For simplicity, we don't check variant/addon equality; if you need distinct items,
+                // you should compare variants/addons as well.
+              );
+              if (existing) {
+                return prev.map((i) =>
+                  i._id === customizedItem._id
+                    ? { ...i, quantity: i.quantity + 1 }
+                    : i,
+                );
+              }
+              return [...prev, customizedItem];
+            });
+            setVariantModalOpen(false);
+            setEditingItem(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -930,33 +1453,33 @@ function OrderDetailModal({
 }) {
   const getStatusColor = (status: string) => {
     const colors: Record<string, { bg: string; text: string; border: string }> =
-    {
-      pending: {
-        bg: "bg-yellow-100",
-        text: "text-yellow-700",
-        border: "border-yellow-300",
-      },
-      preparing: {
-        bg: "bg-blue-100",
-        text: "text-blue-700",
-        border: "border-blue-300",
-      },
-      ready: {
-        bg: "bg-green-100",
-        text: "text-green-700",
-        border: "border-green-300",
-      },
-      served: {
-        bg: "bg-purple-100",
-        text: "text-purple-700",
-        border: "border-purple-300",
-      },
-      completed: {
-        bg: "bg-gray-100",
-        text: "text-gray-700",
-        border: "border-gray-300",
-      },
-    };
+      {
+        pending: {
+          bg: "bg-yellow-100",
+          text: "text-yellow-700",
+          border: "border-yellow-300",
+        },
+        preparing: {
+          bg: "bg-blue-100",
+          text: "text-blue-700",
+          border: "border-blue-300",
+        },
+        ready: {
+          bg: "bg-green-100",
+          text: "text-green-700",
+          border: "border-green-300",
+        },
+        served: {
+          bg: "bg-purple-100",
+          text: "text-purple-700",
+          border: "border-purple-300",
+        },
+        completed: {
+          bg: "bg-gray-100",
+          text: "text-gray-700",
+          border: "border-gray-300",
+        },
+      };
     return colors[status] || colors.pending;
   };
 
@@ -971,7 +1494,7 @@ function OrderDetailModal({
         className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header with gradient */}
+        {/* Header */}
         <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-white/20 p-2 rounded-xl">
@@ -979,7 +1502,7 @@ function OrderDetailModal({
             </div>
             <div>
               <h3 className="text-xl font-bold text-white">
-                Order #{order._id.slice(-6)}
+                Order - {order.orderNumber.slice(-3)}
               </h3>
               <p className="text-white/80 text-sm flex items-center gap-1">
                 <Clock className="w-3 h-3" />
@@ -996,7 +1519,7 @@ function OrderDetailModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-gray-50 to-white space-y-5">
-          {/* Order Info Card */}
+          {/* Order Info */}
           <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
               <div className="w-1 h-5 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full" />
@@ -1041,8 +1564,8 @@ function OrderDetailModal({
             </div>
           </div>
 
-          {/* Customer Info Card (if exists) */}
-          {order.customerName && (
+          {/* Customer Info */}
+          {order.customer?.name && (
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
               <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                 <div className="w-1 h-5 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-full" />
@@ -1055,17 +1578,17 @@ function OrderDetailModal({
                   </p>
                   <p className="font-medium text-gray-800 flex items-center gap-1">
                     <User className="w-4 h-4 text-emerald-500" />
-                    {order.customerName}
+                    {order.customer.name}
                   </p>
                 </div>
-                {order.customerPhone && (
+                {order.customer.phone && (
                   <div>
                     <p className="text-xs text-gray-500 uppercase tracking-wider">
                       Phone
                     </p>
                     <p className="font-medium text-gray-800 flex items-center gap-1">
                       <Phone className="w-4 h-4 text-emerald-500" />
-                      {order.customerPhone}
+                      {order.customer.phone}
                     </p>
                   </div>
                 )}
@@ -1073,7 +1596,7 @@ function OrderDetailModal({
             </div>
           )}
 
-          {/* Items Card */}
+          {/* Items */}
           <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
               <div className="w-1 h-5 bg-gradient-to-b from-amber-500 to-orange-500 rounded-full" />
@@ -1133,7 +1656,7 @@ function OrderDetailModal({
             </div>
           </div>
 
-          {/* Special Instructions Card */}
+          {/* Special Instructions */}
           {order.specialInstructions && (
             <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-5 shadow-sm border border-orange-200">
               <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
@@ -1147,7 +1670,7 @@ function OrderDetailModal({
           )}
         </div>
 
-        {/* Footer with actions */}
+        {/* Footer Actions */}
         <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-t border-gray-200 px-6 py-5 flex justify-between items-center">
           <div className="flex gap-3">
             {order.status === "ready" && (

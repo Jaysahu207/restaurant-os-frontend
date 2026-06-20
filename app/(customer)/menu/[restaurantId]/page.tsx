@@ -258,8 +258,6 @@ function CustomerMenuContent() {
 
   useEffect(() => {
     // Inside the verifyTable effect (around line 280)
-
-
     verifyTable();
   }, [restaurantSlug, table]);
   const verifyTable = async () => {
@@ -635,6 +633,7 @@ function CustomerMenuContent() {
     setCustomerEmail(customer.email || "");
   }, []);
   const handlePlaceOrder = async () => {
+
     if (submitting) return;
     if (!customerName.trim() || !customerPhone.trim() || !cartItems.length) {
       toast.error("Please enter your name and phone number");
@@ -806,12 +805,21 @@ function CustomerMenuContent() {
     setCustomerName("");
     setCustomerPhone("");
     setCustomerEmail("");
+    setCustomerLocked(false);
     setSpecialInstructions("");
     localStorage.removeItem("cart-storage");
     localStorage.removeItem("currentOrder");
     toast.success("Session reset. You can start a new order.");
   };
+  const isValidPhone = /^[6-9]\d{9}$/.test(customerPhone);
+  const isValidEmail =
+    customerEmail === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail);
 
+  const canPlaceOrder =
+    customerName.trim() !== "" &&
+    isValidPhone &&
+    isValidEmail &&
+    cartItems.length > 0 && !submitting;
   // ------------------------------------------------------------
   // Render Helpers
   // ------------------------------------------------------------
@@ -1592,6 +1600,11 @@ function CustomerMenuContent() {
                       disabled={customerLocked}
                       className="w-full px-3 py-2.5 border rounded-xl text-sm"
                     />
+                    {customerPhone && !isValidPhone && (
+                      <p className="text-red-500 text-sm mt-1">
+                        Enter a valid 10-digit mobile number
+                      </p>
+                    )}
                     <input
                       type="email"
                       placeholder="Email (optional)"
@@ -1600,6 +1613,11 @@ function CustomerMenuContent() {
                       disabled={customerLocked}
                       className="w-full px-3 py-2.5 border rounded-xl text-sm"
                     />
+                    {customerEmail && !isValidEmail && (
+                      <p className="text-red-500 text-sm mt-1">
+                        Enter a valid email address
+                      </p>
+                    )}
                     <textarea
                       placeholder="Special instructions (optional)"
                       value={specialInstructions}
@@ -1616,8 +1634,11 @@ function CustomerMenuContent() {
                       </button>
                       <button
                         onClick={handlePlaceOrder}
-                        disabled={submitting}
-                        className="flex-1 py-2.5 bg-green-500 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+                        disabled={submitting || !canPlaceOrder}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-semibold ${submitting || !canPlaceOrder
+                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          : "bg-green-500 text-white"
+                          }`}
                       >
                         {submitting ? (
                           <Loader2 className="w-4 h-4 animate-spin mx-auto" />
