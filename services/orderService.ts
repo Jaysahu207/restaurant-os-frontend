@@ -65,7 +65,21 @@ export const updateOrderStatus = async (id: string, status: string) => {
     throw error;
   }
 };
+// 🔥 PRINT KOT (Returns only pending items)
+export const printKOT = async (orderId: string) => {
+  try {
+    const res = await API.post(`/api/orders/${orderId}/print-kot`);
 
+    return res.data;
+  } catch (error: any) {
+    console.error(
+      "PRINT KOT ERROR:",
+      error?.response?.data || error.message,
+    );
+
+    throw error;
+  }
+};
 // 🔥 ADD ITEMS TO ORDER
 export const addItemsToOrder = async (id: string, items: OrderItem[]) => {
   try {

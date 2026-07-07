@@ -22,6 +22,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useUIStore } from "@/store/useUIStore";
+import { useNotificationStore } from "@/store/useNotificationStore";
 
 const menuSections = [
   {
@@ -75,7 +76,7 @@ export default function Sidebar() {
     setSidebarCollapsed,
     setSidebarMobileOpen,
   } = useUIStore();
-
+  const unreadOrders = useNotificationStore((state) => state.unreadOrders);
   // Handle responsive behavior
   useEffect(() => {
     const handleResize = () => {
@@ -156,12 +157,13 @@ export default function Sidebar() {
           bg-white border-r border-gray-200 flex flex-col h-screen shadow-xl
           transition-all duration-300 ease-in-out
           ${sidebarWidth}
-          ${isMobile || isTablet
-            ? `
+          ${
+            isMobile || isTablet
+              ? `
               fixed top-0 left-0 z-50
               ${sidebarMobileOpen ? "translate-x-0" : "-translate-x-full"}
             `
-            : "sticky top-0"
+              : "sticky top-0"
           }
         `}
       >
@@ -257,18 +259,40 @@ export default function Sidebar() {
                       className={`
                         flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
                         group relative
-                        ${active
-                          ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
-                          : "text-gray-600 hover:bg-gray-100"
+                        ${
+                          active
+                            ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
+                            : "text-gray-600 hover:bg-gray-100"
                         }
                         ${sidebarCollapsed ? "justify-center" : ""}
                       `}
                     >
                       <Icon size={20} className="flex-shrink-0" />
                       {!sidebarCollapsed && (
-                        <span className="text-sm font-medium truncate">
-                          {item.name}
-                        </span>
+                        <>
+                          <span className="font-medium text-sm flex-1">
+                            {item.name}
+                          </span>
+
+                          {item.name === "Orders" && unreadOrders > 0 && (
+                            <span
+                              className="
+            bg-red-500
+            text-white
+            text-xs
+            min-w-[20px]
+            h-5
+            px-1
+            rounded-full
+            flex
+            items-center
+            justify-center
+          "
+                            >
+                              {unreadOrders}
+                            </span>
+                          )}
+                        </>
                       )}
                       {/* Tooltip for collapsed mode */}
                       {sidebarCollapsed && (

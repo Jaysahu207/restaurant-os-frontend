@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import {
   getOrders,
+  printKOT,
   updateOrderStatus as updateStatusAPI,
   verifyPayment,
 } from "@/services/orderService";
@@ -26,7 +27,7 @@ import toast from "react-hot-toast";
 import InvoiceTemplate from "@/components/invoice/InvoiceTemplate";
 import { generateInvoicePDF } from "@/utils/pdf/generateInvoicePDF";
 import { useReactToPrint } from "react-to-print";
-
+import { useNotificationStore } from "@/store/useNotificationStore";
 
 // ==================== Types ====================
 interface OrderItem {
@@ -60,7 +61,24 @@ interface Order {
   paymentMethod?: "cash" | "upi";
   paymentStatus?: "unpaid" | "pending" | "paid";
 }
+interface KOTItem {
+  _id?: string;
+  name: string;
+  quantity: number;
+  price?: number;
+  revision?: number;
+}
 
+interface KOTData {
+  orderId: string;
+  orderNumber: string;
+  batch: number;
+  tableNumber: number | null;
+  orderType: "dine_in" | "takeaway";
+  createdAt: string;
+  specialInstructions?: string;
+  items: KOTItem[];
+}
 type OrderStatus =
   | "pending"
   | "preparing"
@@ -100,7 +118,8 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [kotModalOpen, setKotModalOpen] = useState(false);
-  const [kotOrder, setKotOrder] = useState<Order | null>(null);
+
+  const [kotData, setKotData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const socketRef = useRef<Socket | null>(null);
@@ -132,13 +151,15 @@ export default function OrdersPage() {
 
   useEffect(() => {
     loadOrders();
+    clearOrders();
   }, [loadOrders]);
+  const clearOrders = useNotificationStore((state) => state.clearOrders);
 
   const handleRefresh = () => {
     setRefreshing(true);
     loadOrders();
   };
-
+ 
   // Real-time socket connection
   useEffect(() => {
     if (!restaurant?._id) return;
@@ -169,7 +190,7 @@ export default function OrdersPage() {
         return [formattedOrder, ...prev];
       });
       playSound();
-      toast.success(`New order #${newOrder._id.slice(-6)} received!`);
+      toast.success(`New order #${newOrder.orderNumber.slice(-3)} received!`);
     });
 
     socket.on("ORDER_UPDATED", (updatedOrder: any) => {
@@ -180,6 +201,8 @@ export default function OrdersPage() {
             : order,
         ),
       );
+      playSound();
+      toast.success(`Order #${updatedOrder.orderNumber.slice(-3)} updated!`);
     });
 
     socket.on("PAYMENT_UPDATED", (updatedOrder: any) => {
@@ -187,15 +210,15 @@ export default function OrdersPage() {
         prev.map((order) =>
           order.id === updatedOrder._id
             ? {
-              ...order,
-              paymentStatus: updatedOrder.paymentStatus,
-              paymentMethod: updatedOrder.paymentMethod,
-            }
+                ...order,
+                paymentStatus: updatedOrder.paymentStatus,
+                paymentMethod: updatedOrder.paymentMethod,
+              }
             : order,
         ),
       );
       toast.success(
-        `Payment received for order #${updatedOrder._id.slice(-6)}`,
+        `Payment received for order #${updatedOrder._id.slice(-3)}`,
       );
     });
 
@@ -272,10 +295,16 @@ export default function OrdersPage() {
     setDetailModalOpen(true);
   };
 
-  const openKOT = (order: Order) => {
-    setKotOrder(order);
+ const openKOT = async (order: Order) => {
+  try {
+    const kot = await printKOT(order.id);
+
+    setKotData(kot);
     setKotModalOpen(true);
-  };
+  } catch (err) {
+    toast.error("Failed to load KOT");
+  }
+};
 
   const clearFilters = () => {
     setSearch("");
@@ -289,7 +318,7 @@ export default function OrdersPage() {
         audioRef.current
           .play()
           .then(() => audioRef.current?.pause())
-          .catch(() => { });
+          .catch(() => {});
       }
       window.removeEventListener("click", unlockAudio);
     };
@@ -428,10 +457,11 @@ export default function OrdersPage() {
               <button
                 key={status}
                 onClick={() => setFilter(status)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition flex items-center gap-2 ${filter === status
-                  ? "bg-orange-500 text-white shadow-sm"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition flex items-center gap-2 ${
+                  filter === status
+                    ? "bg-orange-500 text-white shadow-sm"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
               >
                 {statusLabels[status]}
                 {status !== "all" && (
@@ -447,13 +477,13 @@ export default function OrdersPage() {
           {(search ||
             filter !== "all" ||
             selectedDate !== new Date().toISOString().split("T")[0]) && (
-              <button
-                onClick={clearFilters}
-                className="ml-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
-              >
-                <X className="w-4 h-4" /> Clear
-              </button>
-            )}
+            <button
+              onClick={clearFilters}
+              className="ml-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
+            >
+              <X className="w-4 h-4" /> Clear
+            </button>
+          )}
         </div>
       </div>
 
@@ -470,8 +500,8 @@ export default function OrdersPage() {
               </h3>
               <p className="text-gray-500">
                 {search ||
-                  filter !== "all" ||
-                  selectedDate !== new Date().toISOString().split("T")[0]
+                filter !== "all" ||
+                selectedDate !== new Date().toISOString().split("T")[0]
                   ? "Try adjusting your filters or search criteria."
                   : "Waiting for new orders to arrive."}
               </p>
@@ -509,11 +539,11 @@ export default function OrdersPage() {
           restaurantName={restaurant?.name}
         />
       )}
-      {kotModalOpen && kotOrder && (
+      {kotModalOpen && kotData && (
         <KOTModal
-          order={kotOrder}
-          onClose={() => setKotModalOpen(false)}
+          kot={kotData}
           restaurantName={restaurant?.name}
+          onClose={() => setKotModalOpen(false)}
         />
       )}
     </div>
@@ -606,7 +636,6 @@ function OrderCard({
   onKOT: () => void;
   onUpdateStatus: (status: OrderStatus) => void;
 }) {
-
   const allStatuses: OrderStatus[] = [
     "pending",
     "preparing",
@@ -702,9 +731,7 @@ function OrderCard({
             <div className="relative">
               <select
                 value={order.status}
-                onChange={(e) =>
-                  onUpdateStatus(e.target.value as OrderStatus)
-                }
+                onChange={(e) => onUpdateStatus(e.target.value as OrderStatus)}
               >
                 {allStatuses.map((status) => (
                   <option key={status} value={status}>
@@ -712,7 +739,7 @@ function OrderCard({
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              {/* <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" /> */}
             </div>
             {order.paymentStatus === "paid" && order.status !== "completed" && (
               <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">
@@ -743,8 +770,6 @@ function OrderDetailModal({
   onUpdateStatus: (status: OrderStatus) => void;
   restaurantName?: string;
 }) {
-
-
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -753,10 +778,7 @@ function OrderDetailModal({
   const handleDownloadPDF = async () => {
     if (!printRef.current) return;
 
-    await generateInvoicePDF(
-      printRef.current,
-      order.invoiceNumber
-    );
+    await generateInvoicePDF(printRef.current, order.invoiceNumber);
   };
   return (
     <div
@@ -811,20 +833,23 @@ function OrderDetailModal({
 
 // ==================== KOT Modal (Kitchen Order Ticket) ====================
 function KOTModal({
-  order,
+  kot,
   onClose,
   restaurantName = "Your Restaurant",
 }: {
-  order: Order;
+  kot: KOTData;
   onClose: () => void;
   restaurantName?: string;
 }) {
   const printRef = useRef<HTMLDivElement>(null);
+
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: `KOT-${order.orderNumber}`,
+    documentTitle: `KOT-${kot.orderNumber}-Batch-${kot.batch}`,
+    onAfterPrint: () => {
+      onClose();
+    },
   });
-  console.log(order);
 
   return (
     <div
@@ -835,10 +860,12 @@ function KOTModal({
         className="bg-white rounded-xl max-w-sm w-full"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Header */}
         <div className="p-6 border-b flex justify-between items-center">
           <h3 className="text-lg font-semibold text-gray-800">
             Kitchen Order Ticket
           </h3>
+
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded-full"
@@ -846,57 +873,62 @@ function KOTModal({
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
-        <div ref={printRef} id="kot-print" className="px-2 py-2 space-y-2">
+
+        {/* Printable Area */}
+        <div ref={printRef} id="kot-print" className="px-3 py-3 space-y-3">
           <div className="text-center">
-            <h2 className="font-bold text-xl">{restaurantName}</h2>
-            <p className="text-sm text-gray-500 font-mono">
-              KOT #{order.orderNumber.slice(-3)}
-            </p>
-            <p className="text-sm text-gray-500">
-              {new Date(order.createdAt).toLocaleString()}
-            </p>
-            <p className="text-sm uppercase font-semibold mt-1">
-              {order.orderType || "dine_in"}
+            <h2 className="text-xl font-bold">{restaurantName}</h2>
+
+            <p className="text-sm font-mono">
+              KOT #{kot.orderNumber.slice(-3)}
             </p>
 
-            {order.orderType === "dine_in" && order.table && (
-              <p className="text-sm font-medium mt-1">
-                Table: {order.table}
-              </p>
+            <p className="font-bold text-base">Batch #{kot.batch}</p>
+
+            <p className="text-sm">
+              {new Date(kot.createdAt).toLocaleString()}
+            </p>
+
+            <p className="text-sm uppercase font-semibold">
+              {kot.orderType.replace("_", " ")}
+            </p>
+
+            {kot.orderType === "dine_in" && kot.tableNumber && (
+              <p className="font-medium">Table : {kot.tableNumber}</p>
             )}
           </div>
-          <div className="border-t border-b border-dashed py-3 space-y-2">
-            {order.items.map((item, idx) => (
-              <div className="flex gap-2">
-                <span className="font-bold min-w-[24px]">
-                  {item.quantity}x
-                </span>
 
-                <span className="flex-1 break-words">
-                  {item.name}
-                </span>
+          <div className="border-y border-dashed py-3 space-y-2">
+            {kot.items.map((item) => (
+              <div key={item._id ?? item.name} className="flex gap-2">
+                <span className="font-bold min-w-[28px]">{item.quantity}x</span>
+
+                <span className="flex-1 break-words">{item.name}</span>
               </div>
             ))}
           </div>
-          {order.specialInstructions && (
+
+          {kot.specialInstructions && (
             <div className="text-sm border-t border-dashed pt-3">
-              <span className="font-medium">Special Note: </span>
-              <span className="italic">{order.specialInstructions}</span>
+              <span className="font-semibold">Special Note:</span>
+
+              <div className="italic mt-1">{kot.specialInstructions}</div>
             </div>
           )}
         </div>
+
+        {/* Footer */}
         <div className="border-t p-4 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-          >
+          <button onClick={onClose} className="px-4 py-2 border rounded-lg">
             Close
           </button>
+
           <button
             onClick={handlePrint}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2 hover:bg-blue-700"
           >
-            <Printer className="w-4 h-4" /> Print KOT
+            <Printer className="w-4 h-4" />
+            Print KOT
           </button>
         </div>
       </div>

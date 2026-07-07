@@ -24,7 +24,11 @@ import {
   VolumeX,
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
-import { fetchCustomerMenu, checkTableStatus, releaseTable } from "@/services/customerMenu";
+import {
+  fetchCustomerMenu,
+  checkTableStatus,
+  releaseTable,
+} from "@/services/customerMenu";
 import { useParams, useSearchParams } from "next/navigation";
 import {
   placeOrder,
@@ -273,7 +277,7 @@ function CustomerMenuContent() {
       const res = await checkTableStatus(
         restaurantSlug,
         Number(table),
-        sessionId
+        sessionId,
       );
 
       if (res.order) {
@@ -299,7 +303,7 @@ function CustomerMenuContent() {
         const menuItems = data?.items || [];
         const restaurantData = data?.restaurant || null;
         setMenu(menuItems);
-        console.log("Restaurant Data:", restaurantData);
+        // console.log("Restaurant Data:", restaurantData);
         setRestaurant(restaurantData);
         setBanners(data.banners || []);
         const uniqueCategories: string[] = [
@@ -363,7 +367,7 @@ function CustomerMenuContent() {
         const res = await checkTableStatus(
           restaurantSlug,
           Number(table),
-          sessionId
+          sessionId,
         );
 
         setTableOccupied(res.allowed === false);
@@ -380,7 +384,7 @@ function CustomerMenuContent() {
         const parsed = JSON.parse(saved);
         setCurrentOrder(parsed);
         setOrderPlaced(true);
-      } catch (e) { }
+      } catch (e) {}
     }
   }, []);
 
@@ -538,7 +542,7 @@ function CustomerMenuContent() {
       audioRef.current
         ?.play()
         .then(() => audioRef.current?.pause())
-        .catch(() => { });
+        .catch(() => {});
       window.removeEventListener("click", unlockAudio);
     };
     window.addEventListener("click", unlockAudio);
@@ -633,7 +637,6 @@ function CustomerMenuContent() {
     setCustomerEmail(customer.email || "");
   }, []);
   const handlePlaceOrder = async () => {
-
     if (submitting) return;
     if (!customerName.trim() || !customerPhone.trim() || !cartItems.length) {
       toast.error("Please enter your name and phone number");
@@ -675,10 +678,11 @@ function CustomerMenuContent() {
             items: payload.items,
           },
         );
-        res = data;
+        res = data.order;
       } else {
         res = await placeOrder(payload);
       }
+      console.log("Response:", res);
       setCurrentOrder(res);
       setOrderPlaced(true);
       clearCart();
@@ -731,7 +735,7 @@ function CustomerMenuContent() {
         await completePayment(currentOrder._id, "cash");
 
         const updated = await getOrderById(currentOrder._id);
-
+        console.log("Updated Order:", updated);
         setCurrentOrder(updated);
 
         toast.success("Cash payment selected!");
@@ -819,7 +823,8 @@ function CustomerMenuContent() {
     customerName.trim() !== "" &&
     isValidPhone &&
     isValidEmail &&
-    cartItems.length > 0 && !submitting;
+    cartItems.length > 0 &&
+    !submitting;
   // ------------------------------------------------------------
   // Render Helpers
   // ------------------------------------------------------------
@@ -830,9 +835,26 @@ function CustomerMenuContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3">
-        <UtensilsCrossed className="w-10 h-10 text-orange-400 animate-pulse" />
-        <p className="text-gray-500">Loading menu...</p>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-yellow-50 flex flex-col items-center justify-center px-6">
+        <div className="relative">
+          <div className="w-28 h-28 rounded-full bg-orange-100 flex items-center justify-center shadow-lg">
+            <UtensilsCrossed className="w-12 h-12 text-orange-600 animate-pulse" />
+          </div>
+
+          <div className="absolute -inset-3 rounded-full border-4 border-orange-200 animate-ping" />
+        </div>
+
+        <h1 className="mt-8 text-3xl font-bold text-gray-800">Welcome 👋</h1>
+
+        <p className="mt-2 text-gray-500 text-center">
+          Preparing today's delicious menu...
+        </p>
+
+        <div className="mt-8 w-72 h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-full w-1/2 bg-orange-500 animate-[loading_1.5s_ease-in-out_infinite]" />
+        </div>
+
+        {/* <p className="text-xs text-gray-400 mt-4">Powered by QRasoi</p> */}
       </div>
     );
   }
@@ -897,7 +919,7 @@ function CustomerMenuContent() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-gray-800">
-                    Order #{currentOrder.orderNumber.slice(-3)}
+                    Order #{currentOrder.orderNumber.slice(-3).toUpperCase()}
                   </h2>
 
                   <p className="text-xs text-gray-500">Table No. {table}</p>
@@ -921,10 +943,11 @@ function CustomerMenuContent() {
                       className="flex flex-col items-center flex-1"
                     >
                       <div
-                        className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all ${isActive
-                          ? "bg-gradient-to-r from-orange-500 to-orange-600 shadow-md"
-                          : "bg-gray-200"
-                          }`}
+                        className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                          isActive
+                            ? "bg-gradient-to-r from-orange-500 to-orange-600 shadow-md"
+                            : "bg-gray-200"
+                        }`}
                       >
                         {isActive ? (
                           <CheckCircle className="w-4 h-4 text-white" />
@@ -1111,10 +1134,11 @@ function CustomerMenuContent() {
                     <button
                       onClick={() => handlePayment("qr")}
                       disabled={isPaying}
-                      className={`rounded-2xl py-3 text-sm font-bold text-white shadow-md transition-all active:scale-95 ${selectedPayment === "qr"
-                        ? "bg-gradient-to-r from-green-500 to-emerald-600"
-                        : "bg-gradient-to-r from-orange-500 to-orange-600"
-                        }`}
+                      className={`rounded-2xl py-3 text-sm font-bold text-white shadow-md transition-all active:scale-95 ${
+                        selectedPayment === "qr"
+                          ? "bg-gradient-to-r from-green-500 to-emerald-600"
+                          : "bg-gradient-to-r from-orange-500 to-orange-600"
+                      }`}
                     >
                       📱 QR Pay
                     </button>
@@ -1137,10 +1161,11 @@ function CustomerMenuContent() {
                     {/* QR */}
                     <div className="relative mt-3 flex justify-center">
                       <div
-                        className={`rounded-2xl bg-white p-2 shadow-md transition-all duration-500 ${selectedPayment !== "qr"
-                          ? "blur-sm opacity-40"
-                          : "blur-0 opacity-100"
-                          }`}
+                        className={`rounded-2xl bg-white p-2 shadow-md transition-all duration-500 ${
+                          selectedPayment !== "qr"
+                            ? "blur-sm opacity-40"
+                            : "blur-0 opacity-100"
+                        }`}
                       >
                         <QRCode value={baseUPI} size={135} />
                       </div>
@@ -1267,17 +1292,6 @@ function CustomerMenuContent() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            {/* <button
-              onClick={() => setSoundEnabled((s) => !s)}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition"
-            >
-              {soundEnabled ? (
-                <Volume2 className="w-5 h-5 text-gray-700" />
-              ) : (
-                <VolumeX className="w-5 h-5 text-gray-700" />
-              )}
-            </button> */}
-
             <button
               onClick={() => setIsCartOpen(true)}
               className="relative w-11 h-11 flex items-center justify-center rounded-xl bg-orange-500 text-white shadow-lg shadow-orange-200"
@@ -1327,20 +1341,46 @@ function CustomerMenuContent() {
       </div>
 
       {/* Categories */}
-      <div className="sticky top-[60px] z-20 bg-white/95 backdrop-blur-md border-b shadow-sm overflow-x-auto">
-        <div className="flex gap-2 px-4 py-3 max-w-2xl mx-auto">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-all ${selectedCategory === cat
-                ? "bg-orange-500 text-white shadow-md"
-                : "bg-gray-100 text-gray-700"
-                }`}
-            >
-              {cat}
-            </button>
-          ))}
+      <div className="sticky top-[60px] z-20 bg-white/90 backdrop-blur-xl border-b border-orange-100 shadow-sm">
+        <div className="relative max-w-2xl mx-auto">
+          {/* Left Fade */}
+          <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
+
+          {/* Right Fade */}
+          <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
+
+          <div className="overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth">
+            <div className="flex w-max items-center gap-3 px-4 py-3">
+              {categories.map((cat) => {
+                const active = selectedCategory === cat;
+
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`
+                flex-shrink-0
+                rounded-full
+                px-5
+                py-2.5
+                text-sm
+                font-semibold
+                transition-all
+                duration-300
+                active:scale-95
+                ${
+                  active
+                    ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-200"
+                    : "bg-gray-100 text-gray-700 hover:bg-orange-50 hover:text-orange-600"
+                }
+              `}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1431,10 +1471,11 @@ function CustomerMenuContent() {
                             addToCartSimple(item);
                           }}
                           disabled={!isAvailable}
-                          className={`px-4 py-1.5 rounded-lg text-sm font-medium ${isAvailable
-                            ? "bg-orange-500 text-white hover:bg-orange-600"
-                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                            }`}
+                          className={`px-4 py-1.5 rounded-lg text-sm font-medium ${
+                            isAvailable
+                              ? "bg-orange-500 text-white hover:bg-orange-600"
+                              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                          }`}
                         >
                           Add
                         </button>
@@ -1635,10 +1676,11 @@ function CustomerMenuContent() {
                       <button
                         onClick={handlePlaceOrder}
                         disabled={submitting || !canPlaceOrder}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-semibold ${submitting || !canPlaceOrder
-                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                          : "bg-green-500 text-white"
-                          }`}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-semibold ${
+                          submitting || !canPlaceOrder
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            : "bg-green-500 text-white"
+                        }`}
                       >
                         {submitting ? (
                           <Loader2 className="w-4 h-4 animate-spin mx-auto" />
@@ -1657,6 +1699,8 @@ function CustomerMenuContent() {
       <ReviewPopup
         open={showReviewPopup && !!restaurant?.googleReviewLink}
         onClose={() => setShowReviewPopup(false)}
+        restaurentName={restaurant?.name || ""}
+        restaurentLogo={restaurant?.logo || ""}
         onFinish={resetCustomerSession}
         googleReviewLink={restaurant?.googleReviewLink}
       />
@@ -1706,10 +1750,11 @@ function CustomerMenuContent() {
                             price: variant.price,
                           })
                         }
-                        className={`px-4 py-2 rounded-full text-sm border ${selectedVariant?.name === variant.name
-                          ? "bg-orange-500 text-white border-orange-500"
-                          : "bg-white text-gray-700 border-gray-300"
-                          }`}
+                        className={`px-4 py-2 rounded-full text-sm border ${
+                          selectedVariant?.name === variant.name
+                            ? "bg-orange-500 text-white border-orange-500"
+                            : "bg-white text-gray-700 border-gray-300"
+                        }`}
                       >
                         {variant.name} (₹{variant.price})
                       </button>
@@ -1726,10 +1771,11 @@ function CustomerMenuContent() {
                       <button
                         key={addon.name}
                         onClick={() => toggleAddon(addon)}
-                        className={`px-3 py-1.5 rounded-full text-xs border ${selectedAddons.find((a) => a.name === addon.name)
-                          ? "bg-orange-100 border-orange-500 text-orange-700"
-                          : "bg-white border-gray-300 text-gray-600"
-                          }`}
+                        className={`px-3 py-1.5 rounded-full text-xs border ${
+                          selectedAddons.find((a) => a.name === addon.name)
+                            ? "bg-orange-100 border-orange-500 text-orange-700"
+                            : "bg-white border-gray-300 text-gray-600"
+                        }`}
                       >
                         {addon.name} (+₹{addon.price})
                       </button>

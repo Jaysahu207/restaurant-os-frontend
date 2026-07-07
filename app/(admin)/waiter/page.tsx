@@ -32,6 +32,7 @@ import {
   Eye,
   LogOut,
   CandyCaneIcon,
+  XCircle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import TableManagement from "@/components/super-admin/TableManagement";
@@ -68,6 +69,9 @@ interface OrderItem {
   price: number;
   quantity: number;
   specialInstructions?: string;
+  kotBatch?: number;
+  kotPrinted?: boolean;
+  addedAt?: string;
 }
 
 type SelectedItem = {
@@ -102,17 +106,34 @@ interface Order {
     | "completed"
     | "cancelled";
   totalAmount: number;
+  finalAmount: number;
+  currentKotBatch?: number;
+  updatedAt?: string;
+  cgstRate: number;
+  sgstRate: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  revision?: number;
+  hasNewItems?: boolean;
+  pendingKOT?: boolean;
   createdAt: string;
-  customer?: CustomerInfo;
+  customerId?: Customer;
   specialInstructions?: string;
 }
-
-interface CustomerInfo {
+interface Customer {
+  _id: string;
   name: string;
-  phone: string;
+  phone?: string;
   email?: string;
 }
 
+interface KotBatchItem {
+  menuItemId: string;
+  name: string;
+  quantity: number;
+  price: number;
+  specialInstructions?: string;
+}
 // ==================== Main Component ====================
 export default function WaiterPage() {
   const { restaurant, user } = useAuthStore();
@@ -126,6 +147,7 @@ export default function WaiterPage() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const [completedModalOpen, setCompletedModalOpen] = useState(false); // NEW
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [selectedTable, setSelectedTable] = useState<any>(null);
 
@@ -408,12 +430,17 @@ export default function WaiterPage() {
             color="bg-gray-500"
             icon={CheckCircle2}
           />
-          <StatCard
-            label="Completed"
-            value={completedOrders.length}
-            color="bg-gray-500"
-            icon={CheckCircle2}
-          />
+          <div
+            onClick={() => setCompletedModalOpen(true)}
+            className="cursor-pointer"
+          >
+            <StatCard
+              label="Completed"
+              value={completedOrders.length}
+              color="bg-gray-500"
+              icon={CheckCircle2}
+            />
+          </div>
           <StatCard
             label="Cancelled"
             value={cancelledOrders.length}
@@ -498,6 +525,13 @@ export default function WaiterPage() {
             restaurantId={restaurant?._id}
           />
         </div>
+        {completedModalOpen && (
+          <CompletedOrdersModal
+            orders={orders}
+            onClose={() => setCompletedModalOpen(false)}
+            onViewOrder={openDetail}
+          />
+        )}
       </div>
     </div>
   );
@@ -586,6 +620,11 @@ function CompactOrderCard({
 }) {
   return (
     <div className="border rounded-lg p-3 bg-gray-50 hover:shadow-sm transition">
+      {order.hasNewItems && (
+        <span className="bg-red-500 text-white text-[10px] px-2 py-1 rounded-full animate-pulse">
+          NEW ITEMS
+        </span>
+      )}
       <div className="flex justify-between items-start">
         <div>
           <p className="font-medium">Table {order.tableNumber}</p>
@@ -609,86 +648,6 @@ function CompactOrderCard({
     </div>
   );
 }
-
-// // ==================== Full Order Card ====================
-// function OrderCard({
-//   order,
-//   onServe,
-//   onViewDetail,
-//   highlight = false,
-// }: {
-//   order: Order;
-//   onServe: (id: string) => void;
-//   onViewDetail: (order: Order) => void;
-//   highlight?: boolean;
-// }) {
-//   return (
-//     <div
-//       className={`bg-white rounded-xl shadow-sm border ${
-//         highlight ? "border-green-300 ring-1 ring-green-200" : "border-gray-200"
-//       } p-4 hover:shadow-md transition`}
-//     >
-//       <div className="flex justify-between items-start mb-2">
-//         <div>
-//           <div className="flex items-center gap-2">
-//             <span className="font-semibold text-gray-800 text-lg">
-//               Table {order.tableNumber}
-//             </span>
-//             <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
-//               #{order._id.slice(-6)}
-//             </span>
-//           </div>
-//           {order.customer?.name && (
-//             <p className="text-sm text-gray-600 flex items-center gap-1">
-//               <User className="w-3 h-3" />
-//               {order.customer.name}
-//             </p>
-//           )}
-//         </div>
-//         <button
-//           onClick={() => onViewDetail(order)}
-//           className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition"
-//         >
-//           <Eye className="w-4 h-4" />
-//         </button>
-//       </div>
-
-//       <div className="mt-2 space-y-1">
-//         {order.items.slice(0, 3).map((item, idx) => (
-//           <div key={idx} className="flex justify-between text-sm">
-//             <span>
-//               {item.quantity}× {item.name}
-//             </span>
-//           </div>
-//         ))}
-//         {order.items.length > 3 && (
-//           <p className="text-xs text-gray-500">
-//             +{order.items.length - 3} more items
-//           </p>
-//         )}
-//       </div>
-
-//       {order.specialInstructions && (
-//         <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-1.5 rounded">
-//           Note: {order.specialInstructions}
-//         </div>
-//       )}
-
-//       <div className="mt-3 flex items-center justify-between">
-//         <span className="text-sm font-semibold">
-//           ₹{order.totalAmount.toFixed(2)}
-//         </span>
-//         <button
-//           onClick={() => onServe(order._id)}
-//           className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition flex items-center gap-1"
-//         >
-//           <CheckCircle2 className="w-4 h-4" />
-//           Mark Served
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
 
 // ==================== Create Order Modal ====================
 function CreateOrderModal({
@@ -1484,7 +1443,11 @@ function OrderDetailModal({
   };
 
   const statusStyle = getStatusColor(order.status);
-
+ 
+  const currentBatch = order.currentKotBatch as number;
+  const latestItems = order.items.filter(
+    (item) => item.kotBatch === currentBatch && currentBatch > 1,
+  );
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
@@ -1565,7 +1528,7 @@ function OrderDetailModal({
           </div>
 
           {/* Customer Info */}
-          {order.customer?.name && (
+          {order.customerId?.name && (
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
               <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                 <div className="w-1 h-5 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-full" />
@@ -1578,17 +1541,17 @@ function OrderDetailModal({
                   </p>
                   <p className="font-medium text-gray-800 flex items-center gap-1">
                     <User className="w-4 h-4 text-emerald-500" />
-                    {order.customer.name}
+                    {order.customerId.name}
                   </p>
                 </div>
-                {order.customer.phone && (
+                {order.customerId.phone && (
                   <div>
                     <p className="text-xs text-gray-500 uppercase tracking-wider">
                       Phone
                     </p>
                     <p className="font-medium text-gray-800 flex items-center gap-1">
                       <Phone className="w-4 h-4 text-emerald-500" />
-                      {order.customer.phone}
+                      {order.customerId.phone}
                     </p>
                   </div>
                 )}
@@ -1602,6 +1565,41 @@ function OrderDetailModal({
               <div className="w-1 h-5 bg-gradient-to-b from-amber-500 to-orange-500 rounded-full" />
               Order Items
             </h3>
+            {/* Newly Added Items */}
+            {currentBatch > 1 && latestItems.length > 0 && (
+              <div className="mb-5 rounded-xl border-2 border-orange-300 bg-orange-50 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <ChefHat className="w-5 h-5 text-orange-600" />
+
+                  <h4 className="font-bold text-orange-700">
+                    Newly Added Items (KOT #{currentBatch})
+                  </h4>
+                </div>
+
+                <div className="space-y-2">
+                  {latestItems.map((item: KotBatchItem, index: number) => (
+                    <div
+                      key={index}
+                      className="flex justify-between rounded-lg bg-white p-3 border"
+                    >
+                      <div>
+                        <p className="font-semibold">
+                          {item.quantity} × {item.name}
+                        </p>
+
+                        {item.specialInstructions && (
+                          <p className="text-xs text-red-500 mt-1">
+                            {item.specialInstructions}
+                          </p>
+                        )}
+                      </div>
+
+                      <span className="font-semibold text-orange-600">NEW</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="overflow-hidden rounded-lg border border-gray-200">
               <table className="w-full text-sm">
                 <thead className="bg-gradient-to-r from-amber-50 to-orange-50">
@@ -1648,11 +1646,34 @@ function OrderDetailModal({
                 </tbody>
               </table>
             </div>
-            <div className="mt-4 pt-3 border-t border-gray-200 flex justify-between items-center">
-              <span className="text-gray-600 font-medium">Total Amount</span>
-              <span className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-                ₹{order.totalAmount.toFixed(2)}
-              </span>
+            {/* Bill Summary */}
+            <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Subtotal</span>
+                <span className="font-medium">
+                  ₹{order.totalAmount.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">CGST ({order.cgstRate}%)</span>
+                <span>₹{order.cgstAmount.toFixed(2)}</span>
+              </div>
+
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">SGST ({order.sgstRate}%)</span>
+                <span>₹{order.sgstAmount.toFixed(2)}</span>
+              </div>
+
+              <div className="border-t border-dashed border-gray-300 pt-3 flex justify-between items-center">
+                <span className="text-lg font-bold text-gray-800">
+                  Final Amount
+                </span>
+
+                <span className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+                  ₹{order.finalAmount.toFixed(2)}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1743,6 +1764,159 @@ function WaiterSkeleton() {
           ))}
         </div>
         <div className="h-64 bg-gray-200 rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
+// ==================== Completed Orders Modal ====================
+interface CompletedOrdersModalProps {
+  orders: Order[];
+  onClose: () => void;
+  onViewOrder: (order: Order) => void; // to open detail modal
+}
+function CompletedOrdersModal({
+  orders,
+  onClose,
+  onViewOrder,
+}: CompletedOrdersModalProps) {
+  // Filter completed/served orders and sort by latest update
+  const completedOrders = orders
+    .filter((o) => o.status === "completed" || o.status === "served")
+    .sort((a, b) => {
+      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+  const totalItems = (order: Order) =>
+    order.items.reduce((sum, item) => sum + item.quantity, 0);
+
+  const formatTime = (date?: string) => {
+    if (!date) return "—";
+    return new Date(date).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-gray-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-2xl">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
+              <span>✅ Completed Orders</span>
+              <span className="bg-green-100 text-green-700 text-sm font-semibold px-3 py-0.5 rounded-full">
+                {completedOrders.length}
+              </span>
+            </h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              All finished orders – newest first. Click any order to view
+              details.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <XCircle className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Scrollable Body */}
+        <div className="p-6 overflow-y-auto flex-1">
+          {completedOrders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <div className="bg-gray-50 rounded-full p-6 mb-4">
+                <Clock className="w-10 h-10" strokeWidth={1.5} />
+              </div>
+              <p className="text-lg font-medium text-gray-500">
+                No completed orders yet
+              </p>
+              <p className="text-sm text-gray-400">
+                Completed orders will appear here for review.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {completedOrders.map((order) => (
+                <div
+                  key={order._id}
+                  onClick={() => {
+                    onViewOrder(order);
+                    onClose(); // close completed modal after opening detail
+                  }}
+                  className="bg-gray-50/70 hover:bg-gray-100 border border-gray-200 rounded-xl p-4 transition-all cursor-pointer flex items-center justify-between"
+                >
+                  {/* Order Info Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1">
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+                        Order No
+                      </p>
+                      <p className="font-bold text-gray-800">
+                        #{order.orderNumber.slice(-3)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+                        Table
+                      </p>
+                      <p className="font-semibold text-gray-800">
+                        {order.tableNumber}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+                        Customer
+                      </p>
+                      <p className="font-semibold text-gray-800">
+                        <p>{order.customerId?.name || "Walk-in "}</p>
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+                        Items
+                      </p>
+                      <p className="font-semibold text-gray-800">
+                        {totalItems(order)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right side: time + status icon */}
+                  <div className="flex items-center gap-4 ml-4 flex-shrink-0">
+                    <div className="text-right">
+                      <p className="text-xs text-gray-400">Completed</p>
+                      <p className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                        {formatTime(order.updatedAt)}
+                      </p>
+                    </div>
+                    <CheckCircle2 className="w-6 h-6 text-green-500 flex-shrink-0" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-gray-100 px-6 py-4 flex justify-end bg-gray-50/80 rounded-b-2xl">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-colors text-sm"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );

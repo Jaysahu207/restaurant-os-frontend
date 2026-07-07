@@ -109,7 +109,25 @@ export default function TablesPage() {
       toast.error("Failed to download QR code", { id: "qr-download" });
     }
   }, []);
+  const downloadTakeawayQR = useCallback(async () => {
+    const element = document.getElementById(`takeaway-qr`);
+    if (!element) return;
 
+    try {
+      toast.loading("Generating QR code...", { id: "qr-download" });
+      const dataUrl = await toPng(element, {
+        quality: 1,
+        pixelRatio: 2,
+      });
+      const link = document.createElement("a");
+      link.download = `takeaway-qr.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success("QR code downloaded!", { id: "qr-download" });
+    } catch (error) {
+      toast.error("Failed to download QR code", { id: "qr-download" });
+    }
+  }, []);
   // Copy QR URL to clipboard
   const copyQRUrl = useCallback(async (tableNumber: number, id: string) => {
     const url = getQRUrl(tableNumber);
@@ -315,16 +333,16 @@ export default function TablesPage() {
                 {/* QR Code Section */}
                 <div className="p-5 flex flex-col items-center border-b border-gray-100">
                   <div className="relative">
-                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                    <div className="absolute -inset-1 bg-white rounded-xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
                     <div
                       id={`qr-${table._id}`}
                       className="relative bg-white p-3 rounded-xl shadow-sm"
                     >
                       <QRCode
                         value={getQRUrl(table.tableNumber)}
-                        size={140}
+                        size={160}
                         bgColor="#FFFFFF"
-                        fgColor="#1F2937"
+                        fgColor="#111827"
                         level="H"
                       />
                     </div>
@@ -366,11 +384,8 @@ export default function TablesPage() {
           </div>
         )}
 
-
         <div className="bg-white rounded-2xl shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4">
-            Takeaway QR
-          </h2>
+          <h2 className="text-xl font-bold mb-4">Takeaway QR</h2>
 
           <div
             id="takeaway-qr"
@@ -387,16 +402,14 @@ export default function TablesPage() {
 
           <div className="mt-4 flex gap-3">
             <button
-              // onClick={() => downloadTakeawayQR()}
+              onClick={() => downloadTakeawayQR()}
               className="flex-1 bg-orange-500 text-white py-2 rounded-xl"
             >
               Download
             </button>
 
             <button
-              onClick={() =>
-                navigator.clipboard.writeText(getTakeawayQRUrl())
-              }
+              onClick={() => navigator.clipboard.writeText(getTakeawayQRUrl())}
               className="flex-1 border py-2 rounded-xl"
             >
               Copy URL

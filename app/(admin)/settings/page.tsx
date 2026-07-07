@@ -692,7 +692,7 @@ export default function SettingsPage() {
                   placeholder="e.g. 2.5"
                 />
               </div>
-              <div>
+              {/* <div>
                 <label className={labelClass}>IGST (%)</label>
                 <input
                   type="number"
@@ -709,7 +709,7 @@ export default function SettingsPage() {
                   className={inputClass}
                   placeholder="e.g. 5"
                 />
-              </div>
+              </div> */}
 
               {/* Billing Settings */}
               <div className="md:col-span-2">

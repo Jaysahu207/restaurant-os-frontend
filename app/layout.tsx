@@ -3,17 +3,21 @@ import QueryProvider from "@/providers/QueryProvider";
 import { Toaster } from "react-hot-toast";
 import AuthInitializer from "@/components/AuthInitializer";
 import "@/styles/print.css";
+import SocketProvider from "@/providers/SocketProvider";
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="bg-gray-50 text-gray-900">
         <QueryProvider>
-          <AuthInitializer />
-          {children}
+          <SocketProvider>
+            <AuthInitializer />
+            {children}
+          </SocketProvider>
 
           <Toaster
             position="top-right"

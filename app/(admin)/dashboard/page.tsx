@@ -260,14 +260,14 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
               <th className="px-5 py-3 font-medium">After Tax</th>
               <th className="px-5 py-3 font-medium">Status</th>
               <th className="px-5 py-3 font-medium">Time</th>
-
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {orders.map((order) => (
               <tr key={order.id} className="hover:bg-gray-50 transition">
                 <td className="px-5 py-3 font-mono text-sm text-gray-800">
-                  {order.orderNumber || order.id.slice(-8)}
+                  {order.orderNumber?.slice(-3).toUpperCase() ||
+                    order.id.slice(-8)}
                 </td>
                 <td className="px-5 py-3 text-sm text-gray-600">
                   Table {order.table}
@@ -292,7 +292,6 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
                 <td className="px-5 py-3 text-sm text-gray-500">
                   {order.time}
                 </td>
-
               </tr>
             ))}
           </tbody>
@@ -416,7 +415,6 @@ export default function DashboardPage() {
       socket.disconnect();
     };
   }, [restaurant?._id, refreshDashboard]);
-
 
   if (loading) {
     return (

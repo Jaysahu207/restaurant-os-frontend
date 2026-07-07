@@ -18,7 +18,6 @@ import {
   Utensils,
   AlertCircle,
   LogOut,
-  LogOutIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -29,6 +28,8 @@ interface OrderItem {
   quantity: number;
   price: number;
   specialInstructions?: string;
+  kotBatch: number;
+  kotPrinted: boolean;
 }
 
 interface Order {
@@ -38,8 +39,19 @@ interface Order {
   orderType: "dine_in" | "takeaway";
   status: "pending" | "preparing" | "ready" | "served" | "completed";
   createdAt: string;
+  customerId?: Customer;
   specialInstructions?: string;
   customerName?: string;
+  orderNumber: string;
+  currentKotBatch: number;
+  hasNewItems: boolean;
+  updatedAt?: string; // added for completed modal sorting
+}
+interface Customer {
+  _id: string;
+  name: string;
+  phone?: string;
+  email?: string;
 }
 
 type OrderStatus = "pending" | "preparing" | "ready" | "served" | "completed";
@@ -53,6 +65,7 @@ export default function KitchenPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [completedModalOpen, setCompletedModalOpen] = useState(false); // NEW
   const [socketConnected, setSocketConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -67,33 +80,26 @@ export default function KitchenPage() {
             audio.pause();
             audio.currentTime = 0;
           })
-          .catch(() => { });
+          .catch(() => {});
       }
-
       window.removeEventListener("click", unlockAudio);
     };
-
     window.addEventListener("click", unlockAudio);
-
     return () => window.removeEventListener("click", unlockAudio);
   }, []);
 
   // Initialize audio on client side
   useEffect(() => {
     audioRef.current = new Audio("/sounds/new-order.mp3");
-    // Preload audio
     audioRef.current.load();
   }, []);
 
   // Play sound with user interaction handling
   const playSound = useCallback(() => {
     if (!soundEnabled || !audioRef.current) return;
-
     try {
       audioRef.current.currentTime = 0;
-
       const playPromise = audioRef.current.play();
-
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
           console.warn("Audio play failed:", err);
@@ -112,12 +118,12 @@ export default function KitchenPage() {
       const today = new Date().toISOString().split("T")[0];
       const data = await getOrders(restaurant._id, today);
       const ordersArray = Array.isArray(data) ? data : data.orders || [];
-      // Filter only kitchen-relevant statuses
       const kitchenOrders = ordersArray.filter((o: Order) =>
         ["pending", "preparing", "ready", "served", "completed"].includes(
           o.status,
         ),
       );
+
       setOrders(kitchenOrders);
     } catch (error) {
       console.error("Failed to load orders:", error);
@@ -150,7 +156,7 @@ export default function KitchenPage() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("🔌 Kitchen socket connected");
+      // console.log("🔌 Kitchen socket connected");
       setSocketConnected(true);
       socket.emit("joinRestaurant", restaurant._id);
     });
@@ -159,43 +165,40 @@ export default function KitchenPage() {
       console.log("🔌 Kitchen socket disconnected");
       setSocketConnected(false);
     });
+    socket.on("NEW_ORDER", (newOrder: Order) => {
+      setOrders((prev) => {
+        if (prev.some((o) => o._id === newOrder._id)) {
+          return prev;
+        }
 
-    socket.on("NEW_ORDER", (order: Order) => {
-      // Only add if status is kitchen-relevant
-      if (["pending", "preparing", "ready"].includes(order.status)) {
-        setOrders((prev) => {
-          // Avoid duplicates
-          if (prev.find((o) => o._id === order._id)) return prev;
-          return [order, ...prev];
-        });
         playSound();
-        toast.success(`New order! Table ${order.tableNumber}`, {
-          icon: "🔔",
-          duration: 4000,
+
+        toast.success(`New Order - Table ${newOrder.tableNumber}`, {
+          icon: "🍽️",
         });
-      }
+
+        return [newOrder, ...prev];
+      });
     });
 
     socket.on("ORDER_UPDATED", (updatedOrder: Order) => {
       setOrders((prev) => {
-        // If order is no longer in kitchen status, remove it
-        if (
-          !["pending", "preparing", "ready", "served", "completed"].includes(
-            updatedOrder.status,
-          )
-        ) {
-          return prev.filter((o) => o._id !== updatedOrder._id);
+        const index = prev.findIndex((o) => o._id === updatedOrder._id);
+
+        if (index !== -1) {
+          const copy = [...prev];
+          copy[index] = updatedOrder;
+          return copy;
         }
-        // Update existing or add if new
-        const exists = prev.find((o) => o._id === updatedOrder._id);
-        if (exists) {
-          return prev.map((o) =>
-            o._id === updatedOrder._id ? updatedOrder : o,
-          );
-        } else {
-          return [updatedOrder, ...prev];
-        }
+        return [updatedOrder, ...prev];
       });
+
+      if (updatedOrder.hasNewItems) {
+        playSound();
+        toast.success(`New items added on Table ${updatedOrder.tableNumber}`, {
+          icon: "🍽️",
+        });
+      }
     });
 
     return () => {
@@ -205,20 +208,17 @@ export default function KitchenPage() {
 
   // Update order status with optimistic UI
   const updateStatus = async (orderId: string, newStatus: string) => {
-    // Optimistic update
     setOrders((prev) =>
       prev.map((o) =>
         o._id === orderId ? { ...o, status: newStatus as OrderStatus } : o,
       ),
     );
-
     try {
       await updateOrderStatus(orderId, newStatus);
       toast.success(`Order marked as ${newStatus}`);
     } catch (error) {
       console.error("Status update failed:", error);
       toast.error("Failed to update status");
-      // Revert optimistic update by reloading
       loadOrders();
     }
   };
@@ -232,12 +232,13 @@ export default function KitchenPage() {
     setDetailModalOpen(false);
     setSelectedOrder(null);
   };
+
   const handleLogout = () => {
-    // Clear auth state and redirect to login
     localStorage.removeItem("authToken");
     useAuthStore.setState({ user: null, token: null });
     window.location.href = "/";
   };
+
   // Group orders by status
   const pendingOrders = orders.filter((o) => o.status === "pending");
   const preparingOrders = orders.filter((o) => o.status === "preparing");
@@ -251,7 +252,7 @@ export default function KitchenPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-6">
-        {/* Header: Restaurant & Chef Info + Actions */}
+        {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div className="flex-1 min-w-0">
             <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-orange-600 to-orange-800 bg-clip-text text-transparent truncate">
@@ -275,10 +276,11 @@ export default function KitchenPage() {
             {/* Sound Toggle */}
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2 rounded-full transition-all ${soundEnabled
-                ? "bg-orange-100 text-orange-600"
-                : "bg-gray-200 text-gray-500"
-                }`}
+              className={`p-2 rounded-full transition-all ${
+                soundEnabled
+                  ? "bg-orange-100 text-orange-600"
+                  : "bg-gray-200 text-gray-500"
+              }`}
               title={soundEnabled ? "Sound On" : "Sound Off"}
             >
               {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
@@ -307,7 +309,7 @@ export default function KitchenPage() {
           </div>
         </div>
 
-        {/* Stats Overview - Responsive Grid (2 columns mobile, 5 columns desktop) */}
+        {/* Stats Overview - Responsive Grid */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
           <StatCard
             label="Pending"
@@ -333,15 +335,21 @@ export default function KitchenPage() {
             color="bg-purple-500"
             icon={CheckCircle}
           />
-          <StatCard
-            label="Completed"
-            value={orders.filter((o) => o.status === "completed").length}
-            color="bg-gray-500"
-            icon={CheckCircle}
-          />
+          {/* Completed Stat Card - now clickable */}
+          <div
+            onClick={() => setCompletedModalOpen(true)}
+            className="cursor-pointer"
+          >
+            <StatCard
+              label="Completed"
+              value={orders.filter((o) => o.status === "completed").length}
+              color="bg-gray-500"
+              icon={CheckCircle}
+            />
+          </div>
         </div>
 
-        {/* Kanban Columns - Horizontal Scroll on Mobile, Grid on Desktop */}
+        {/* Kanban Columns */}
         <div className="flex overflow-x-auto lg:overflow-visible lg:grid lg:grid-cols-3 gap-5 pb-4 -mx-4 px-4 lg:mx-0 lg:px-0">
           {/* Pending Column */}
           <div className="min-w-[280px] lg:min-w-0 flex-1">
@@ -399,9 +407,18 @@ export default function KitchenPage() {
           </div>
         )}
 
-        {/* Order Detail Modal (unchanged) */}
+        {/* Order Detail Modal */}
         {detailModalOpen && selectedOrder && (
           <OrderDetailModal order={selectedOrder} onClose={closeDetail} />
+        )}
+
+        {/* Completed Orders Modal */}
+        {completedModalOpen && (
+          <CompletedOrdersModal
+            orders={orders}
+            onClose={() => setCompletedModalOpen(false)}
+            onViewOrder={openDetail}
+          />
         )}
       </div>
     </div>
@@ -455,7 +472,6 @@ function Column({
   statusColor: string;
   buttonColor: string;
 }) {
-  // Sort orders by creation time (oldest first)
   const sortedOrders = [...orders].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
@@ -504,7 +520,6 @@ function OrderCard({
   nextStatus: string;
   buttonColor: string;
 }) {
-  // Calculate time elapsed since order created
   const getElapsedTime = () => {
     const created = new Date(order.createdAt);
     const now = new Date();
@@ -518,9 +533,20 @@ function OrderCard({
   };
 
   const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  const sortedItems = [...order.items].sort((a, b) => {
+    if (a.kotPrinted !== b.kotPrinted) {
+      return a.kotPrinted ? 1 : -1;
+    }
+    return b.kotBatch - a.kotBatch;
+  });
 
   return (
     <div className="border rounded-lg bg-gray-50 hover:shadow-md transition">
+      {order.hasNewItems && (
+        <div className="mb-3 rounded-lg bg-red-100 text-red-700 px-3 py-2 text-sm font-semibold animate-pulse">
+          🔔 New Items Added
+        </div>
+      )}
       <div className="p-4">
         {/* Header */}
         <div className="flex items-start justify-between mb-2">
@@ -532,7 +558,7 @@ function OrderCard({
                   : "🥡 Takeaway"}
               </span>
               <span className="text-xs bg-gray-200 px-2 py-0.5 rounded-full">
-                #{order._id.slice(-6)}
+                #{order.orderNumber.slice(-3)}
               </span>
             </div>
             {order.customerName && (
@@ -552,16 +578,21 @@ function OrderCard({
         <div className="text-sm text-gray-700 mb-2">
           <p className="font-medium">{totalItems} items:</p>
           <ul className="mt-1 space-y-0.5">
-            {order.items.slice(0, 3).map((item, idx) => (
-              <li key={idx} className="flex justify-between">
+            {sortedItems.slice(0, 3).map((item) => (
+              <li key={item._id} className="flex justify-between items-center">
                 <span className="truncate">
-                  {item.quantity}× {item.name}
+                  {item.quantity} × {item.name}
                 </span>
+                {!item.kotPrinted && (
+                  <span className="ml-2 px-2 py-0.5 rounded bg-red-500 text-white text-[10px]">
+                    NEW
+                  </span>
+                )}
               </li>
             ))}
             {order.items.length > 3 && (
               <li className="text-gray-500 text-xs">
-                +{order.items.length - 3} more items
+                +{sortedItems.length - 4} more items
               </li>
             )}
           </ul>
@@ -601,99 +632,334 @@ function OrderDetailModal({
   order: Order;
   onClose: () => void;
 }) {
+  const batches = order.items.reduce(
+    (acc, item) => {
+      if (!acc[item.kotBatch]) {
+        acc[item.kotBatch] = { items: [], hasNew: false };
+      }
+      acc[item.kotBatch].items.push(item);
+      if (!item.kotPrinted) acc[item.kotBatch].hasNew = true;
+      return acc;
+    },
+    {} as Record<number, { items: OrderItem[]; hasNew: boolean }>,
+  );
+
+  const sortedBatchEntries = Object.entries(batches).sort(
+    ([batchA, dataA], [batchB, dataB]) => {
+      if (dataA.hasNew && !dataB.hasNew) return -1;
+      if (!dataA.hasNew && dataB.hasNew) return 1;
+      return Number(batchB) - Number(batchA);
+    },
+  );
+
+  const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  const newItemsCount = order.items.filter((i) => !i.kotPrinted).length;
+
+  const statusColor = {
+    pending: "bg-yellow-100 text-yellow-800",
+    preparing: "bg-blue-100 text-blue-800",
+    ready: "bg-green-100 text-green-800",
+    served: "bg-purple-100 text-purple-800",
+    completed: "bg-gray-200 text-gray-700",
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-gray-100"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-800">
-            Order Details - Table {order.tableNumber}
-          </h3>
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-2xl">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <span>Order No : </span>
+              <span className="text-gray-700 font-mono">
+                {order.orderNumber.slice(-3)}
+              </span>
+              <span className="text-sm font-normal text-gray-700 ml-2">
+                · Table {order.tableNumber}
+              </span>
+            </h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              <p>
+                {order.customerId?.name ||
+                  order.customerName ||
+                  "Walk-in Customer"}
+              </p>{" "}
+              · {totalItems} item
+              {totalItems > 1 ? "s" : ""}
+              {newItemsCount > 0 && (
+                <span className="ml-2 text-red-500 font-semibold">
+                  ({newItemsCount} new)
+                </span>
+              )}
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded-full"
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
-            <XCircle className="w-5 h-5 text-gray-500" />
+            <XCircle className="w-5 h-5 text-gray-400" />
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-gray-500">Order ID</p>
-              <p className="font-mono font-medium">{order._id}</p>
-            </div>
-            <div>
-              <p className="text-gray-500">Received</p>
-              <p className="font-medium">
-                {new Date(order.createdAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            </div>
-            <div>
-              <p className="text-gray-500">Status</p>
-              <p className="font-medium capitalize">{order.status}</p>
-            </div>
-            {order.customerName && (
-              <div>
-                <p className="text-gray-500">Customer</p>
-                <p className="font-medium">{order.customerName}</p>
-              </div>
+        {/* Body */}
+        <div className="p-6 space-y-5">
+          <div className="flex flex-wrap items-center gap-4">
+            <span
+              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${
+                statusColor[order.status]
+              }`}
+            >
+              {order.status}
+            </span>
+            {order.specialInstructions && (
+              <span className="inline-flex items-center text-sm text-amber-700 bg-amber-50 px-3 py-1 rounded-full">
+                ⚠️ Special instructions
+              </span>
             )}
           </div>
 
           <div>
-            <h4 className="font-medium text-gray-700 mb-2">Items</h4>
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Item</th>
-                    <th className="px-3 py-2 text-center">Qty</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {order.items.map((item, idx) => (
-                    <tr key={idx}>
-                      <td className="px-3 py-2">
-                        {item.name}
-                        {item.specialInstructions && (
-                          <p className="text-xs text-gray-500 italic">
-                            Note: {item.specialInstructions}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-center">{item.quantity}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              Kitchen Order Tickets
+            </h4>
+            <div className="space-y-4">
+              {sortedBatchEntries.map(([batch, { items, hasNew }]) => (
+                <div
+                  key={batch}
+                  className={`rounded-xl border ${
+                    hasNew
+                      ? "border-red-200 bg-red-50/40"
+                      : "border-gray-200 bg-white"
+                  } shadow-sm overflow-hidden transition-all`}
+                >
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50/80 border-b border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-800">
+                        KOT #{batch}
+                      </span>
+                      {hasNew && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white animate-pulse">
+                          NEW
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {items.length} item{items.length > 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {items.map((item) => (
+                      <div
+                        key={item._id}
+                        className={`px-4 py-3 flex justify-between items-center ${
+                          !item.kotPrinted ? "bg-red-50/20" : ""
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-gray-800">
+                              {item.quantity}× {item.name}
+                            </span>
+                            {!item.kotPrinted && (
+                              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white">
+                                NEW
+                              </span>
+                            )}
+                          </div>
+                          {item.specialInstructions && (
+                            <p className="text-xs text-orange-600 mt-1 flex items-start gap-1">
+                              <span>📌</span> {item.specialInstructions}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
           {order.specialInstructions && (
-            <div className="bg-orange-50 p-3 rounded-lg">
-              <p className="text-sm font-medium text-orange-800">
-                Special Instructions:
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-2">
+              <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider">
+                Order Instructions
               </p>
-              <p className="text-sm text-orange-700">
+              <p className="text-sm text-amber-700 mt-0.5">
                 {order.specialInstructions}
               </p>
             </div>
           )}
         </div>
 
-        <div className="border-t p-4 flex justify-end">
+        <div className="border-t border-gray-100 px-6 py-4 flex justify-end bg-gray-50/80 rounded-b-2xl">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+            className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-colors text-sm"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==================== Completed Orders Modal ====================
+interface CompletedOrdersModalProps {
+  orders: Order[];
+  onClose: () => void;
+  onViewOrder: (order: Order) => void; // to open detail modal
+}
+
+function CompletedOrdersModal({
+  orders,
+  onClose,
+  onViewOrder,
+}: CompletedOrdersModalProps) {
+  // Filter completed/served orders and sort by latest update
+  const completedOrders = orders
+    .filter((o) => o.status === "completed" || o.status === "served")
+    .sort((a, b) => {
+      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+  const totalItems = (order: Order) =>
+    order.items.reduce((sum, item) => sum + item.quantity, 0);
+
+  const formatTime = (date?: string) => {
+    if (!date) return "—";
+    return new Date(date).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-gray-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-2xl">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
+              <span>✅ Completed Orders</span>
+              <span className="bg-green-100 text-green-700 text-sm font-semibold px-3 py-0.5 rounded-full">
+                {completedOrders.length}
+              </span>
+            </h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              All finished orders – newest first. Click any order to view
+              details.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <XCircle className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Scrollable Body */}
+        <div className="p-6 overflow-y-auto flex-1">
+          {completedOrders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <div className="bg-gray-50 rounded-full p-6 mb-4">
+                <Clock className="w-10 h-10" strokeWidth={1.5} />
+              </div>
+              <p className="text-lg font-medium text-gray-500">
+                No completed orders yet
+              </p>
+              <p className="text-sm text-gray-400">
+                Completed orders will appear here for review.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {completedOrders.map((order) => (
+                <div
+                  key={order._id}
+                  onClick={() => {
+                    onViewOrder(order);
+                    onClose(); // close completed modal after opening detail
+                  }}
+                  className="bg-gray-50/70 hover:bg-gray-100 border border-gray-200 rounded-xl p-4 transition-all cursor-pointer flex items-center justify-between"
+                >
+                  {/* Order Info Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1">
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+                        Order #
+                      </p>
+                      <p className="font-bold text-gray-800">
+                        #{order.orderNumber.slice(-4)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+                        Table
+                      </p>
+                      <p className="font-semibold text-gray-800">
+                        {order.tableNumber}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+                        Customer
+                      </p>
+                      <p className="font-semibold text-gray-800">
+                        <p>
+                          {order.customerId?.name ||
+                            order.customerName ||
+                            "Walk-in "}
+                        </p>
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+                        Items
+                      </p>
+                      <p className="font-semibold text-gray-800">
+                        {totalItems(order)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right side: time + status icon */}
+                  <div className="flex items-center gap-4 ml-4 flex-shrink-0">
+                    <div className="text-right">
+                      <p className="text-xs text-gray-400">Completed</p>
+                      <p className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                        {formatTime(order.updatedAt)}
+                      </p>
+                    </div>
+                    <CheckCircle2 className="w-6 h-6 text-green-500 flex-shrink-0" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-gray-100 px-6 py-4 flex justify-end bg-gray-50/80 rounded-b-2xl">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-colors text-sm"
           >
             Close
           </button>

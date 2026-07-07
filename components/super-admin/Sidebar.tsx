@@ -13,9 +13,11 @@ import {
   Menu,
   ChevronLeft,
   Crown,
+  Bell, // add
   LogOut,
 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useNotificationStore } from "@/store/useNotificationStore";
 // optional, you can implement simple div on hover
 
 const menuItems = [
@@ -26,6 +28,7 @@ const menuItems = [
     icon: CreditCard,
     href: "/super-admin/subscriptions",
   },
+
   { name: "Analytics", icon: BarChart3, href: "/super-admin/analytics" },
   { name: "Support Tickets", icon: LifeBuoy, href: "/super-admin/support" },
   { name: "Admin Users", icon: Users, href: "/super-admin/admins" },
@@ -40,13 +43,15 @@ export default function Sidebar({ collapsed, setCollapsed }: any) {
   const handleLogout = () => {
     logout();
 
-    window.location.href = "/";  // redirect
+    window.location.href = "/"; // redirect
   };
+  const unreadOrders = useNotificationStore((state) => state.unreadOrders);
 
   return (
     <aside
-      className={`bg-white border-r border-slate-200 shadow-sm transition-all duration-300 flex flex-col ${collapsed ? "w-20" : "w-64"
-        }`}
+      className={`bg-white border-r border-slate-200 shadow-sm transition-all duration-300 flex flex-col ${
+        collapsed ? "w-20" : "w-64"
+      }`}
     >
       {/* Logo Area */}
       <div className="flex items-center justify-between p-4 border-b border-slate-100 h-16">
@@ -76,10 +81,11 @@ export default function Sidebar({ collapsed, setCollapsed }: any) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${isActive
-                ? "bg-indigo-50 text-indigo-700 shadow-sm"
-                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                } ${collapsed ? "justify-center" : ""}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
+                isActive
+                  ? "bg-indigo-50 text-indigo-700 shadow-sm"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              } ${collapsed ? "justify-center" : ""}`}
             >
               <item.icon size={20} className="shrink-0" />
               {!collapsed && (
@@ -98,7 +104,6 @@ export default function Sidebar({ collapsed, setCollapsed }: any) {
       {/* Footer (optional) */}
       {/* Footer */}
       <div className="p-3 border-t border-slate-100 space-y-2">
-
         {/* Logout Button */}
         <button
           onClick={handleLogout}
@@ -107,16 +112,13 @@ export default function Sidebar({ collapsed, setCollapsed }: any) {
   ${collapsed ? "justify-center" : ""}`}
         >
           <LogOut size={20} />
-          {!collapsed && (
-            <span className="text-sm font-medium">Logout</span>
-          )}
+          {!collapsed && <span className="text-sm font-medium">Logout</span>}
         </button>
 
         {/* Version */}
         <div className="text-xs text-slate-400 text-center">
           {!collapsed ? "v2.0 · Secure Admin" : "v2"}
         </div>
-
       </div>
     </aside>
   );

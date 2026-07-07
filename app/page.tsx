@@ -676,7 +676,7 @@ export default function AuthPage() {
               </p>
             </div>
 
-            {/* Gmail Integration */}
+            {/* Gmail Integration
             <div className="bg-blue-50/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-5 sm:p-6 shadow-md hover:shadow-xl transition-all duration-300">
               <div className="flex items-center gap-3 mb-3 sm:mb-4">
                 <div className="p-2 bg-blue-100 rounded-xl">
@@ -718,7 +718,7 @@ export default function AuthPage() {
                 professional emails (invoices, promotions) from your own Gmail
                 address. We only send emails you initiate.
               </div>
-            </div>
+            </div> */}
 
             {/* Feature Icons */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
