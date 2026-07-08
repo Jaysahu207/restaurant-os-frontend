@@ -26,24 +26,162 @@ import API from "@/config/axios";
 
 // All possible categories (for filter dropdown)
 const allCategories = [
-  "--select--",
-  "Starters",
-  "Lunch",
+  "--Select Category--",
+
+  // Meals
   "Breakfast",
+  "Brunch",
+  "Lunch",
+  "Dinner",
   "Main Course",
+  "Executive Meals",
+  "Thali",
+  "Mini Meals",
+  "Family Packs",
+  "Combo Meals",
+
+  // Starters
+  "Starters",
+  "Appetizers",
+  "Finger Food",
   "Snacks",
-  "Beverages",
-  "Drinks",
-  "Desserts",
-  "Thali Meals",
-  "Specials",
-  "Side Dishes",
-  "Soups",
-  "Salads",
+  "Street Food",
+  "Chaat",
+
+  // Veg / Non-Veg
+  "Veg",
+  "Non-Veg",
+  "Jain Food",
+
+  // Indian
+  "North Indian",
+  "South Indian",
+  "Punjabi",
+  "Gujarati",
+  "Rajasthani",
+  "Maharashtrian",
+  "Bengali",
+  "Hyderabadi",
+  "Kashmiri",
+
+  // Chinese & Asian
+  "Chinese",
+  "Indo-Chinese",
+  "Thai",
+  "Japanese",
+  "Korean",
+  "Asian",
+
+  // International
+  "Italian",
+  "Mexican",
+  "Continental",
+  "Mediterranean",
+  "American",
+
+  // Rice
+  "Rice",
+  "Biryani",
+  "Fried Rice",
+  "Pulao",
+
+  // Noodles & Pasta
+  "Noodles",
+  "Pasta",
+
+  // Curry
+  "Curries",
+  "Gravy",
+  "Dal",
+
+  // Bread
   "Breads",
+  "Naan",
+  "Roti",
+  "Paratha",
+  "Kulcha",
+
+  // Fast Food
+  "Burgers",
   "Sandwiches",
   "Wraps",
+  "Rolls",
+  "Hot Dogs",
+  "Fries",
+
+  // Pizza
   "Pizzas",
+  "Garlic Bread",
+
+  // Cafe
+  "Coffee",
+  "Tea",
+  "Hot Beverages",
+  "Cold Beverages",
+  "Milkshakes",
+  "Smoothies",
+  "Mocktails",
+  "Juices",
+  "Soft Drinks",
+
+  // Desserts
+  "Desserts",
+  "Ice Cream",
+  "Cakes",
+  "Pastries",
+  "Cookies",
+  "Brownies",
+  "Mithai",
+
+  // Bakery
+  "Bakery",
+  "Fresh Bakes",
+
+  // Healthy
+  "Salads",
+  "Soups",
+  "Healthy Food",
+  "Protein Meals",
+
+  // Tandoor & BBQ
+  "Tandoori",
+  "Barbecue",
+  "Grill",
+  "Kebabs",
+
+  // Seafood
+  "Seafood",
+
+  // Kids
+  "Kids Menu",
+
+  // Sides
+  "Side Dishes",
+  "Accompaniments",
+  "Dips",
+  "Sauces",
+  "Pickles",
+
+  // Add-ons
+  "Extras",
+  "Toppings",
+
+  // Seasonal
+  "Seasonal Specials",
+  "Chef Specials",
+  "Today's Special",
+  "Festival Specials",
+
+  // Cafe
+  "Quick Bites",
+
+  // Dhaba
+  "Dhaba Specials",
+
+  // Misc
+  "Beverages",
+  "Drinks",
+  "Others",
 ];
 
 export default function MenuPage() {
