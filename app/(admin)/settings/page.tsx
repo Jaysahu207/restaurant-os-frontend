@@ -68,6 +68,7 @@ interface RestaurantForm {
     dineIn: boolean;
     takeaway: boolean;
     delivery: boolean;
+    preparationTime: number;
   };
   timings: {
     openTime: string;
@@ -120,7 +121,9 @@ export default function SettingsPage() {
       dineIn: true,
       takeaway: true,
       delivery: false,
+      preparationTime: 15,
     },
+
     timings: { openTime: "", closeTime: "" },
   });
 
@@ -226,6 +229,7 @@ export default function SettingsPage() {
           dineIn: restaurant.operations?.dineIn ?? true,
           takeaway: restaurant.operations?.takeaway ?? true,
           delivery: restaurant.operations?.delivery ?? false,
+          preparationTime: restaurant.operations?.preparationTime || 15,
         },
         timings: {
           openTime: restaurant.timings?.openTime || "",
@@ -403,10 +407,11 @@ export default function SettingsPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === tab.id
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition ${
+                  activeTab === tab.id
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
@@ -804,6 +809,23 @@ export default function SettingsPage() {
                   className={inputClass}
                 />
               </div>
+              <div>
+                <label className={labelClass}>Preparation Time (minutes)</label>
+                <input
+                  type="number"
+                  value={restaurantForm.operations.preparationTime ?? 15}
+                  onChange={(e) =>
+                    setRestaurantForm({
+                      ...restaurantForm,
+                      operations: {
+                        ...restaurantForm.operations,
+                        preparationTime: parseInt(e.target.value) || 15,
+                      },
+                    })
+                  }
+                  className={inputClass}
+                />
+              </div>
               <div className="flex flex-wrap gap-4 col-span-2">
                 {(["dineIn", "takeaway", "delivery"] as const).map((field) => (
                   <label
@@ -1117,7 +1139,7 @@ export default function SettingsPage() {
                         ...notificationSettings,
                         [item.key]:
                           !notificationSettings[
-                          item.key as keyof typeof notificationSettings
+                            item.key as keyof typeof notificationSettings
                           ],
                       })
                     }

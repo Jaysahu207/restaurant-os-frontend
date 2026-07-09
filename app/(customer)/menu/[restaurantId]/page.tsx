@@ -22,6 +22,8 @@ import {
   Loader2,
   Volume2,
   VolumeX,
+  Mail,
+  Download,
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import {
@@ -43,7 +45,10 @@ import QRCode from "react-qr-code";
 import { sendInvoice } from "@/services/invoiceService";
 import ReviewPopup from "@/components/reviews/ReviewPopup";
 import BannerCarousel from "@/components/customer/BannerCarousel";
+import InvoiceTemplate from "@/components/invoice/InvoiceTemplate";
+import { generateInvoicePDF } from "@/utils/pdf/generateInvoicePDF";
 import { v4 as uuidv4 } from "uuid";
+import CustomerInvoice from "@/components/invoice/CustomerInvoice";
 
 // ------------------------------------------------------------
 // Types
@@ -84,8 +89,8 @@ interface Restaurant {
     dineIn: boolean;
     takeaway: boolean;
     delivery: boolean;
+    preparationTime: number;
   };
-
   googleReviewLink?: string;
 
   logo?: string;
@@ -118,6 +123,16 @@ interface Order {
   cgstAmount?: number;
   sgstAmount?: number;
   serviceChargeAmount?: number;
+  invoiceNumber: string;
+  customerId?: { name: string; phone: string; email?: string };
+  subtotal?: number;
+  total?: number;
+  paymentStatus?: string;
+  specialInstructions?: string;
+  tableNumber?: string;
+  preparationTime?: number;
+  orderType?: string;
+  table?: string;
 }
 
 // ------------------------------------------------------------
@@ -131,7 +146,6 @@ const STATUS_FLOW: Order["status"][] = [
   "paid",
   "completed",
 ];
-const PREP_TIME_MINUTES = 15;
 
 // ------------------------------------------------------------
 // Helper: Calculate cart totals with taxes (mirrors backend)
@@ -228,7 +242,7 @@ function CustomerMenuContent() {
   const socketRef = useRef<Socket | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
-
+  const invoiceRef = useRef<HTMLDivElement>(null);
   const [showReviewPopup, setShowReviewPopup] = useState(false);
   useEffect(() => {
     if (table) {
@@ -255,7 +269,7 @@ function CustomerMenuContent() {
     () => calculateCartTotals(cartSubtotal, restaurant),
     [cartSubtotal, restaurant],
   );
-
+  console.log("Restaurant Data:", restaurant);
   // ------------------------------------------------------------
   // Effects
   // ------------------------------------------------------------
@@ -497,7 +511,7 @@ function CustomerMenuContent() {
       socketRef.current = null;
     };
   }, [restaurant?._id, currentOrder?._id]); // added dependency to avoid stale closure
-
+  const PREP_TIME_MINUTES = restaurant?.operations?.preparationTime ?? 15; // Default to 15 minutes if not set
   // Timer for ETA
   useEffect(() => {
     if (!currentOrder?.createdAt) return;
@@ -832,10 +846,10 @@ function CustomerMenuContent() {
     if (selectedCategory === "All") return menu;
     return menu.filter((item) => item.category === selectedCategory);
   }, [menu, selectedCategory]);
-
+  // console.log("Current Order:", currentOrder);
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-yellow-50 flex flex-col items-center justify-center px-6">
+      <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-yellow-50 flex flex-col items-center justify-center px-6">
         <div className="relative">
           <div className="w-28 h-28 rounded-full bg-orange-100 flex items-center justify-center shadow-lg">
             <UtensilsCrossed className="w-12 h-12 text-orange-600 animate-pulse" />
@@ -906,15 +920,54 @@ function CustomerMenuContent() {
   if (orderPlaced && currentOrder) {
     const currentStepIndex = STATUS_FLOW.indexOf(currentOrder.status);
     const baseUPI = `upi://pay?pa=${restaurant?.upiId}&pn=${restaurant?.name}&am=${currentOrder.finalAmount}&cu=INR`;
+    const handleDownloadPDF = async () => {
+      console.log("Download Clicked");
+      console.log(invoiceRef.current);
 
+      if (!invoiceRef.current) {
+        console.log("invoiceRef is null");
+        return;
+      }
+
+      await generateInvoicePDF(invoiceRef.current, currentOrder.invoiceNumber);
+    };
+    const invoiceOrder = currentOrder
+      ? {
+          ...currentOrder,
+
+          subtotal: currentOrder.totalAmount ?? 0,
+          total: currentOrder.finalAmount ?? 0,
+
+          cgstAmount: currentOrder.cgstAmount ?? 0,
+          sgstAmount: currentOrder.sgstAmount ?? 0,
+          serviceChargeAmount: currentOrder.serviceChargeAmount ?? 0,
+
+          customer: {
+            name: currentOrder.customerId?.name || "Guest",
+            phone: currentOrder.customerId?.phone || "",
+            email: currentOrder.customerId?.email || "",
+          },
+
+          paymentStatus:
+            currentOrder.paymentStatus === "paid" ? "Paid" : "Pending",
+
+          paymentMethod: currentOrder.paymentMethod ?? "Cash",
+
+          orderType: currentOrder.orderType,
+
+          table: currentOrder.tableNumber?.toString() ?? "",
+        }
+      : null;
+
+    const isEtaExpired = timeLeft.minutes === 0 && timeLeft.seconds === 0;
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50/30 p-4 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-gray-50 via-white to-indigo-50/30 p-4 flex items-center justify-center">
         <div className="max-w-md w-full mx-auto space-y-5 animate-fadeInUp  ">
           <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-6 ">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <div className="w-12 h-12 bg-linear-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
                   <ChefHat className="w-6 h-6 text-white" />
                 </div>
                 <div>
@@ -945,7 +998,7 @@ function CustomerMenuContent() {
                       <div
                         className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
                           isActive
-                            ? "bg-gradient-to-r from-orange-500 to-orange-600 shadow-md"
+                            ? "bg-linear-to-r from-orange-500 to-orange-600 shadow-md"
                             : "bg-gray-200"
                         }`}
                       >
@@ -967,19 +1020,27 @@ function CustomerMenuContent() {
             </div>
 
             {/* ETA */}
+            {/* ETA */}
             {currentOrder.status !== "completed" &&
               currentOrder.status !== "served" && (
-                <div className="bg-gradient-to-r from-gray-100 to-gray-50 rounded-2xl p-3 flex items-center justify-center gap-2">
-                  <Clock className="w-4 h-4 text-orange-500 animate-pulse" />
-                  <span className="text-sm text-gray-600">
-                    Estimated arrival:{" "}
-                    <span className="font-mono font-bold text-gray-800">
-                      {timeLeft.minutes}m {timeLeft.seconds}s
+                <div className="flex items-center justify-center gap-2 rounded-xl bg-gray-100 px-4 py-3">
+                  <Clock className="h-4 w-4 text-orange-500 animate-pulse" />
+
+                  {isEtaExpired ? (
+                    <span className="text-sm font-medium text-orange-600">
+                      Your order is taking a little longer than expected. It
+                      will be ready shortly. 😊
                     </span>
-                  </span>
+                  ) : (
+                    <span className="text-sm text-gray-700">
+                      Estimated preparation time:{" "}
+                      <span className="font-bold text-gray-900">
+                        {timeLeft.minutes}m {timeLeft.seconds}s
+                      </span>
+                    </span>
+                  )}
                 </div>
               )}
-
             {/* Order Items */}
             <div className="mt-4 space-y-3">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -1050,7 +1111,7 @@ function CustomerMenuContent() {
               {currentOrder.status === "served" && (
                 <button
                   onClick={() => setShowPayment(true)}
-                  className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md hover:shadow-lg"
+                  className="w-full py-3 rounded-xl font-semibold bg-linear-to-r from-green-500 to-emerald-600 text-white shadow-md hover:shadow-lg"
                 >
                   💳 Proceed to Pay
                 </button>
@@ -1066,29 +1127,46 @@ function CustomerMenuContent() {
               )}
 
               {currentOrder.status === "completed" && (
-                <div className="text-center space-y-4">
+                <div className="text-center space-y-3">
                   <div className="flex items-center justify-center gap-2 text-green-600 font-semibold">
                     <CheckCircle className="w-6 h-6" />
                     Payment Verified ✅
                   </div>
+
                   <p className="text-gray-500 text-sm">
                     Thank you! Visit Again 👋
                   </p>
+
+                  {/* Download Invoice */}
+                  <button
+                    onClick={handleDownloadPDF}
+                    className="w-full py-3 rounded-xl font-semibold
+  bg-linear-to-r from-green-500 to-emerald-600
+  text-white shadow-md
+  flex items-center justify-center gap-2"
+                  >
+                    <Download className="w-5 h-5" />
+                    Download Invoice
+                  </button>
+
+                  {/* Email Invoice */}
                   <button
                     onClick={handleSendEmail}
                     disabled={sending}
-                    className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-xl font-semibold bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-60"
                   >
                     {sending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
-                      "📧"
-                    )}{" "}
-                    Get Bill on Email
+                      <Mail className="w-5 h-5" />
+                    )}
+                    {sending ? "Sending..." : "Get Bill on Email"}
                   </button>
+
+                  {/* Back */}
                   <button
                     onClick={resetCustomerSession}
-                    className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-orange-500 to-amber-600 text-white"
+                    className="w-full py-3 rounded-xl font-semibold bg-linear-to-r from-orange-500 to-amber-600 text-white shadow-md hover:shadow-lg transition"
                   >
                     Back to Menu
                   </button>
@@ -1103,7 +1181,7 @@ function CustomerMenuContent() {
               <div className="w-full max-w-[320px] rounded-3xl border border-orange-100 bg-white p-4 shadow-2xl">
                 {/* Header */}
                 <div className="text-center">
-                  <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-100 to-orange-200">
+                  <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-orange-100 to-orange-200">
                     <CreditCard className="h-5 w-5 text-orange-600" />
                   </div>
 
@@ -1136,8 +1214,8 @@ function CustomerMenuContent() {
                       disabled={isPaying}
                       className={`rounded-2xl py-3 text-sm font-bold text-white shadow-md transition-all active:scale-95 ${
                         selectedPayment === "qr"
-                          ? "bg-gradient-to-r from-green-500 to-emerald-600"
-                          : "bg-gradient-to-r from-orange-500 to-orange-600"
+                          ? "bg-linear-to-r from-green-500 to-emerald-600"
+                          : "bg-linear-to-r from-orange-500 to-orange-600"
                       }`}
                     >
                       📱 QR Pay
@@ -1208,7 +1286,7 @@ function CustomerMenuContent() {
                       <button
                         onClick={confirmPayment}
                         disabled={isPaying}
-                        className="mt-4 w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-sm font-bold text-white shadow-md transition-all active:scale-95"
+                        className="mt-4 w-full rounded-2xl bg-linear-to-r from-blue-600 to-indigo-600 py-3 text-sm font-bold text-white shadow-md transition-all active:scale-95"
                       >
                         {isPaying ? "Confirming..." : "✅ I Have Paid"}
                       </button>
@@ -1238,6 +1316,22 @@ function CustomerMenuContent() {
               </div>
             </div>
           )}
+
+          {invoiceOrder && restaurant && (
+            <div
+              style={{
+                position: "absolute",
+                left: "-99999px",
+                top: 0,
+              }}
+            >
+              <CustomerInvoice
+                ref={invoiceRef}
+                order={invoiceOrder}
+                restaurant={restaurant!}
+              />
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1260,7 +1354,7 @@ function CustomerMenuContent() {
                     className="w-14 h-14 rounded-2xl object-cover border border-gray-200 shadow-sm"
                   />
                 ) : (
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
+                  <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
                     <span className="text-white font-bold text-xl">
                       {restaurant?.name?.charAt(0)?.toUpperCase() || "R"}
                     </span>
@@ -1299,7 +1393,7 @@ function CustomerMenuContent() {
               <ShoppingCart className="w-5 h-5" />
 
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+                <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
                   {cartCount}
                 </span>
               )}
@@ -1307,7 +1401,7 @@ function CustomerMenuContent() {
           </div>
         </div>
         {showWelcome && (
-          <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 text-white relative animate-in slide-in-from-top duration-500">
+          <div className="bg-linear-to-r from-orange-500 via-orange-600 to-red-500 text-white relative animate-in slide-in-from-top duration-500">
             <button
               onClick={dismissWelcome}
               className="absolute top-3 right-3 p-1 rounded-full hover:bg-white/20 transition"
@@ -1341,13 +1435,13 @@ function CustomerMenuContent() {
       </div>
 
       {/* Categories */}
-      <div className="sticky top-[60px] z-20 bg-white/90 backdrop-blur-xl border-b border-orange-100 shadow-sm">
+      <div className="sticky top-15 z-20 bg-white/90 backdrop-blur-xl border-b border-orange-100 shadow-sm">
         <div className="relative max-w-2xl mx-auto">
           {/* Left Fade */}
-          <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
+          <div className="absolute left-0 top-0 bottom-0 w-6 bg-linear-to-r from-white to-transparent pointer-events-none z-10" />
 
           {/* Right Fade */}
-          <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
+          <div className="absolute right-0 top-0 bottom-0 w-6 bg-linear-to-l from-white to-transparent pointer-events-none z-10" />
 
           <div className="overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth">
             <div className="flex w-max items-center gap-3 px-4 py-3">
@@ -1359,7 +1453,7 @@ function CustomerMenuContent() {
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
                     className={`
-                flex-shrink-0
+                shrink-0
                 rounded-full
                 px-5
                 py-2.5
@@ -1370,7 +1464,7 @@ function CustomerMenuContent() {
                 active:scale-95
                 ${
                   active
-                    ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-200"
+                    ? "bg-linear-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-200"
                     : "bg-gray-100 text-gray-700 hover:bg-orange-50 hover:text-orange-600"
                 }
               `}

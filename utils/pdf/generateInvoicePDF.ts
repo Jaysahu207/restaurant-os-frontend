@@ -4,46 +4,36 @@ export async function generateInvoicePDF(
 ) {
     if (typeof window === "undefined") return;
 
-    const [{ default: jsPDF }, { default: html2canvas }] =
-        await Promise.all([
-            import("jspdf"),
-            import("html2canvas"),
-        ]);
-    const allElements = document.querySelectorAll("*");
+    const [{ default: jsPDF }, htmlToImage] = await Promise.all([
+        import("jspdf"),
+        import("html-to-image"),
+    ]);
 
-    for (const el of allElements) {
-        const styles = getComputedStyle(el);
-
-        const values = [
-            styles.color,
-            styles.backgroundColor,
-            styles.borderColor,
-            styles.outlineColor,
-        ];
-
-        for (const value of values) {
-            if (
-                value.includes("lab(") ||
-                value.includes("oklab(") ||
-                value.includes("oklch(")
-            ) {
-                console.log("FOUND:", el, value);
-            }
-        }
-    }
-    // DEBUG END
-    const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
+    const width = element.scrollWidth;
+    const height = element.scrollHeight;
+    // Convert HTML to PNG
+    const dataUrl = await htmlToImage.toPng(element, {
+        width,
+        height,
+        canvasWidth: width * 3,
+        canvasHeight: height * 3,
+        pixelRatio: 1,
         backgroundColor: "#ffffff",
-        logging: false,
     });
 
-    const imgData = canvas.toDataURL("image/png");
+    // Get image dimensions
+    const img = new Image();
 
+    await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = dataUrl;
+    });
+
+    // Thermal receipt width (80mm)
     const pdfWidth = 80;
-    const pdfHeight =
-        (canvas.height * pdfWidth) / canvas.width;
+
+    const pdfHeight = (img.height * pdfWidth) / img.width;
 
     const pdf = new jsPDF({
         orientation: "portrait",
@@ -52,12 +42,14 @@ export async function generateInvoicePDF(
     });
 
     pdf.addImage(
-        imgData,
+        dataUrl,
         "PNG",
         0,
         0,
         pdfWidth,
-        pdfHeight
+        pdfHeight,
+        undefined,
+        "FAST"
     );
 
     pdf.save(`Invoice-${invoiceNo}.pdf`);

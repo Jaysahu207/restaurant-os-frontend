@@ -128,7 +128,7 @@ export const verifyPayment = async (orderId: string) => {
 };
 // 🔥 GET ORDER BY ID
 export const getOrderById = async (id: string) => {
-  console.log(id)
+  // console.log(id)
   try {
     const res = await API.get(`/api/orders/${id}`);
     // console.log(res.data)

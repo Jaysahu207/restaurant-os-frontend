@@ -1,4 +1,3 @@
-import { useAuthStore } from "@/store/useAuthStore";
 import "@/styles/print.css";
 import React, { forwardRef } from "react";
 
@@ -58,17 +57,42 @@ interface Order {
 
   total: number;
 }
+interface RestaurantAddress {
+  street?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+}
 
+interface RestaurantLegal {
+  gstNumber?: string;
+  fssaiNumber?: string;
+}
+
+export interface Restaurant {
+  _id?: string;
+
+  name?: string;
+
+  logo?: string;
+
+  contactPhone?: string;
+
+  contactEmail?: string;
+
+  address?: RestaurantAddress;
+
+  legal?: RestaurantLegal;
+}
 interface Props {
   order: Order;
 
-  restaurantName: string;
+  restaurant: Restaurant;
 }
 
-const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
-  ({ order, restaurantName }, ref) => {
-    const { restaurant } = useAuthStore();
-
+const CustomerInvoice = forwardRef<HTMLDivElement, Props>(
+  ({ order, restaurant }, ref) => {
     const formatCurrency = (amount: number) => {
       return `₹${(amount || 0).toFixed(2)}`;
     };
@@ -77,9 +101,10 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
       (acc, item) => acc + item.quantity,
       0,
     );
-    console.log("Restaurant:", restaurant);
-    console.log("Order:", order);
-    console.log("Customer:", order.customer);
+    console.log("Restaurant =", restaurant);
+    console.log("Order =", order);
+    console.log("Customer =", order.customer);
+    console.log("CustomerId =", (order as any).customerId);
     return (
       <div
         ref={ref}
@@ -93,14 +118,14 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
             <div className="flex justify-center mb-3">
               <img
                 src={restaurant.logo}
-                alt={restaurantName}
+                alt={restaurant.name}
                 className="h-10 w-10 object-cover rounded-full border"
               />
             </div>
           )}
 
           {/* NAME */}
-          <h1 className="text-lg font-bold uppercase">{restaurantName}</h1>
+          <h1 className="text-lg font-bold uppercase">{restaurant.name}</h1>
 
           {/* ADDRESS */}
           <div className="mt-2 text-xs text-gray-700 leading-5">
@@ -364,4 +389,4 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
   },
 );
 
-export default InvoiceTemplate;
+export default CustomerInvoice;

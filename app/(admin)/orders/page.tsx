@@ -159,7 +159,7 @@ export default function OrdersPage() {
     setRefreshing(true);
     loadOrders();
   };
- 
+
   // Real-time socket connection
   useEffect(() => {
     if (!restaurant?._id) return;
@@ -295,16 +295,16 @@ export default function OrdersPage() {
     setDetailModalOpen(true);
   };
 
- const openKOT = async (order: Order) => {
-  try {
-    const kot = await printKOT(order.id);
+  const openKOT = async (order: Order) => {
+    try {
+      const kot = await printKOT(order.id);
 
-    setKotData(kot);
-    setKotModalOpen(true);
-  } catch (err) {
-    toast.error("Failed to load KOT");
-  }
-};
+      setKotData(kot);
+      setKotModalOpen(true);
+    } catch (err) {
+      toast.error("Failed to load KOT");
+    }
+  };
 
   const clearFilters = () => {
     setSearch("");
@@ -775,11 +775,7 @@ function OrderDetailModal({
     contentRef: printRef,
     documentTitle: `Invoice-${order.invoiceNumber}`,
   });
-  const handleDownloadPDF = async () => {
-    if (!printRef.current) return;
 
-    await generateInvoicePDF(printRef.current, order.invoiceNumber);
-  };
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 no-print"
