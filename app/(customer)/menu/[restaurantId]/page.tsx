@@ -50,6 +50,9 @@ import { generateInvoicePDF } from "@/utils/pdf/generateInvoicePDF";
 import { v4 as uuidv4 } from "uuid";
 import CustomerInvoice from "@/components/invoice/CustomerInvoice";
 
+import "aos/dist/aos.css";
+import AOS from "aos";
+
 // ------------------------------------------------------------
 // Types
 // ------------------------------------------------------------
@@ -133,6 +136,7 @@ interface Order {
   preparationTime?: number;
   orderType?: string;
   table?: string;
+  preparationStartedAt?: string;
 }
 
 // ------------------------------------------------------------
@@ -237,6 +241,7 @@ function CustomerMenuContent() {
     null,
   );
   const [tableOccupied, setTableOccupied] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const router = useRouter();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -269,11 +274,18 @@ function CustomerMenuContent() {
     () => calculateCartTotals(cartSubtotal, restaurant),
     [cartSubtotal, restaurant],
   );
-  console.log("Restaurant Data:", restaurant);
+  // console.log("Restaurant Data:", restaurant);
   // ------------------------------------------------------------
   // Effects
   // ------------------------------------------------------------
-
+  useEffect(() => {
+    AOS.init({
+      duration: 600,
+      easing: "ease-out-cubic",
+      once: true,
+      offset: 80,
+    });
+  }, []);
   useEffect(() => {
     // Inside the verifyTable effect (around line 280)
     verifyTable();
@@ -332,7 +344,7 @@ function CustomerMenuContent() {
         ];
         setCategories(uniqueCategories);
       } catch (err) {
-        console.error(err);
+        // console.error(err);
         setError("Failed to load menu. Please try again.");
         toast.error("Menu loading failed");
       } finally {
@@ -341,6 +353,7 @@ function CustomerMenuContent() {
     };
     loadMenu();
   }, [restaurantSlug]);
+
   useEffect(() => {
     if (!restaurant?._id) return;
     const seen = sessionStorage.getItem(`welcome_seen_${restaurant._id}`);
@@ -424,7 +437,7 @@ function CustomerMenuContent() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("Socket connected");
+      // console.log("Socket connected");
       socket.emit("joinRestaurant", restaurant._id);
     });
 
@@ -454,7 +467,7 @@ function CustomerMenuContent() {
         // ✅ Release table on backend
         if (table && restaurantSlug) {
           await releaseTable(restaurantSlug, Number(table));
-          console.log("Table released successfully");
+          // console.log("Table released successfully");
         }
       } catch (err) {
         console.error("Failed to release table", err);
@@ -511,25 +524,50 @@ function CustomerMenuContent() {
       socketRef.current = null;
     };
   }, [restaurant?._id, currentOrder?._id]); // added dependency to avoid stale closure
-  const PREP_TIME_MINUTES = restaurant?.operations?.preparationTime ?? 15; // Default to 15 minutes if not set
-  // Timer for ETA
+  const PREP_TIME_MINUTES = restaurant?.operations?.preparationTime ?? 15;
+  console.log(" Current Order:", currentOrder);
   useEffect(() => {
-    if (!currentOrder?.createdAt) return;
+    if (!currentOrder) return;
+
     const updateTimer = () => {
-      const end =
-        new Date(currentOrder.createdAt).getTime() + PREP_TIME_MINUTES * 60000;
-      const diff = Math.max(0, end - Date.now());
+      // If order is served, always show 00:00
+      if (currentOrder.status === "served") {
+        setTimeLeft({
+          minutes: 0,
+          seconds: 0,
+        });
+        return;
+      }
+
+      const startTime = new Date(
+        currentOrder.preparationStartedAt || currentOrder.createdAt,
+      ).getTime();
+
+      const endTime = startTime + PREP_TIME_MINUTES * 60 * 1000;
+
+      const diff = Math.max(0, endTime - Date.now());
+
       setTimeLeft({
         minutes: Math.floor(diff / 60000),
         seconds: Math.floor((diff % 60000) / 1000),
       });
     };
+
     updateTimer();
+
     timerIntervalRef.current = setInterval(updateTimer, 1000);
+
     return () => {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
     };
-  }, [currentOrder?.createdAt]);
+  }, [
+    currentOrder?.preparationStartedAt,
+    currentOrder?.createdAt,
+    currentOrder?.status,
+    PREP_TIME_MINUTES,
+  ]);
 
   // Payment timeout
   useEffect(() => {
@@ -725,18 +763,6 @@ function CustomerMenuContent() {
       setShowReviewPopup(true);
     }
   }, [currentOrder?.status, restaurant?.googleReviewLink]);
-  const generateUPILink = (
-    amount: number,
-    upiId: string,
-    name: string,
-    orderId: string,
-  ) => {
-    return `upi://pay?pa=${upiId}&pn=${encodeURIComponent(
-      name,
-    )}&tn=${encodeURIComponent(
-      `Order Payment ${orderId}`,
-    )}&am=${amount}&cu=INR`;
-  };
 
   const handlePayment = async (method: "cash" | "qr") => {
     if (!currentOrder) return;
@@ -770,7 +796,7 @@ function CustomerMenuContent() {
         toast.success("Scan QR to complete payment");
       }
     } catch (error) {
-      console.error(error);
+      // console.error(error);
 
       toast.error("Payment failed");
     } finally {
@@ -846,29 +872,68 @@ function CustomerMenuContent() {
     if (selectedCategory === "All") return menu;
     return menu.filter((item) => item.category === selectedCategory);
   }, [menu, selectedCategory]);
+  useEffect(() => {
+    AOS.refresh();
+  }, [filteredItems]);
   // console.log("Current Order:", currentOrder);
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-yellow-50 flex flex-col items-center justify-center px-6">
+      <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-amber-50 flex flex-col items-center justify-center overflow-hidden relative px-6">
+        {/* Floating Blurred Background */}
+        <div className="absolute -top-20 -left-20 w-64 h-64 bg-orange-200/40 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-20 -right-20 w-72 h-72 bg-yellow-200/40 rounded-full blur-3xl animate-pulse delay-500" />
+
+        {/* Floating Food Emojis */}
+        <span className="absolute top-20 left-10 text-4xl animate-bounce">
+          🍕
+        </span>
+        <span className="absolute top-36 right-12 text-3xl animate-bounce delay-200">
+          🍔
+        </span>
+        <span className="absolute bottom-32 left-16 text-3xl animate-bounce delay-500">
+          🍜
+        </span>
+        <span className="absolute bottom-20 right-16 text-4xl animate-bounce delay-700">
+          🍰
+        </span>
+
+        {/* Logo Circle */}
         <div className="relative">
-          <div className="w-28 h-28 rounded-full bg-orange-100 flex items-center justify-center shadow-lg">
-            <UtensilsCrossed className="w-12 h-12 text-orange-600 animate-pulse" />
+          <div className="absolute inset-0 rounded-full bg-orange-300 blur-2xl opacity-40 animate-pulse" />
+
+          <div className="relative w-28 h-28 rounded-full bg-white shadow-2xl flex items-center justify-center border-4 border-orange-100">
+            <UtensilsCrossed className="w-12 h-12 text-orange-500 animate-pulse" />
           </div>
 
-          <div className="absolute -inset-3 rounded-full border-4 border-orange-200 animate-ping" />
+          {/* Rotating Ring */}
+          <div className="absolute -inset-4 border-4 border-dashed border-orange-300 rounded-full animate-spin [animation-duration:8s]" />
         </div>
 
-        <h1 className="mt-8 text-3xl font-bold text-gray-800">Welcome 👋</h1>
+        {/* Welcome Text */}
+        <h1 className="mt-10 text-4xl font-extrabold text-gray-800 tracking-tight">
+          Welcome 👋
+        </h1>
 
-        <p className="mt-2 text-gray-500 text-center">
-          Preparing today's delicious menu...
+        <p className="mt-3 text-gray-500 text-center max-w-xs leading-relaxed">
+          Preparing today's delicious menu for you...
         </p>
 
-        <div className="mt-8 w-72 h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full w-1/2 bg-orange-500 animate-[loading_1.5s_ease-in-out_infinite]" />
+        {/* Animated Dots */}
+        <div className="flex gap-2 mt-6">
+          <span className="w-3 h-3 rounded-full bg-orange-500 animate-bounce" />
+          <span className="w-3 h-3 rounded-full bg-orange-400 animate-bounce delay-150" />
+          <span className="w-3 h-3 rounded-full bg-orange-300 animate-bounce delay-300" />
         </div>
 
-        {/* <p className="text-xs text-gray-400 mt-4">Powered by QRasoi</p> */}
+        {/* Premium Progress Bar */}
+        <div className="mt-8 w-72 h-3 bg-orange-100 rounded-full overflow-hidden shadow-inner">
+          <div className="h-full w-1/2 bg-linear-to-r from-orange-500 via-amber-400 to-orange-500 animate-[loading_1.8s_ease-in-out_infinite]" />
+        </div>
+
+        {/* Footer
+        <p className="mt-8 text-sm text-orange-600 font-medium tracking-wide">
+          🍽️ Powered by QRasoi
+        </p> */}
       </div>
     );
   }
@@ -921,15 +986,24 @@ function CustomerMenuContent() {
     const currentStepIndex = STATUS_FLOW.indexOf(currentOrder.status);
     const baseUPI = `upi://pay?pa=${restaurant?.upiId}&pn=${restaurant?.name}&am=${currentOrder.finalAmount}&cu=INR`;
     const handleDownloadPDF = async () => {
-      console.log("Download Clicked");
-      console.log(invoiceRef.current);
+      if (isDownloading) return;
 
       if (!invoiceRef.current) {
-        console.log("invoiceRef is null");
         return;
       }
 
-      await generateInvoicePDF(invoiceRef.current, currentOrder.invoiceNumber);
+      try {
+        setIsDownloading(true);
+
+        await generateInvoicePDF(
+          invoiceRef.current,
+          currentOrder.invoiceNumber,
+        );
+      } catch (error) {
+        console.error("Download failed:", error);
+      } finally {
+        setIsDownloading(false);
+      }
     };
     const invoiceOrder = currentOrder
       ? {
@@ -1020,7 +1094,6 @@ function CustomerMenuContent() {
             </div>
 
             {/* ETA */}
-            {/* ETA */}
             {currentOrder.status !== "completed" &&
               currentOrder.status !== "served" && (
                 <div className="flex items-center justify-center gap-2 rounded-xl bg-gray-100 px-4 py-3">
@@ -1100,7 +1173,7 @@ function CustomerMenuContent() {
                 <button
                   onClick={() => {
                     setOrderPlaced(false);
-                    setIsCartOpen(true);
+                    // setIsCartOpen(true);
                   }}
                   className="w-full py-3 rounded-xl font-semibold bg-white border border-gray-200 text-gray-700 hover:border-orange-300"
                 >
@@ -1140,16 +1213,31 @@ function CustomerMenuContent() {
                   {/* Download Invoice */}
                   <button
                     onClick={handleDownloadPDF}
-                    className="w-full py-3 rounded-xl font-semibold
-  bg-linear-to-r from-green-500 to-emerald-600
-  text-white shadow-md
-  flex items-center justify-center gap-2"
+                    disabled={isDownloading}
+                    className={`w-full py-3 rounded-xl font-semibold
+    text-white shadow-md
+    flex items-center justify-center gap-2
+    transition-all duration-200
+    ${
+      isDownloading
+        ? "bg-gray-400 cursor-not-allowed"
+        : "bg-linear-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+    }`}
                   >
-                    <Download className="w-5 h-5" />
-                    Download Invoice
+                    {isDownloading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Downloading...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-5 h-5" />
+                        Download Invoice
+                      </>
+                    )}
                   </button>
 
-                  {/* Email Invoice */}
+                  {/* Email Invoice
                   <button
                     onClick={handleSendEmail}
                     disabled={sending}
@@ -1161,7 +1249,7 @@ function CustomerMenuContent() {
                       <Mail className="w-5 h-5" />
                     )}
                     {sending ? "Sending..." : "Get Bill on Email"}
-                  </button>
+                  </button> */}
 
                   {/* Back */}
                   <button
@@ -1487,73 +1575,88 @@ function CustomerMenuContent() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
-            {filteredItems.map((item) => {
+            {filteredItems.map((item, index) => {
               const cartItem = cartItems.find((c) => c._id === item._id);
               const isAvailable = item.isAvailable !== false;
+
               return (
                 <div
                   key={item._id}
-                  className="bg-white rounded-2xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition active:scale-[0.98]"
+                  data-aos="fade-up"
+                  data-aos-delay={index * 70}
+                  data-aos-duration="600"
+                  data-aos-once="true"
+                  className="group bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden cursor-pointer hover:shadow-xl hover:border-orange-200 transition-all duration-300 active:scale-[0.98]"
                   onClick={() => openItemModal(item)}
                 >
-                  <div className="h-36 bg-gray-100 relative">
+                  {/* Image */}
+                  <div className="h-36 bg-gradient-to-br from-orange-50 to-white relative overflow-hidden">
                     {item.image ? (
                       <img
                         src={item.image}
                         alt={item.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-3xl">
+                      <div className="w-full h-full flex items-center justify-center text-4xl">
                         🍴
                       </div>
                     )}
+
                     {item.isPopular && (
-                      <span className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
-                        Popular
+                      <span className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full shadow">
+                        🔥 Popular
                       </span>
                     )}
+
                     {!isAvailable && (
-                      <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                        <span className="text-xs text-gray-500 font-medium">
+                      <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center">
+                        <span className="text-xs font-semibold text-gray-600">
                           Not Available
                         </span>
                       </div>
                     )}
                   </div>
+
+                  {/* Details */}
                   <div className="p-3">
-                    <h3 className="font-semibold text-gray-800 text-sm">
+                    <h3 className="font-semibold text-gray-800 text-sm line-clamp-1">
                       {item.name}
                     </h3>
+
                     {item.description && (
                       <p className="text-xs text-gray-400 mt-1 line-clamp-2">
                         {item.description}
                       </p>
                     )}
+
                     <div className="mt-3 flex items-center justify-between">
-                      <span className="font-bold text-gray-800">
+                      <span className="font-bold text-gray-900">
                         ₹{item.price.toFixed(2)}
                       </span>
+
                       {cartItem ? (
-                        <div className="flex items-center gap-2 bg-orange-50 rounded-lg px-2 py-1">
+                        <div className="flex items-center gap-2 bg-orange-50 rounded-xl px-2 py-1">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               decreaseQty(item._id);
                             }}
-                            className="text-orange-500"
+                            className="text-orange-500 hover:scale-110 transition"
                           >
                             <Minus className="w-4 h-4" />
                           </button>
-                          <span className="text-sm font-bold text-orange-600 w-4 text-center">
+
+                          <span className="text-sm font-bold text-orange-600 w-5 text-center">
                             {cartItem.quantity}
                           </span>
+
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               increaseQty(item._id);
                             }}
-                            className="text-orange-500"
+                            className="text-orange-500 hover:scale-110 transition"
                           >
                             <Plus className="w-4 h-4" />
                           </button>
@@ -1565,9 +1668,9 @@ function CustomerMenuContent() {
                             addToCartSimple(item);
                           }}
                           disabled={!isAvailable}
-                          className={`px-4 py-1.5 rounded-lg text-sm font-medium ${
+                          className={`px-4 py-1.5 rounded-xl text-sm font-medium transition-all duration-300 ${
                             isAvailable
-                              ? "bg-orange-500 text-white hover:bg-orange-600"
+                              ? "bg-orange-500 text-white hover:bg-orange-600 hover:scale-105"
                               : "bg-gray-200 text-gray-400 cursor-not-allowed"
                           }`}
                         >

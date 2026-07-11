@@ -14,6 +14,8 @@ import {
   RefreshCw,
   Calendar,
   ChevronDown,
+  TableIcon,
+  User,
 } from "lucide-react";
 import {
   getOrders,
@@ -344,24 +346,51 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-7xl mx-auto">
+    <div className="space-y-6 p-4 md:p-6 max-w-8xl mx-auto shadow-sm rounded-xl bg-gray-50">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Order Management</h1>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
-          title="Refresh orders"
-        >
-          <RefreshCw
-            className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`}
-          />
-        </button>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Left: Title + subtitle */}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 tracking-tight">
+            Order Management
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {filteredOrders.length} order
+            {filteredOrders.length !== 1 ? "s" : ""} •{" "}
+            {new Date().toLocaleDateString("en-IN", {
+              weekday: "short",
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </p>
+        </div>
+
+        {/* Right: Refresh button + optional quick filter badge */}
+        <div className="flex items-center gap-3">
+          {filter !== "all" && (
+            <span className="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
+              Filtered: {filter}
+            </span>
+          )}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="relative p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition disabled:opacity-50 group"
+            title="Refresh orders"
+          >
+            <RefreshCw
+              className={`w-5 h-5 ${refreshing ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`}
+            />
+            {refreshing && (
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full animate-ping" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4  ">
         <StatCard
           label="Total Orders"
           value={stats.total}
@@ -403,7 +432,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm space-y-4 border border-gray-100">
+      <div className="bg-white p-4 rounded-xl shadow-sm space-y-4">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -488,7 +517,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders List */}
-      <div className="space-y-4">
+      <div className="space-y-4  p-4 rounded-xl shadow-sm">
         {filteredOrders.length === 0 ? (
           <div className="bg-white p-12 rounded-xl text-center shadow-sm border border-gray-100">
             <div className="max-w-md mx-auto">
@@ -509,21 +538,24 @@ export default function OrdersPage() {
           </div>
         ) : (
           <>
-            <div className="text-sm text-gray-500 mb-2">
+            <div className="text-sm text-gray-500 mb-2 ">
               Showing {filteredOrders.length} order
               {filteredOrders.length !== 1 ? "s" : ""}
             </div>
-            {filteredOrders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                onViewDetails={() => openDetail(order)}
-                onKOT={() => openKOT(order)}
-                onUpdateStatus={(newStatus) =>
-                  updateOrderStatus(order.id, newStatus)
-                }
-              />
-            ))}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ">
+              {filteredOrders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  onViewDetails={() => openDetail(order)}
+                  onKOT={() => openKOT(order)}
+                  onUpdateStatus={(newStatus) =>
+                    updateOrderStatus(order.id, newStatus)
+                  }
+                />
+              ))}
+            </div>
           </>
         )}
       </div>
@@ -647,108 +679,141 @@ function OrderCard({
   ];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition p-4 border border-gray-100 group">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-2 flex-wrap">
-            <span className="text-sm font-mono font-semibold text-gray-700">
+    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition h-full flex flex-col">
+      {/* Left accent border based on status */}
+      <div
+        className={`h-1 w-full rounded-t-xl ${statusColors[order.status].split(" ")[0]}`}
+      />
+
+      <div className="p-4 flex flex-col gap-4 flex-1">
+        {/* ---------- TOP ROW: Order ID, status, time & quick actions ---------- */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono font-bold text-sm text-gray-900">
               #{order.orderNumber?.slice(-3)}
             </span>
             <span
-              className={`px-2 py-1 text-xs font-medium rounded-full border ${statusColors[order.status]}`}
+              className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${statusColors[order.status]}`}
             >
               {statusLabels[order.status]}
             </span>
             <span className="text-xs text-gray-500 flex items-center gap-1">
-              <Clock className="w-3 h-3" />{" "}
+              <Clock className="w-3.5 h-3.5" />
               {new Date(order.createdAt).toLocaleString()}
             </span>
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <span className="font-medium text-gray-800">
-              {order.customer.name}
-            </span>
-            <span className="text-gray-500">Table {order.table}</span>
-            <span className="text-gray-500">{order.items.length} items</span>
-          </div>
-          {order.specialInstructions && (
-            <p className="text-xs text-gray-500 mt-1 italic truncate">
-              Note: {order.specialInstructions}
-            </p>
-          )}
-        </div>
 
-        <div className="flex items-center gap-4 md:gap-6">
-          <div className="text-right">
-            <p className="text-xs text-gray-500">
-              Subtotal: ₹{order.subtotal.toFixed(2)}
-            </p>
-            {order.cgstAmount > 0 && (
-              <p className="text-xs text-gray-500">
-                CGST: ₹{order.cgstAmount.toFixed(2)}
-              </p>
-            )}
-            {order.sgstAmount > 0 && (
-              <p className="text-xs text-gray-500">
-                SGST: ₹{order.sgstAmount.toFixed(2)}
-              </p>
-            )}
-            {order.serviceChargeAmount > 0 && (
-              <p className="text-xs text-gray-500">
-                Service Charge: ₹{order.serviceChargeAmount.toFixed(2)}
-              </p>
-            )}
-            <p className="text-lg font-bold text-gray-800">
-              Total: ₹{order.total.toFixed(2)}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+          {/* View & KOT buttons always visible */}
+          <div className="flex items-center gap-1">
             <button
               onClick={onViewDetails}
-              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
               title="View Details"
             >
-              <Eye className="w-5 h-5" />
+              <Eye className="w-4.5 h-4.5" />
             </button>
             <button
               onClick={onKOT}
-              className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
               title="Print KOT"
             >
-              <Printer className="w-5 h-5" />
+              <Printer className="w-4.5 h-4.5" />
             </button>
+          </div>
+        </div>
+
+        {/* ---------- MIDDLE SECTION: Customer info + Billing side by side ---------- */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Customer details */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
+              <User className="w-4 h-4 text-gray-400" />
+              {order.customer.name}
+            </div>
+            <div className="flex items-center gap-4 text-xs text-gray-500">
+              <span className="flex items-center gap-1">
+                <TableIcon className="w-3.5 h-3.5" /> Table {order.table}
+              </span>
+              <span>{order.items.length} items</span>
+            </div>
+            {order.specialInstructions && (
+              <p className="text-xs text-gray-400 italic break-words mt-1">
+                💬 {order.specialInstructions}
+              </p>
+            )}
+          </div>
+
+          {/* Billing (styled like a mini receipt) */}
+          <div className="bg-gray-50 rounded-lg p-3 text-sm">
+            <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <span>Subtotal</span>
+              <span>₹{order.subtotal.toFixed(2)}</span>
+            </div>
+            {order.cgstAmount > 0 && (
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>CGST</span>
+                <span>₹{order.cgstAmount.toFixed(2)}</span>
+              </div>
+            )}
+            {order.sgstAmount > 0 && (
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>SGST</span>
+                <span>₹{order.sgstAmount.toFixed(2)}</span>
+              </div>
+            )}
+            {order.serviceChargeAmount > 0 && (
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>Service</span>
+                <span>₹{order.serviceChargeAmount.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-bold text-gray-800 border-t border-gray-200 pt-1.5 mt-1.5">
+              <span>Total</span>
+              <span>₹{order.total.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ---------- BOTTOM ROW: Status change, payment verification, badges ---------- */}
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-auto">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Status dropdown */}
+            <select
+              value={order.status}
+              onChange={(e) => onUpdateStatus(e.target.value as OrderStatus)}
+              className="text-xs border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {allStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {statusLabels[status]}
+                </option>
+              ))}
+            </select>
+
+            {/* Verify Payment button */}
             {order.paymentStatus === "paid" && order.status !== "completed" && (
               <button
                 onClick={async () => {
                   await verifyPayment(order.id);
                   onUpdateStatus("completed");
                 }}
-                className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                className="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-1"
               >
-                Verify Payment ✅
+                ✅ Verify Payment
               </button>
             )}
-            <div className="relative">
-              <select
-                value={order.status}
-                onChange={(e) => onUpdateStatus(e.target.value as OrderStatus)}
-              >
-                {allStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {statusLabels[status]}
-                  </option>
-                ))}
-              </select>
-              {/* <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" /> */}
-            </div>
-            {order.paymentStatus === "paid" && order.status !== "completed" && (
-              <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">
-                Awaiting Verification ⏳
+          </div>
+
+          {/* Badges */}
+          <div className="flex flex-wrap items-center gap-2">
+            {order.paymentMethod && (
+              <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full font-medium whitespace-nowrap">
+                {order.paymentMethod.toUpperCase()}
               </span>
             )}
-            {order.paymentMethod && (
-              <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
-                {order.paymentMethod.toUpperCase()}
+            {order.paymentStatus === "paid" && order.status !== "completed" && (
+              <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full font-medium whitespace-nowrap">
+                ⏳ Awaiting Verification
               </span>
             )}
           </div>

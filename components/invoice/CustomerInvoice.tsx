@@ -101,10 +101,10 @@ const CustomerInvoice = forwardRef<HTMLDivElement, Props>(
       (acc, item) => acc + item.quantity,
       0,
     );
-    console.log("Restaurant =", restaurant);
-    console.log("Order =", order);
-    console.log("Customer =", order.customer);
-    console.log("CustomerId =", (order as any).customerId);
+    // console.log("Restaurant =", restaurant);
+    // console.log("Order =", order);
+    // console.log("Customer =", order.customer);
+    // console.log("CustomerId =", (order as any).customerId);
     return (
       <div
         ref={ref}

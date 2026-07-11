@@ -92,3 +92,16 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+@keyframes loading {
+  0% {
+    transform: translateX(-100%);
+    width: 30%;
+  }
+  50% {
+    width: 60%;
+  }
+  100% {
+    transform: translateX(350%);
+    width: 30%;
+  }
+}

@@ -5,11 +5,11 @@ export const fetchCustomerMenu = async (slug: string) => {
   try {
     const res = await PublicAPI.get(`/api/customers/menu/${slug}`);
 
-    console.log("✅ RAW API RESPONSE:", res.data);
+    // console.log("✅ RAW API RESPONSE:", res.data);
 
     return res.data;
   } catch (err: any) {
-    console.log("❌ FULL ERROR:", err);
+    // console.log("❌ FULL ERROR:", err);
     throw err;
   }
 };
