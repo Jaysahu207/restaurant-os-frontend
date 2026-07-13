@@ -482,7 +482,8 @@ export default function SettingsPage() {
                       slug: e.target.value,
                     })
                   }
-                  className={inputClass}
+                  disabled
+                  className={`${inputClass} bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200`}
                 />
               </div>
 

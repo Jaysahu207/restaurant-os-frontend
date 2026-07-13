@@ -207,7 +207,7 @@ export default function MenuPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { user, restaurant } = useAuthStore();
-  // console.log("🟡 RESTAURANT ID:", restaurant._id);
+  // console.log("Restaurant Slug:", restaurant.slug);
 
   // Handle sorting
   const handleSort = (field: string) => {
@@ -294,47 +294,47 @@ export default function MenuPage() {
       } else {
         // ➕ CREATE
         await createMenuItem(formData);
-        toast.success("Item created");
+        toast.success("Item Added Successfully");
       }
 
       await fetchMenu(); // ✅ refresh from backend
       closeModal();
     } catch (error) {
       console.error(error);
-      toast.error("Something went wrong");
+      toast.error("Something went wrong  ");
     }
   };
 
   const openDeleteModal = (id: string) => {
-    console.log("🟡 openDeleteModal called with ID:", id);
+    // console.log("🟡 openDeleteModal called with ID:", id);
     setItemToDelete(id);
     setIsDeleteModalOpen(true);
   };
   const confirmDelete = async () => {
-    console.log("🟢 confirmDelete triggered");
+    // console.log("🟢 confirmDelete triggered");
 
     if (!itemToDelete) {
-      console.log("❌ No itemToDelete found");
+      // console.log("❌ No itemToDelete found");
       return;
     }
 
-    console.log("🟡 Deleting item with ID:", itemToDelete);
+    // console.log("🟡 Deleting item with ID:", itemToDelete);
 
     try {
       setIsDeleting(true);
 
-      console.log("📡 Calling API...");
+      // console.log("📡 Calling API...");
       const res = await deleteMenuItem(itemToDelete);
 
-      console.log("✅ API Success Response:", res);
+      // console.log("✅ API Success Response:", res);
 
       // 🔥 CHECK THIS CAREFULLY
       setMenuItems((prev: any) => {
-        console.log("📦 Previous Items:", prev);
+        // console.log("📦 Previous Items:", prev);
 
         const updated = prev.filter((item: any) => item._id !== itemToDelete);
 
-        console.log("🧹 Updated Items:", updated);
+        // console.log("🧹 Updated Items:", updated);
 
         return updated;
       });

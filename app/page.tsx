@@ -187,7 +187,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-white to-orange-50 overflow-x-hidden">
+    <div className="min-h-screen bg-linear-to-br from-white via-white to-orange-50 overflow-x-hidden">
       <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16 xl:py-20">
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 xl:gap-16">
           {/* ---------- LEFT COLUMN: AUTH FORM ---------- */}
@@ -195,7 +195,7 @@ export default function AuthPage() {
             <div className="w-full max-w-2xl mx-auto lg:mx-0">
               {/* Logo & Brand Section */}
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 mb-8 sm:mb-10">
-                <div className="flex-shrink-0 bg-white rounded-2xl p-2 shadow-md">
+                <div className="shrink-0 bg-white rounded-2xl p-2 shadow-md">
                   <Image
                     src="/final.png"
                     alt="QRasoi Logo"
@@ -236,20 +236,22 @@ export default function AuthPage() {
                   <div className="flex bg-gray-100/80 rounded-2xl p-1 mb-6 sm:mb-8">
                     <button
                       onClick={() => setActiveTab("login")}
-                      className={`flex-1 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${activeTab === "login"
-                        ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md transform scale-[1.02]"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
-                        }`}
+                      className={`flex-1 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${
+                        activeTab === "login"
+                          ? "bg-linear-to-r from-orange-600 to-amber-600 text-white shadow-md transform scale-[1.02]"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                      }`}
                     >
                       Login
                     </button>
 
                     <button
                       onClick={() => setActiveTab("register")}
-                      className={`flex-1 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${activeTab === "register"
-                        ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md transform scale-[1.02]"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
-                        }`}
+                      className={`flex-1 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${
+                        activeTab === "register"
+                          ? "bg-linear-to-r from-orange-600 to-amber-600 text-white shadow-md transform scale-[1.02]"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                      }`}
                     >
                       Register
                     </button>
@@ -321,7 +323,7 @@ export default function AuthPage() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md hover:shadow-lg transform hover:scale-[1.02] active:scale-100"
+                      className="w-full bg-linear-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md hover:shadow-lg transform hover:scale-[1.02] active:scale-100"
                     >
                       {loading ? (
                         <>
@@ -386,7 +388,7 @@ export default function AuthPage() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-gradient-to-r from-orange-600 to-amber-600 text-white py-3 rounded-xl font-semibold"
+                      className="w-full bg-linear-to-r from-orange-600 to-amber-600 text-white py-3 rounded-xl font-semibold"
                     >
                       {loading ? "Sending..." : "Send Reset Link"}
                     </button>
@@ -444,7 +446,7 @@ export default function AuthPage() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-gradient-to-r from-orange-600 to-amber-600 text-white py-3 rounded-xl font-semibold"
+                      className="w-full bg-linear-to-r from-orange-600 to-amber-600 text-white py-3 rounded-xl font-semibold"
                     >
                       {loading ? "Updating Password..." : "Reset Password"}
                     </button>
@@ -595,7 +597,7 @@ export default function AuthPage() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md hover:shadow-lg transform hover:scale-[1.02] active:scale-100"
+                      className="w-full bg-linear-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md hover:shadow-lg transform hover:scale-[1.02] active:scale-100"
                     >
                       {loading ? (
                         <>

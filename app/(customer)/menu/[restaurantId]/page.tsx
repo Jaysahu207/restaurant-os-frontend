@@ -24,6 +24,7 @@ import {
   VolumeX,
   Mail,
   Download,
+  BookOpen,
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import {
@@ -103,8 +104,26 @@ interface Restaurant {
   timezone?: string;
   createdAt?: string;
   updatedAt?: string;
-}
 
+  subscriptionId?: {
+    _id?: string;
+    plan: string;
+    status: string;
+
+    features: SubscriptionFeatures;
+  };
+}
+interface SubscriptionFeatures {
+  digitalMenu: boolean;
+  qrOrdering: boolean;
+  billing: boolean;
+  inventory: boolean;
+  crm: boolean;
+  analytics: boolean;
+  marketing: boolean;
+  promotions: boolean;
+  reports: boolean;
+}
 interface OrderItem {
   _id?: string;
   menuItemId?: string;
@@ -249,6 +268,9 @@ function CustomerMenuContent() {
   const [showWelcome, setShowWelcome] = useState(false);
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [showReviewPopup, setShowReviewPopup] = useState(false);
+  // const subscription = restaurant.subscription;
+
+  // const orderingEnabled = subscription.features.qrOrdering;
   useEffect(() => {
     if (table) {
       setOrderType("dine_in");
@@ -329,7 +351,7 @@ function CustomerMenuContent() {
         const menuItems = data?.items || [];
         const restaurantData = data?.restaurant || null;
         setMenu(menuItems);
-        // console.log("Restaurant Data:", restaurantData);
+        console.log("Restaurant Data:", restaurantData);
         setRestaurant(restaurantData);
         setBanners(data.banners || []);
         const uniqueCategories: string[] = [
@@ -525,7 +547,7 @@ function CustomerMenuContent() {
     };
   }, [restaurant?._id, currentOrder?._id]); // added dependency to avoid stale closure
   const PREP_TIME_MINUTES = restaurant?.operations?.preparationTime ?? 15;
-  console.log(" Current Order:", currentOrder);
+  // console.log(" Current Order:", currentOrder);
   useEffect(() => {
     if (!currentOrder) return;
 
@@ -876,6 +898,18 @@ function CustomerMenuContent() {
     AOS.refresh();
   }, [filteredItems]);
   // console.log("Current Order:", currentOrder);
+
+  const subscription = restaurant?.subscriptionId;
+  const features = subscription?.features;
+  const orderingEnabled = features?.qrOrdering ?? false;
+  const digitalMenuEnabled = features?.digitalMenu ?? true;
+  console.log(
+    "Ordering Enabled:",
+    orderingEnabled,
+    "Digital Menu Enabled:",
+    digitalMenuEnabled,
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-amber-50 flex flex-col items-center justify-center overflow-hidden relative px-6">
@@ -1424,7 +1458,7 @@ function CustomerMenuContent() {
       </div>
     );
   }
-
+  const hasBanners = banners?.length > 0;
   // --- Menu & Cart View ---
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -1518,12 +1552,18 @@ function CustomerMenuContent() {
         )}
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-4">
-        <BannerCarousel banners={banners} />
-      </div>
+      {hasBanners && (
+        <section className="max-w-2xl mx-auto px-4 pt-4 pb-2">
+          <BannerCarousel banners={banners} />
+        </section>
+      )}
 
       {/* Categories */}
-      <div className="sticky top-15 z-20 bg-white/90 backdrop-blur-xl border-b border-orange-100 shadow-sm">
+      <div
+        className={`sticky z-20 bg-white/90 backdrop-blur-xl border-b border-orange-100 shadow-sm ${
+          showWelcome ? "top-[132px]" : "top-[72px]"
+        }`}
+      >
         <div className="relative max-w-2xl mx-auto">
           {/* Left Fade */}
           <div className="absolute left-0 top-0 bottom-0 w-6 bg-linear-to-r from-white to-transparent pointer-events-none z-10" />
@@ -1567,7 +1607,11 @@ function CustomerMenuContent() {
       </div>
 
       {/* Menu Grid */}
-      <main className="max-w-2xl mx-auto px-4 py-4">
+      <main
+        className={`max-w-2xl mx-auto px-4 ${
+          hasBanners ? "pt-4 pb-4" : "pt-2 pb-4"
+        }`}
+      >
         {filteredItems.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <UtensilsCrossed className="w-10 h-10 mx-auto mb-3 opacity-40" />
@@ -1590,7 +1634,7 @@ function CustomerMenuContent() {
                   onClick={() => openItemModal(item)}
                 >
                   {/* Image */}
-                  <div className="h-36 bg-gradient-to-br from-orange-50 to-white relative overflow-hidden">
+                  <div className="h-36 bg-linear-to-br from-orange-50 to-white relative overflow-hidden">
                     {item.image ? (
                       <img
                         src={item.image}
@@ -1635,47 +1679,53 @@ function CustomerMenuContent() {
                         ₹{item.price.toFixed(2)}
                       </span>
 
-                      {cartItem ? (
-                        <div className="flex items-center gap-2 bg-orange-50 rounded-xl px-2 py-1">
+                      {orderingEnabled ? (
+                        cartItem ? (
+                          <div className="flex items-center gap-2 bg-orange-50 rounded-xl px-2 py-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                decreaseQty(item._id);
+                              }}
+                              className="text-orange-500 hover:scale-110 transition"
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+
+                            <span className="text-sm font-bold text-orange-600 w-5 text-center">
+                              {cartItem.quantity}
+                            </span>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                increaseQty(item._id);
+                              }}
+                              className="text-orange-500 hover:scale-110 transition"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              decreaseQty(item._id);
+                              addToCartSimple(item);
                             }}
-                            className="text-orange-500 hover:scale-110 transition"
+                            disabled={!isAvailable}
+                            className={`px-4 py-1.5 rounded-xl text-sm font-medium transition-all duration-300 ${
+                              isAvailable
+                                ? "bg-orange-500 text-white hover:bg-orange-600 hover:scale-105"
+                                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            }`}
                           >
-                            <Minus className="w-4 h-4" />
+                            Add
                           </button>
-
-                          <span className="text-sm font-bold text-orange-600 w-5 text-center">
-                            {cartItem.quantity}
-                          </span>
-
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              increaseQty(item._id);
-                            }}
-                            className="text-orange-500 hover:scale-110 transition"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
+                        )
                       ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addToCartSimple(item);
-                          }}
-                          disabled={!isAvailable}
-                          className={`px-4 py-1.5 rounded-xl text-sm font-medium transition-all duration-300 ${
-                            isAvailable
-                              ? "bg-orange-500 text-white hover:bg-orange-600 hover:scale-105"
-                              : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          }`}
-                        >
-                          Add
-                        </button>
+                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                          View Only
+                        </span>
                       )}
                     </div>
                   </div>
@@ -1980,43 +2030,75 @@ function CustomerMenuContent() {
                   </div>
                 </div>
               )}
+              {orderingEnabled ? (
+                <>
+                  <div className="mt-4 flex items-center gap-3">
+                    <span className="font-medium">Quantity:</span>
+                    <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1">
+                      <button
+                        onClick={() =>
+                          setModalQuantity(Math.max(1, modalQuantity - 1))
+                        }
+                        className="text-gray-600"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="w-8 text-center font-bold">
+                        {modalQuantity}
+                      </span>
+                      <button
+                        onClick={() => setModalQuantity(modalQuantity + 1)}
+                        className="text-gray-600"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
 
-              <div className="mt-4 flex items-center gap-3">
-                <span className="font-medium">Quantity:</span>
-                <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1">
+                  <div className="mt-4 flex justify-between items-center border-t pt-4">
+                    <span className="font-bold text-lg">Total:</span>
+                    <span className="font-bold text-xl text-orange-600">
+                      ₹{getModalItemTotal().toFixed(2)}
+                    </span>
+                  </div>
+
                   <button
-                    onClick={() =>
-                      setModalQuantity(Math.max(1, modalQuantity - 1))
-                    }
-                    className="text-gray-600"
+                    onClick={addCustomizedToCart}
+                    className="w-full mt-4 bg-orange-500 text-white py-3 rounded-xl font-semibold"
                   >
-                    <Minus className="w-4 h-4" />
+                    Add to Cart • ₹{getModalItemTotal().toFixed(2)}
                   </button>
-                  <span className="w-8 text-center font-bold">
-                    {modalQuantity}
-                  </span>
-                  <button
-                    onClick={() => setModalQuantity(modalQuantity + 1)}
-                    className="text-gray-600"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+                </>
+              ) : (
+                <div className="mt-6 border-t border-orange-100 pt-5">
+                  <div className="relative overflow-hidden rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50 p-5 shadow-sm">
+                    {/* Decorative Circle */}
+                    <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-orange-100/50 blur-2xl" />
+
+                    <div className="relative z-10 flex flex-col items-center text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 shadow-sm">
+                        <BookOpen className="h-6 w-6 text-orange-500" />
+                      </div>
+
+                      <h3 className="mt-3 text-lg font-bold text-gray-800">
+                        Digital Menu
+                      </h3>
+
+                      <p className="mt-2 text-sm leading-relaxed text-gray-600 max-w-xs">
+                        Explore our delicious menu and let our team know your
+                        favorite dishes.
+                      </p>
+
+                      <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-sm border border-orange-100">
+                        <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <span className="text-xs font-medium text-orange-600">
+                          Powered by QRasoi
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div className="mt-4 flex justify-between items-center border-t pt-4">
-                <span className="font-bold text-lg">Total:</span>
-                <span className="font-bold text-xl text-orange-600">
-                  ₹{getModalItemTotal().toFixed(2)}
-                </span>
-              </div>
-
-              <button
-                onClick={addCustomizedToCart}
-                className="w-full mt-4 bg-orange-500 text-white py-3 rounded-xl font-semibold"
-              >
-                Add to Cart • ₹{getModalItemTotal().toFixed(2)}
-              </button>
+              )}
             </div>
           </div>
         </div>

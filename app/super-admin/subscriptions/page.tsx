@@ -37,6 +37,9 @@ interface Plan {
     crm: boolean;
     analytics: boolean;
     marketing: boolean;
+    promotions: boolean;
+    reports: boolean;
+    digitalMenu: boolean;
   };
 }
 
@@ -55,6 +58,9 @@ interface RestaurantSubscription {
     crm: boolean;
     analytics: boolean;
     marketing: boolean;
+    promotions: boolean;
+    reports: boolean;
+    digitalMenu: boolean;
   };
 }
 
@@ -89,7 +95,7 @@ function AssignPlanModal({
   onAssign: (restaurantId: string, planCode: string) => Promise<void>;
 }) {
   const [selectedPlan, setSelectedPlan] = useState<string>(
-    restaurant?.subscriptionId?.plan || ""
+    restaurant?.subscriptionId?.plan || "",
   );
   const [loading, setLoading] = useState(false);
 
@@ -116,7 +122,9 @@ function AssignPlanModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
           <div>
-            <h3 className="text-xl font-bold text-slate-800">Assign Subscription</h3>
+            <h3 className="text-xl font-bold text-slate-800">
+              Assign Subscription
+            </h3>
             <p className="mt-1 text-sm text-slate-500">{restaurant.name}</p>
           </div>
           <button
@@ -152,26 +160,39 @@ function AssignPlanModal({
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <h4 className="text-lg font-bold text-slate-800">{selectedPlanData.name}</h4>
-                  <p className="mt-1 text-sm text-indigo-600">₹{selectedPlanData.basePrice}/month</p>
+                  <h4 className="text-lg font-bold text-slate-800">
+                    {selectedPlanData.name}
+                  </h4>
+                  <p className="mt-1 text-sm text-indigo-600">
+                    ₹{selectedPlanData.basePrice}/month
+                  </p>
                 </div>
                 <div className="rounded-xl bg-indigo-100 p-2">
                   <Crown className="h-5 w-5 text-indigo-600" />
                 </div>
               </div>
-              <div className="mt-3 text-sm text-slate-500">{selectedPlanData.trialDays} days free trial</div>
+              <div className="mt-3 text-sm text-slate-500">
+                {selectedPlanData.trialDays} days free trial
+              </div>
 
               <div className="mt-5">
-                <p className="mb-3 text-sm font-semibold text-slate-700">Included Features</p>
+                <p className="mb-3 text-sm font-semibold text-slate-700">
+                  Included Features
+                </p>
                 <div className="space-y-2">
                   {Object.entries(selectedPlanData.features || {})
                     .filter(([, value]) => value)
                     .map(([key], idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-sm text-slate-600">
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 text-sm text-slate-600"
+                      >
                         <div className="rounded-full bg-emerald-100 p-1">
                           <Check className="h-3 w-3 text-emerald-600" />
                         </div>
-                        <span className="capitalize">{key.replace(/([A-Z])/g, " $1")}</span>
+                        <span className="capitalize">
+                          {key.replace(/([A-Z])/g, " $1")}
+                        </span>
                       </div>
                     ))}
                 </div>
@@ -193,7 +214,11 @@ function AssignPlanModal({
             disabled={!selectedPlan || loading}
             className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Assign Plan"}
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Assign Plan"
+            )}
           </button>
         </div>
       </div>
@@ -229,7 +254,8 @@ export default function SubscriptionsPage() {
 
   // Local UI state
   const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
+  const [selectedRestaurant, setSelectedRestaurant] =
+    useState<Restaurant | null>(null);
 
   // Fetch data on mount & filter changes
   useEffect(() => {
@@ -291,17 +317,19 @@ export default function SubscriptionsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800">Subscription Management</h1>
-          <p className="mt-1 text-sm text-slate-500">Manage plans, subscriptions and recurring revenue</p>
+          <h1 className="text-3xl font-extrabold text-slate-800">
+            Subscription Management
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Manage plans, subscriptions and recurring revenue
+          </p>
         </div>
         <button
           onClick={refreshSubscriptions}
           disabled={loading}
           className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
         >
-          <RefreshCcw
-            className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-          />
+          <RefreshCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
 
           {loading ? "Refreshing..." : "Refresh"}
         </button>
@@ -313,7 +341,9 @@ export default function SubscriptionsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Total Restaurants</p>
-              <h2 className="mt-2 text-3xl font-bold text-slate-800">{safeStats.totalRestaurants}</h2>
+              <h2 className="mt-2 text-3xl font-bold text-slate-800">
+                {safeStats.totalRestaurants}
+              </h2>
             </div>
             <div className="rounded-2xl bg-indigo-100 p-3">
               <Users className="h-7 w-7 text-indigo-600" />
@@ -324,7 +354,9 @@ export default function SubscriptionsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Active Subscriptions</p>
-              <h2 className="mt-2 text-3xl font-bold text-slate-800">{safeStats.activeSubscriptions}</h2>
+              <h2 className="mt-2 text-3xl font-bold text-slate-800">
+                {safeStats.activeSubscriptions}
+              </h2>
             </div>
             <div className="rounded-2xl bg-emerald-100 p-3">
               <CreditCard className="h-7 w-7 text-emerald-600" />
@@ -347,12 +379,9 @@ export default function SubscriptionsPage() {
       </div>
       {/* Revenue Analytics */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-
         {/* Total Revenue */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-500">
-            Total Revenue
-          </p>
+          <p className="text-sm text-slate-500">Total Revenue</p>
 
           <h2 className="mt-3 text-3xl font-extrabold text-slate-800">
             ₹{stats?.totalRevenue?.toLocaleString?.() || 0}
@@ -365,9 +394,7 @@ export default function SubscriptionsPage() {
 
         {/* Trial Restaurants */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-500">
-            Trial Restaurants
-          </p>
+          <p className="text-sm text-slate-500">Trial Restaurants</p>
 
           <h2 className="mt-3 text-3xl font-extrabold text-amber-600">
             {stats?.trialSubscriptions || 0}
@@ -380,30 +407,31 @@ export default function SubscriptionsPage() {
 
         {/* Expired Subscriptions */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-500">
-            Expired Subscriptions
-          </p>
+          <p className="text-sm text-slate-500">Expired Subscriptions</p>
 
           <h2 className="mt-3 text-3xl font-extrabold text-rose-600">
             {stats?.expiredSubscriptions || 0}
           </h2>
 
-          <p className="mt-2 text-xs text-slate-400">
-            Need renewal attention
-          </p>
+          <p className="mt-2 text-xs text-slate-400">Need renewal attention</p>
         </div>
       </div>
       {/* Available Plans Section */}
       <div className="space-y-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Available Plans</h2>
-          <p className="text-sm text-slate-500">Subscription packages for restaurants</p>
+          <p className="text-sm text-slate-500">
+            Subscription packages for restaurants
+          </p>
         </div>
 
         {loading && plans.length === 0 ? (
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div
+                key={i}
+                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+              >
                 <div className="h-28 animate-pulse rounded-lg bg-slate-100" />
               </div>
             ))}
@@ -426,8 +454,12 @@ export default function SubscriptionsPage() {
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="text-lg font-bold text-slate-800">{plan.name}</h3>
-                      <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{plan.code}</p>
+                      <h3 className="text-lg font-bold text-slate-800">
+                        {plan.name}
+                      </h3>
+                      <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">
+                        {plan.code}
+                      </p>
                     </div>
                     <div className="rounded-xl bg-indigo-100 p-2">
                       <Crown className="h-5 w-5 text-indigo-600" />
@@ -435,23 +467,36 @@ export default function SubscriptionsPage() {
                   </div>
                   <div className="mt-5">
                     <div className="flex items-end gap-1">
-                      <span className="text-4xl font-extrabold text-slate-900">₹{plan.basePrice}</span>
-                      <span className="mb-1 text-sm text-slate-500">/month</span>
+                      <span className="text-4xl font-extrabold text-slate-900">
+                        ₹{plan.basePrice}
+                      </span>
+                      <span className="mb-1 text-sm text-slate-500">
+                        /month
+                      </span>
                     </div>
-                    <p className="mt-2 text-sm font-medium text-indigo-600">{plan.trialDays} days free trial</p>
+                    <p className="mt-2 text-sm font-medium text-indigo-600">
+                      {plan.trialDays} days free trial
+                    </p>
                   </div>
                   <div className="mt-6 space-y-3">
                     {enabledFeatures.length > 0 ? (
                       enabledFeatures.map((feature, idx) => (
-                        <div key={idx} className="flex items-center gap-2 text-sm text-slate-600">
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 text-sm text-slate-600"
+                        >
                           <div className="rounded-full bg-emerald-100 p-1">
                             <Check className="h-3 w-3 text-emerald-600" />
                           </div>
-                          <span className="capitalize">{feature.replace(/([A-Z])/g, " $1")}</span>
+                          <span className="capitalize">
+                            {feature.replace(/([A-Z])/g, " $1")}
+                          </span>
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-slate-400">No features listed</p>
+                      <p className="text-sm text-slate-400">
+                        No features listed
+                      </p>
                     )}
                   </div>
                 </div>
@@ -462,11 +507,8 @@ export default function SubscriptionsPage() {
       </div>
       {/* Plan Revenue Analytics */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-
         <div className="border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-800">
-            Revenue By Plan
-          </h2>
+          <h2 className="text-lg font-bold text-slate-800">Revenue By Plan</h2>
 
           <p className="text-sm text-slate-500">
             Earnings breakdown for each subscription plan
@@ -475,28 +517,17 @@ export default function SubscriptionsPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-sm">
-
             <thead className="bg-slate-100 text-slate-700">
               <tr>
-                <th className="px-6 py-4 text-left">
-                  Plan
-                </th>
+                <th className="px-6 py-4 text-left">Plan</th>
 
-                <th className="px-6 py-4 text-left">
-                  Active
-                </th>
+                <th className="px-6 py-4 text-left">Active</th>
 
-                <th className="px-6 py-4 text-left">
-                  Trial
-                </th>
+                <th className="px-6 py-4 text-left">Trial</th>
 
-                <th className="px-6 py-4 text-left">
-                  Expired
-                </th>
+                <th className="px-6 py-4 text-left">Expired</th>
 
-                <th className="px-6 py-4 text-left">
-                  Revenue
-                </th>
+                <th className="px-6 py-4 text-left">Revenue</th>
               </tr>
             </thead>
 
@@ -507,17 +538,11 @@ export default function SubscriptionsPage() {
                     {plan.plan}
                   </td>
 
-                  <td className="px-6 py-4">
-                    {plan.activeSubscriptions}
-                  </td>
+                  <td className="px-6 py-4">{plan.activeSubscriptions}</td>
 
-                  <td className="px-6 py-4">
-                    {plan.trialSubscriptions}
-                  </td>
+                  <td className="px-6 py-4">{plan.trialSubscriptions}</td>
 
-                  <td className="px-6 py-4">
-                    {plan.expiredSubscriptions}
-                  </td>
+                  <td className="px-6 py-4">{plan.expiredSubscriptions}</td>
 
                   <td className="px-6 py-4 font-bold text-emerald-600">
                     ₹{plan.revenue.toLocaleString()}
@@ -533,8 +558,12 @@ export default function SubscriptionsPage() {
         {/* Table Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
           <div>
-            <h2 className="font-bold text-slate-800">Restaurant Subscriptions</h2>
-            <p className="text-xs text-slate-500">Manage restaurant subscription plans</p>
+            <h2 className="font-bold text-slate-800">
+              Restaurant Subscriptions
+            </h2>
+            <p className="text-xs text-slate-500">
+              Manage restaurant subscription plans
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <div className="relative">
@@ -580,10 +609,14 @@ export default function SubscriptionsPage() {
           <table className="w-full min-w-[800px] text-sm">
             <thead className="bg-slate-100 text-slate-700">
               <tr>
-                <th className="px-5 py-4 text-left font-semibold">Restaurant</th>
+                <th className="px-5 py-4 text-left font-semibold">
+                  Restaurant
+                </th>
                 <th className="px-5 py-4 text-left font-semibold">Plan</th>
                 <th className="px-5 py-4 text-left font-semibold">Status</th>
-                <th className="px-5 py-4 text-left font-semibold">Start Date</th>
+                <th className="px-5 py-4 text-left font-semibold">
+                  Start Date
+                </th>
                 <th className="px-5 py-4 text-left font-semibold">End Date</th>
                 <th className="px-5 py-4 text-left font-semibold">Amount</th>
                 <th className="px-5 py-4 text-right font-semibold">Actions</th>
@@ -606,15 +639,21 @@ export default function SubscriptionsPage() {
                 </tr>
               ) : (
                 restaurants.map((restaurant) => (
-                  <tr key={restaurant._id} className="transition hover:bg-slate-50">
+                  <tr
+                    key={restaurant._id}
+                    className="transition hover:bg-slate-50"
+                  >
                     <td className="px-5 py-4">
-                      <div className="font-semibold text-slate-800">{restaurant.name}</div>
+                      <div className="font-semibold text-slate-800">
+                        {restaurant.name}
+                      </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <span
-                          className={`rounded-full px-2 py-1 text-[10px] font-semibold ${restaurant.isActive
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-rose-100 text-rose-700"
-                            }`}
+                          className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                            restaurant.isActive
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-rose-100 text-rose-700"
+                          }`}
                         >
                           {restaurant.isActive ? "Active" : "Inactive"}
                         </span>
@@ -637,14 +676,21 @@ export default function SubscriptionsPage() {
                     <td className="px-5 py-4">
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadge(
-                          restaurant.subscriptionId?.status || restaurant.subscriptionStatus
+                          restaurant.subscriptionId?.status ||
+                            restaurant.subscriptionStatus,
                         )}`}
                       >
-                        {restaurant.subscriptionId?.status || restaurant.subscriptionStatus || "—"}
+                        {restaurant.subscriptionId?.status ||
+                          restaurant.subscriptionStatus ||
+                          "—"}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-slate-600">{formatDate(restaurant.subscriptionId?.startDate)}</td>
-                    <td className="px-5 py-4 text-slate-600">{formatDate(restaurant.subscriptionId?.expiryDate)}</td>
+                    <td className="px-5 py-4 text-slate-600">
+                      {formatDate(restaurant.subscriptionId?.startDate)}
+                    </td>
+                    <td className="px-5 py-4 text-slate-600">
+                      {formatDate(restaurant.subscriptionId?.expiryDate)}
+                    </td>
                     <td className="px-5 py-4 font-medium text-slate-700">
                       {restaurant.subscriptionId?.finalPrice !== undefined
                         ? `₹${restaurant.subscriptionId.finalPrice}`
@@ -680,7 +726,9 @@ export default function SubscriptionsPage() {
                 <ChevronLeft size={16} />
               </button>
               <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                onClick={() =>
+                  setCurrentPage(Math.min(totalPages, currentPage + 1))
+                }
                 disabled={currentPage === totalPages}
                 className="rounded-xl border border-slate-200 p-2 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >

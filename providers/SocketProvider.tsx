@@ -70,7 +70,7 @@ export default function SocketProvider({
       addNotification({
         type: "order_updated",
         title: "Order Updated",
-        message: `Table ${order.orderNumber}`,
+        message: `Table ${order.orderNumber.slice(3)}`,
         createdAt: new Date(),
       });
       toast.success(`Order Updated ${order.orderNumber.slice(3)}`);

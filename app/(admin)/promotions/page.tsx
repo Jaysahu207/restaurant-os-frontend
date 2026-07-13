@@ -16,6 +16,8 @@ import {
   Check,
   Users,
   IndianRupee,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import API from "@/config/axios";
 import toast from "react-hot-toast";
@@ -28,7 +30,7 @@ import {
   updatePromotion,
   sendMarketingEmail,
 } from "@/services/promotionService";
-
+import { useRouter } from "next/navigation";
 // Types
 interface Promotion {
   _id: string;
@@ -69,14 +71,14 @@ export default function PromotionsPage() {
   const [promoToDelete, setPromoToDelete] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
-
+  const [error, setError] = useState<string | null>(null);
   // Customer states
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomers, setSelectedCustomers] = useState<Customer[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
-
+  const router = useRouter();
   // Email states
   const [selectedPromotionId, setSelectedPromotionId] = useState<string>("");
   const [emailSubject, setEmailSubject] = useState("");
@@ -88,6 +90,8 @@ export default function PromotionsPage() {
   const fetchPromotions = useCallback(async () => {
     if (!restaurant?._id) return;
     setLoading(true);
+
+    setError(null);
     try {
       const promos = await getPromotions(restaurant._id);
 
@@ -101,9 +105,21 @@ export default function PromotionsPage() {
         return p;
       });
       setPromotions(promos);
-    } catch (err) {
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const backendMessage =
+        err?.response?.data?.message || "Failed to load inventory";
+
       console.error(err);
-      toast.error("Failed to load promotions");
+      // toast.error("Failed to load promotions");
+      // 🚨 FEATURE LOCKED
+      if (status === 403) {
+        setError(backendMessage);
+        console.log("🚨 FEATURE LOCKED:", backendMessage);
+
+        return;
+      }
+      setError("Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -301,7 +317,37 @@ export default function PromotionsPage() {
       </span>
     );
   };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <span className="ml-2 text-gray-600">Loading Promotions...</span>
+      </div>
+    );
+  }
 
+  if (error) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center">
+        <div className="bg-white border rounded-2xl shadow-sm p-8 max-w-md text-center">
+          <AlertTriangle className="w-14 h-14 text-orange-500 mx-auto mb-4" />
+
+          <h2 className="text-2xl font-bold text-gray-800">
+            Feature Not Available
+          </h2>
+
+          <p className="text-gray-600 mt-3">{error}</p>
+
+          <button
+            onClick={() => router.push("/subscription")}
+            className="mt-6 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl"
+          >
+            Upgrade Plan
+          </button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6">
       {/* Header */}

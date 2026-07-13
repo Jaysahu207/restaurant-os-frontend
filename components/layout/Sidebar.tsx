@@ -139,11 +139,11 @@ export default function Sidebar() {
                 className="w-8 h-8 rounded-lg object-cover"
               />
             ) : (
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold">
+              <div className="w-8 h-8 rounded-lg bg-linear-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold">
                 {restaurant?.name?.charAt(0) || "R"}
               </div>
             )}
-            <span className="font-semibold text-gray-800 truncate max-w-[150px]">
+            <span className="font-semibold text-gray-800 truncate max-w-37.5">
               {restaurant?.name || "Restaurant"}
             </span>
           </div>
@@ -182,7 +182,7 @@ export default function Sidebar() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold text-xl">
+                  <div className="w-full h-full bg-linear-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold text-xl">
                     {restaurant?.name?.charAt(0) || "R"}
                   </div>
                 )}
@@ -199,7 +199,7 @@ export default function Sidebar() {
           ) : (
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 rounded-2xl overflow-hidden shadow border flex-shrink-0">
+                <div className="w-12 h-12 rounded-2xl overflow-hidden shadow border shrink-0">
                   {restaurant?.logo ? (
                     <img
                       src={restaurant.logo}
@@ -207,7 +207,7 @@ export default function Sidebar() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold text-lg">
+                    <div className="w-full h-full bg-linear-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold text-lg">
                       {restaurant?.name?.charAt(0) || "R"}
                     </div>
                   )}
@@ -261,13 +261,13 @@ export default function Sidebar() {
                         group relative
                         ${
                           active
-                            ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
+                            ? "bg-linear-to-r from-orange-500 to-amber-500 text-white shadow-md"
                             : "text-gray-600 hover:bg-gray-100"
                         }
                         ${sidebarCollapsed ? "justify-center" : ""}
                       `}
                     >
-                      <Icon size={20} className="flex-shrink-0" />
+                      <Icon size={20} className="shrink-0" />
                       {!sidebarCollapsed && (
                         <>
                           <span className="font-medium text-sm flex-1">
@@ -280,7 +280,7 @@ export default function Sidebar() {
             bg-red-500
             text-white
             text-xs
-            min-w-[20px]
+            min-w-5
             h-5
             px-1
             rounded-full
@@ -312,7 +312,7 @@ export default function Sidebar() {
         <div className="border-t border-gray-100 p-4">
           {!sidebarCollapsed && user && (
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white font-semibold shadow">
+              <div className="w-10 h-10 rounded-full bg-linear-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white font-semibold shadow">
                 {user?.name?.charAt(0) || "U"}
               </div>
               <div className="flex-1 min-w-0">
@@ -331,7 +331,7 @@ export default function Sidebar() {
             className={`
               w-full py-2.5 rounded-xl font-medium transition-all duration-200
               flex items-center justify-center gap-2
-              bg-gradient-to-r from-red-500 to-red-600 text-white hover:shadow-lg active:scale-95
+              bg-linear-to-r from-red-500 to-red-600 text-white hover:shadow-lg active:scale-95
               ${sidebarCollapsed ? "px-2" : "px-4"}
             `}
           >

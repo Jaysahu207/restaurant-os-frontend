@@ -86,6 +86,7 @@ export const getAllPlans = async () => {
 
     return response.data;
 };
+
 export const getPlanByCode = async (
     code: string
 ) => {

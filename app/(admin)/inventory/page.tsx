@@ -138,7 +138,7 @@ export default function InventoryPage() {
       // 🚨 FEATURE LOCKED
       if (status === 403) {
         setError(backendMessage);
-
+        console.log("🚨 FEATURE LOCKED:", backendMessage);
         showToast(backendMessage, "error");
 
         return;
@@ -525,7 +525,7 @@ export default function InventoryPage() {
           </button>
           <button
             onClick={openAddModal}
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg hover:shadow-md"
+            className="inline-flex items-center gap-2 bg-linear-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg hover:shadow-md"
           >
             <Plus className="w-5 h-5" /> Add Item
           </button>

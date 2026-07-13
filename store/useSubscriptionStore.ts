@@ -28,6 +28,9 @@ export interface Plan {
         crm: boolean;
         analytics: boolean;
         marketing: boolean;
+        promotions: boolean;
+        reports: boolean;
+        digitalMenu: boolean;
     };
 }
 
@@ -53,6 +56,9 @@ export interface RestaurantSubscription {
         crm: boolean;
         analytics: boolean;
         marketing: boolean;
+        promotions: boolean;
+        reports: boolean;
+        digitalMenu: boolean;
     };
 }
 interface PlanAnalytics {
