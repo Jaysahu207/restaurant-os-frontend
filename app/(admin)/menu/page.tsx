@@ -362,7 +362,7 @@ export default function MenuPage() {
         <h2 className="text-2xl font-bold text-gray-800">Menu Management</h2>
         <button
           onClick={openAddModal}
-          className="inline-flex items-center gap-2 bg-gradient-to-br from-orange-400 to-amber-500 text-white px-4 py-2 rounded-lg hover:shadow-md transition"
+          className="inline-flex items-center gap-2 bg-linear-to-br from-orange-400 to-amber-500 text-white px-4 py-2 rounded-lg hover:shadow-md transition"
         >
           <Plus className="w-5 h-5" />
           Add Item
@@ -1083,7 +1083,7 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
     ${
       isSaving
         ? "bg-orange-300 cursor-not-allowed opacity-70"
-        : "bg-gradient-to-br from-orange-400 to-amber-500 hover:opacity-90"
+        : "bg-linear-to-br from-orange-400 to-amber-500 hover:opacity-90"
     }`}
             >
               {isSaving ? (

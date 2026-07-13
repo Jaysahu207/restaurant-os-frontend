@@ -261,7 +261,7 @@ function BannerModal({
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 px-5 py-2 text-sm font-medium text-white shadow-md transition hover:from-orange-700 hover:to-amber-700 disabled:opacity-50"
+              className="rounded-xl bg-linear-to-r from-orange-600 to-amber-600 px-5 py-2 text-sm font-medium text-white shadow-md transition hover:from-orange-700 hover:to-amber-700 disabled:opacity-50"
             >
               {loading ? "Saving..." : banner ? "Update" : "Create"}
             </button>
@@ -345,7 +345,7 @@ export default function BannerManagement() {
             setSelectedBanner(null);
             setShowModal(true);
           }}
-          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:from-orange-700 hover:to-amber-700"
+          className="inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-orange-600 to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:from-orange-700 hover:to-amber-700"
         >
           <Plus size={18} />
           Create Banner
@@ -396,7 +396,7 @@ export default function BannerManagement() {
       {/* Banners Table */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] text-sm">
+          <table className="w-full min-w-175 text-sm">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-5 py-4 text-left font-semibold text-gray-600">
@@ -451,7 +451,7 @@ export default function BannerManagement() {
                           <p className="font-medium text-gray-800">
                             {banner.title}
                           </p>
-                          <p className="text-xs text-gray-500 truncate max-w-[180px]">
+                          <p className="text-xs text-gray-500 truncate max-w-45">
                             {banner.subtitle}
                           </p>
                         </div>

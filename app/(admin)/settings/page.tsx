@@ -938,7 +938,7 @@ export default function SettingsPage() {
                         className="w-24 h-24 rounded-2xl object-cover border-2 border-orange-100 shadow-md"
                       />
                     ) : (
-                      <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
+                      <div className="w-24 h-24 rounded-2xl bg-linear-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
                         <Store className="w-10 h-10 text-white" />
                       </div>
                     )}

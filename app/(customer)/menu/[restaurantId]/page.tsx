@@ -54,6 +54,18 @@ import CustomerInvoice from "@/components/invoice/CustomerInvoice";
 import "aos/dist/aos.css";
 import AOS from "aos";
 
+import { Pacifico, Lobster } from "next/font/google";
+
+const pacifico = Pacifico({
+  subsets: ["latin"],
+  weight: "400",
+});
+
+const lobster = Lobster({
+  subsets: ["latin"],
+  weight: "400",
+});
+
 // ------------------------------------------------------------
 // Types
 // ------------------------------------------------------------
@@ -1497,8 +1509,10 @@ function CustomerMenuContent() {
                   />
                 ) : (
                   <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
-                    <span className="text-white font-bold text-xl">
-                      {restaurant?.name?.charAt(0)?.toUpperCase() || "R"}
+                    <span
+                      className={`${lobster.className} text-white text-2xl`}
+                    >
+                      {restaurant?.name}
                     </span>
                   </div>
                 )}
@@ -1510,7 +1524,9 @@ function CustomerMenuContent() {
             </div>
 
             <div className="min-w-0">
-              <h1 className="font-bold text-lg text-gray-900 truncate">
+              <h1
+                className={`${lobster.className} text-2xl md:text-3xl text-gray-900 truncate max-w-55`}
+              >
                 {restaurant?.name || "Restaurant"}
               </h1>
 
@@ -1581,7 +1597,7 @@ function CustomerMenuContent() {
       {/* Categories */}
       <div
         className={`sticky z-20 bg-white/90 backdrop-blur-xl border-b border-orange-100 shadow-sm ${
-          showWelcome ? "top-[132px]" : "top-[72px]"
+          showWelcome ? "top-33" : "top-18"
         }`}
       >
         <div className="relative max-w-2xl mx-auto">
@@ -2091,7 +2107,7 @@ function CustomerMenuContent() {
                 </>
               ) : (
                 <div className="mt-6 border-t border-orange-100 pt-5">
-                  <div className="relative overflow-hidden rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50 p-5 shadow-sm">
+                  <div className="relative overflow-hidden rounded-2xl border border-orange-200 bg-linear-to-br from-orange-50 via-white to-amber-50 p-5 shadow-sm">
                     {/* Decorative Circle */}
                     <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-orange-100/50 blur-2xl" />
 
