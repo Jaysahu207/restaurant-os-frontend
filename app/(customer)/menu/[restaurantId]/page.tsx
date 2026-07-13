@@ -270,6 +270,7 @@ function CustomerMenuContent() {
   const [showReviewPopup, setShowReviewPopup] = useState(false);
   // const subscription = restaurant.subscription;
 
+  const [shuffledMenu, setShuffledMenu] = useState<MenuItem[]>([]);
   // const orderingEnabled = subscription.features.qrOrdering;
   useEffect(() => {
     if (table) {
@@ -890,10 +891,28 @@ function CustomerMenuContent() {
   // ------------------------------------------------------------
   // Render Helpers
   // ------------------------------------------------------------
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    return shuffled;
+  };
+  useEffect(() => {
+    setShuffledMenu(shuffleArray(menu));
+  }, [menu]);
+
   const filteredItems = useMemo(() => {
-    if (selectedCategory === "All") return menu;
+    if (selectedCategory === "All") {
+      return shuffledMenu;
+    }
+
     return menu.filter((item) => item.category === selectedCategory);
-  }, [menu, selectedCategory]);
+  }, [menu, shuffledMenu, selectedCategory]);
   useEffect(() => {
     AOS.refresh();
   }, [filteredItems]);
@@ -903,12 +922,12 @@ function CustomerMenuContent() {
   const features = subscription?.features;
   const orderingEnabled = features?.qrOrdering ?? false;
   const digitalMenuEnabled = features?.digitalMenu ?? true;
-  console.log(
-    "Ordering Enabled:",
-    orderingEnabled,
-    "Digital Menu Enabled:",
-    digitalMenuEnabled,
-  );
+  // console.log(
+  //   "Ordering Enabled:",
+  //   orderingEnabled,
+  //   "Digital Menu Enabled:",
+  //   digitalMenuEnabled,
+  // );
 
   if (loading) {
     return (
@@ -1458,6 +1477,7 @@ function CustomerMenuContent() {
       </div>
     );
   }
+
   const hasBanners = banners?.length > 0;
   // --- Menu & Cart View ---
   return (
@@ -1649,7 +1669,7 @@ function CustomerMenuContent() {
 
                     {item.isPopular && (
                       <span className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full shadow">
-                        🔥 Popular
+                        Popular
                       </span>
                     )}
 
