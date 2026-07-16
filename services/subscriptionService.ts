@@ -29,13 +29,13 @@ export const getMySubscription = async () => {
 // ==================================================
 export const createOrder = async (data: {
     planCode: string;
-    billingCycle?: "monthly" | "yearly";
+    billingCycle: string;
 }) => {
     const res = await API.post(
         "/api/subscriptions/create-order",
         data,
     );
-    
+
 
     return res.data;
 };

@@ -17,31 +17,11 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-import { useSubscriptionStore } from "@/store/useSubscriptionStore";
+import { useSubscriptionStore, Plan } from "@/store/useSubscriptionStore";
 
 // ----------------------------------------------------------------------
 // Types
 // ----------------------------------------------------------------------
-
-interface Plan {
-  code: string;
-  name: string;
-  basePrice: number;
-  finalPrice?: number;
-  gstPercentage?: number;
-  trialDays: number;
-  features: {
-    qrOrdering: boolean;
-    billing: boolean;
-    inventory: boolean;
-    crm: boolean;
-    analytics: boolean;
-    marketing: boolean;
-    promotions: boolean;
-    reports: boolean;
-    digitalMenu: boolean;
-  };
-}
 
 interface RestaurantSubscription {
   _id?: string;
@@ -92,10 +72,17 @@ function AssignPlanModal({
   restaurant: Restaurant | null;
   plans: Plan[];
   onClose: () => void;
-  onAssign: (restaurantId: string, planCode: string) => Promise<void>;
+  onAssign: (
+    restaurantId: string,
+    planCode: string,
+    billingCycle: "monthly" | "yearly",
+  ) => Promise<void>;
 }) {
   const [selectedPlan, setSelectedPlan] = useState<string>(
     restaurant?.subscriptionId?.plan || "",
+  );
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">(
+    "monthly",
   );
   const [loading, setLoading] = useState(false);
 
@@ -107,7 +94,7 @@ function AssignPlanModal({
     if (!selectedPlan) return;
     try {
       setLoading(true);
-      await onAssign(restaurant._id, selectedPlan);
+      await onAssign(restaurant._id, selectedPlan, billingCycle);
       onClose();
     } catch (error) {
       console.error(error);
@@ -149,11 +136,30 @@ function AssignPlanModal({
               <option value="">Choose Subscription Plan</option>
               {plans.map((plan) => (
                 <option key={plan.code} value={plan.code}>
-                  {plan.name} — ₹{plan.basePrice}/month
+                  {plan.name}
                 </option>
               ))}
             </select>
           </div>
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            Billing Cycle
+          </label>
+
+          <select
+            value={billingCycle}
+            onChange={(e) =>
+              setBillingCycle(e.target.value as "monthly" | "yearly")
+            }
+            className="w-full rounded-xl border border-slate-200 px-4 py-3"
+          >
+            {Object.entries(selectedPlanData?.pricing ?? {}).map(
+              ([key, pricing]: any) => (
+                <option key={key} value={key}>
+                  {pricing.label} — ₹{pricing.amount}
+                </option>
+              ),
+            )}
+          </select>
 
           {/* Plan Details Preview */}
           {selectedPlanData && (
@@ -163,9 +169,6 @@ function AssignPlanModal({
                   <h4 className="text-lg font-bold text-slate-800">
                     {selectedPlanData.name}
                   </h4>
-                  <p className="mt-1 text-sm text-indigo-600">
-                    ₹{selectedPlanData.basePrice}/month
-                  </p>
                 </div>
                 <div className="rounded-xl bg-indigo-100 p-2">
                   <Crown className="h-5 w-5 text-indigo-600" />
@@ -267,8 +270,12 @@ export default function SubscriptionsPage() {
   }, [currentPage, search, planFilter, statusFilter, fetchRestaurants]);
 
   // Handlers
-  const handleAssignPlan = async (restaurantId: string, planCode: string) => {
-    await assignPlan(restaurantId, planCode);
+  const handleAssignPlan = async (
+    restaurantId: string,
+    planCode: string,
+    billingCycle: string,
+  ) => {
+    await assignPlan(restaurantId, planCode, billingCycle);
   };
 
   const openAssignModal = (restaurant: any) => {
@@ -465,16 +472,24 @@ export default function SubscriptionsPage() {
                       <Crown className="h-5 w-5 text-indigo-600" />
                     </div>
                   </div>
-                  <div className="mt-5">
+                  <div className="space-y-3">
                     <div className="flex items-end gap-1">
                       <span className="text-4xl font-extrabold text-slate-900">
-                        ₹{plan.basePrice}
+                        ₹{plan.pricing.monthly.amount}
                       </span>
                       <span className="mb-1 text-sm text-slate-500">
                         /month
                       </span>
                     </div>
-                    <p className="mt-2 text-sm font-medium text-indigo-600">
+
+                    <div className="flex items-end gap-1">
+                      <span className="text-xl font-bold text-indigo-600">
+                        ₹{plan.pricing.yearly.amount}
+                      </span>
+                      <span className="mb-1 text-sm text-slate-500">/year</span>
+                    </div>
+
+                    <p className="text-sm font-medium text-indigo-600">
                       {plan.trialDays} days free trial
                     </p>
                   </div>
@@ -516,7 +531,7 @@ export default function SubscriptionsPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] text-sm">
+          <table className="w-full min-w-175 text-sm">
             <thead className="bg-slate-100 text-slate-700">
               <tr>
                 <th className="px-6 py-4 text-left">Plan</th>
@@ -606,7 +621,7 @@ export default function SubscriptionsPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px] text-sm">
+          <table className="w-full min-w-200 text-sm">
             <thead className="bg-slate-100 text-slate-700">
               <tr>
                 <th className="px-5 py-4 text-left font-semibold">

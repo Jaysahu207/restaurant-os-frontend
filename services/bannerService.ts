@@ -2,13 +2,24 @@ import API from "@/config/axios";
 import axios from "@/config/axios";
 
 export interface BannerPayload {
+    restaurantId: string;
+
     title: string;
     subtitle?: string;
     description?: string;
 
-    type: string;
+    image?: File | null;
 
-    actionType?: string;
+    type:
+    | "offer"
+    | "combo"
+    | "festival"
+    | "announcement"
+    | "special"
+    | "new_item";
+
+    actionType?: "none" | "category" | "product" | "offer";
+
     actionTarget?: string;
 
     buttonText?: string;
@@ -16,13 +27,11 @@ export interface BannerPayload {
     priority?: number;
 
     startDate?: string;
+
     endDate?: string;
 
-    image?: File | null;
-
-    restaurantId: string;
+    isActive?: boolean;
 }
-
 // =========================
 // GET ALL BANNERS
 // =========================
@@ -44,24 +53,47 @@ export const getBanner = async (bannerId: string) => {
 // =========================
 // CREATE BANNER
 // =========================
-export const createBanner = async (data: any) => {
+// =========================
+// CREATE BANNER
+// =========================
+export const createBanner = async (data: BannerPayload & { isActive?: boolean }) => {
     const formData = new FormData();
 
     formData.append("restaurantId", data.restaurantId);
-
     formData.append("title", data.title);
-
     formData.append("subtitle", data.subtitle || "");
+    formData.append("description", data.description || "");
 
     formData.append("type", data.type);
 
-    formData.append("isActive", String(data.isActive));
+    formData.append("actionType", data.actionType || "none");
+    if (
+        data.actionType !== "none" &&
+        data.actionTarget?.trim()
+    ) {
+        formData.append("actionTarget", data.actionTarget);
+    }
+
+    formData.append("buttonText", data.buttonText || "");
+
+    formData.append("priority", String(data.priority ?? 0));
+
+    formData.append("startDate", data.startDate || "");
+    formData.append("endDate", data.endDate || "");
+
+    formData.append("isActive", String(data.isActive ?? true));
 
     if (data.image) {
         formData.append("image", data.image);
     }
 
-    return API.post("/api/banners", formData);
+    const response = await API.post("/api/banners", formData, {
+        headers: {
+            "Content-Type": "multipart/form-data",
+        },
+    });
+
+    return response.data;
 };
 
 // =========================

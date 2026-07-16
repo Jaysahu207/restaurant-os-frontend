@@ -107,7 +107,7 @@ export default function SubscriptionPage() {
     message: string;
     type: "success" | "error";
   } | null>(null);
-
+  const [billingCycle, setBillingCycle] = useState("monthly");
   useEffect(() => {
     fetchData();
     loadRazorpayScript();
@@ -144,10 +144,10 @@ export default function SubscriptionPage() {
     document.body.appendChild(script);
   };
 
-  const handleBuyPlan = async (planCode: string) => {
+  const handleBuyPlan = async (planCode: string, billingCycle: string) => {
     try {
       setPaymentLoading(true);
-      const res = await createOrder({ planCode });
+      const res = await createOrder({ planCode, billingCycle });
       const { order, plan } = res;
 
       const options = {
@@ -265,12 +265,13 @@ export default function SubscriptionPage() {
                   <div>
                     <span className="text-slate-500">Status:</span>
                     <span
-                      className={`ml-2 inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${subscription.status === "active"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : subscription.status === "trial"
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-rose-100 text-rose-800"
-                        }`}
+                      className={`ml-2 inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        subscription.status === "active"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : subscription.status === "trial"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-rose-100 text-rose-800"
+                      }`}
                     >
                       {subscription.status === "trial" && "Trial"}
                       {subscription.status === "active" && "Active"}
@@ -299,7 +300,7 @@ export default function SubscriptionPage() {
                 </div>
                 {subscription.status === "trial" && (
                   <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg text-amber-800 text-sm">
-                    <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <Info className="h-4 w-4 mt-0.5 shrink-0" />
                     <p>
                       Your free trial ends on{" "}
                       <strong>
@@ -311,7 +312,7 @@ export default function SubscriptionPage() {
                 )}
                 {subscription.status === "cancelled" && (
                   <div className="flex items-start gap-2 p-3 bg-rose-50 rounded-lg text-rose-800 text-sm">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                     <p>
                       Your subscription has been cancelled. You will lose access
                       to premium features on{" "}
@@ -347,7 +348,7 @@ export default function SubscriptionPage() {
 
       {/* Free Trial Banner (only if no subscription or trial ended) */}
       {(!subscription || subscription.status === "expired") && (
-        <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-linear-to-r from-indigo-600 to-indigo-800 rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-6 md:px-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="space-y-1">
@@ -420,21 +421,48 @@ export default function SubscriptionPage() {
             Flexible plans to match your restaurant's needs
           </p>
         </div>
+        <div className="flex justify-center mb-8">
+          <div className="inline-flex rounded-xl bg-slate-100 p-1">
+            <button
+              onClick={() => setBillingCycle("monthly")}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition ${
+                billingCycle === "monthly"
+                  ? "bg-white shadow text-slate-900"
+                  : "text-slate-500"
+              }`}
+            >
+              Monthly
+            </button>
+
+            <button
+              onClick={() => setBillingCycle("yearly")}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition ${
+                billingCycle === "yearly"
+                  ? "bg-white shadow text-slate-900"
+                  : "text-slate-500"
+              }`}
+            >
+              Yearly
+            </button>
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {plans.map((plan: any) => {
-            const isPro = plan.code === "pro";
+            const pricing = plan.pricing[billingCycle];
+            const isPopular = plan.isPopular;
             const isCurrentPlan =
               subscription && subscription.plan === plan.code;
 
             return (
               <div
                 key={plan.code}
-                className={`relative bg-white rounded-xl border shadow-sm transition-all hover:shadow-md ${isPro
-                  ? "border-indigo-300 ring-2 ring-indigo-100"
-                  : "border-slate-200"
-                  } ${isCurrentPlan ? "ring-2 ring-emerald-500" : ""}`}
+                className={`relative bg-white rounded-xl border shadow-sm transition-all hover:shadow-md ${
+                  isPopular
+                    ? "border-indigo-300 ring-2 ring-indigo-100"
+                    : "border-slate-200"
+                } ${isCurrentPlan ? "ring-2 ring-emerald-500" : ""}`}
               >
-                {isPro && (
+                {isPopular && (
                   <div className="absolute -top-3 left-6 bg-indigo-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-sm">
                     Most Popular
                   </div>
@@ -452,14 +480,14 @@ export default function SubscriptionPage() {
                       </h3>
                       <p className="text-slate-500 text-xs mt-1">
                         {plan.description ||
-                          (isPro
+                          (isPopular
                             ? "Unlock all premium features"
                             : "Essential features for starters")}
                       </p>
                     </div>
                     <div className="bg-indigo-50 p-2 rounded-lg">
                       <Crown
-                        className={`h-5 w-5 ${isPro ? "text-indigo-600" : "text-indigo-400"}`}
+                        className={`h-5 w-5 ${isPopular ? "text-indigo-600" : "text-indigo-400"}`}
                       />
                     </div>
                   </div>
@@ -467,9 +495,11 @@ export default function SubscriptionPage() {
                   <div className="mb-4">
                     <div className="flex items-baseline gap-1">
                       <span className="text-3xl font-bold text-slate-900">
-                        ₹{plan.basePrice}
+                        ₹{pricing.amount}
                       </span>
-                      <span className="text-slate-500 text-sm">/month</span>
+                      <span className="text-slate-500 text-sm">
+                        /{pricing.label.toLowerCase()}
+                      </span>
                     </div>
                     {/* <div className="text-xs text-slate-500 mt-1">
                       + {plan.gstPercentage}% GST
@@ -500,14 +530,15 @@ export default function SubscriptionPage() {
                   </div>
 
                   <button
-                    onClick={() => handleBuyPlan(plan.code)}
+                    onClick={() => handleBuyPlan(plan.code, billingCycle)}
                     disabled={paymentLoading || isCurrentPlan}
-                    className={`w-full py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2 ${isCurrentPlan
-                      ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                      : isPro
-                        ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                        : "bg-slate-800 hover:bg-slate-900 text-white"
-                      }`}
+                    className={`w-full py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+                      isCurrentPlan
+                        ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                        : paymentLoading
+                          ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                          : "bg-slate-800 hover:bg-slate-900 text-white"
+                    }`}
                   >
                     {paymentLoading ? (
                       <>

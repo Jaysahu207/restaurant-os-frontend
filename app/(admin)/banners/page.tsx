@@ -29,14 +29,40 @@ import {
 // ----------------------------------------------------------------------
 interface Banner {
   _id: string;
+
   title: string;
   subtitle?: string;
+  description?: string;
+
   image: string;
-  type: string;
+
+  type:
+    | "offer"
+    | "combo"
+    | "festival"
+    | "announcement"
+    | "special"
+    | "new_item";
+
   isActive: boolean;
+
   views: number;
   clicks: number;
+
   createdAt: string;
+  updatedAt: string;
+
+  actionType: "none" | "category" | "product" | "offer";
+
+  actionTarget?: string;
+
+  buttonText?: string;
+
+  priority?: number;
+
+  startDate?: string;
+
+  endDate?: string;
 }
 
 // ----------------------------------------------------------------------
@@ -56,7 +82,22 @@ function BannerModal({
   const [formData, setFormData] = useState({
     title: banner?.title || "",
     subtitle: banner?.subtitle || "",
+    description: banner?.description || "",
+
     type: banner?.type || "offer",
+
+    actionType: banner?.actionType || "none",
+
+    actionTarget: banner?.actionTarget || "",
+
+    buttonText: banner?.buttonText || "",
+
+    priority: banner?.priority ?? 0,
+
+    startDate: banner?.startDate ? banner.startDate.slice(0, 10) : "",
+
+    endDate: banner?.endDate ? banner.endDate.slice(0, 10) : "",
+
     isActive: banner?.isActive ?? true,
   });
 
@@ -135,7 +176,7 @@ function BannerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
           <h3 className="text-xl font-bold text-gray-800">
@@ -179,6 +220,20 @@ function BannerModal({
               onChange={handleChange}
               placeholder="Get 20% off on all orders"
               className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">
+              Description
+            </label>
+
+            <textarea
+              rows={3}
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Describe your offer..."
+              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 resize-none"
             />
           </div>
 
@@ -225,27 +280,69 @@ function BannerModal({
               name="type"
               value={formData.type}
               onChange={handleChange}
-              className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              className="w-full rounded-xl border border-gray-300 px-4 py-2.5"
             >
               <option value="offer">Offer</option>
+              <option value="combo">Combo</option>
+              <option value="festival">Festival</option>
               <option value="announcement">Announcement</option>
-              <option value="event">Event</option>
-              <option value="other">Other</option>
+              <option value="special">Special</option>
+              <option value="new_item">New Item</option>
             </select>
           </div>
+          <div className="border-t pt-5">
+            <h4 className="font-semibold text-gray-800 mb-4">Schedule</h4>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block mb-1 text-sm font-semibold">
+                  Start Date
+                </label>
+
+                <input
+                  type="date"
+                  name="startDate"
+                  value={formData.startDate}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 text-sm font-semibold">
+                  End Date
+                </label>
+
+                <input
+                  type="date"
+                  name="endDate"
+                  value={formData.endDate}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5"
+                />
+              </div>
+            </div>
+          </div>
           {/* Active Toggle */}
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              name="isActive"
-              id="isActive"
-              checked={formData.isActive}
-              onChange={handleChange}
-              className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-            />
-            <label htmlFor="isActive" className="text-sm text-gray-700">
-              Active (visible to customers)
+          <div className="flex items-center justify-between rounded-xl border p-4">
+            <div>
+              <h4 className="font-medium">Active Banner</h4>
+
+              <p className="text-sm text-gray-500">Visible to customers</p>
+            </div>
+
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                name="isActive"
+                checked={formData.isActive}
+                onChange={handleChange}
+                className="peer sr-only"
+              />
+
+              <div className="h-6 w-11 rounded-full bg-gray-300 peer-checked:bg-orange-500 transition"></div>
+
+              <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-5"></div>
             </label>
           </div>
 

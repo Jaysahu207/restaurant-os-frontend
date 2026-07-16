@@ -1918,7 +1918,7 @@ function CustomerMenuContent() {
                     />
                     <input
                       type="tel"
-                      placeholder="Phone Number *"
+                      placeholder="Phone Number "
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       disabled={customerLocked}

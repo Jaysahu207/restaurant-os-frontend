@@ -11,29 +11,41 @@ import { getAllPlans, getAllRestaurants } from "@/services/superAdminService";
 // TYPES
 // ======================================================
 
+export interface PricingOption {
+    amount: number;
+    durationInMonths: number;
+    label: string;
+}
+
+export interface PlanFeatures {
+    digitalMenu: boolean;
+    qrOrdering: boolean;
+    billing: boolean;
+    inventory: boolean;
+    crm: boolean;
+    analytics: boolean;
+    marketing: boolean;
+    promotions: boolean;
+    reports: boolean;
+}
+
 export interface Plan {
     code: string;
     name: string;
+    description: string;
 
-    basePrice: number;
-    finalPrice: number;
-    gstPercentage: number;
+    isPopular: boolean;
+    isActive: boolean;
 
     trialDays: number;
 
-    features: {
-        qrOrdering: boolean;
-        billing: boolean;
-        inventory: boolean;
-        crm: boolean;
-        analytics: boolean;
-        marketing: boolean;
-        promotions: boolean;
-        reports: boolean;
-        digitalMenu: boolean;
+    pricing: {
+        monthly: PricingOption;
+        yearly: PricingOption;
     };
-}
 
+    features: PlanFeatures;
+}
 export interface RestaurantSubscription {
     _id?: string;
 
@@ -173,7 +185,7 @@ interface SubscriptionStore {
 
     fetchRestaurants: () => Promise<void>;
 
-    assignPlan: (restaurantId: string, planCode: string) => Promise<void>;
+    assignPlan: (restaurantId: string, planCode: string, billingCycle: string) => Promise<void>;
 
     refreshSubscriptions: () => Promise<void>;
 
@@ -364,7 +376,7 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
     // ASSIGN PLAN
     // ======================================================
 
-    assignPlan: async (restaurantId, planCode) => {
+    assignPlan: async (restaurantId, planCode, billingCycle = "monthly") => {
         try {
             set({
                 loading: true,
@@ -374,6 +386,7 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
                 `/api/super-admin/restaurants/${restaurantId}/subscription`,
                 {
                     planCode,
+                    billingCycle,
                 },
             );
 
