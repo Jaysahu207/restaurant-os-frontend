@@ -41,7 +41,13 @@ interface Order {
   paymentStatus?: string;
 
   paymentMethod?: string;
-
+  deliveryDetails?: {
+    address: string;
+    landmark?: string;
+    city?: string;
+    pincode?: string;
+    charge: number;
+  };
   specialInstructions?: string;
 
   customer?: Customer;
@@ -77,9 +83,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
       (acc, item) => acc + item.quantity,
       0,
     );
-    console.log("Restaurant:", restaurant);
-    console.log("Order:", order);
-    console.log("Customer:", order.customer);
+
     return (
       <div
         ref={ref}
@@ -87,98 +91,107 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
         className="bg-white text-black w-full p-2 text-xs"
       >
         {/* ================= RESTAURANT HEADER ================= */}
-        <div className="text-center border-b-2 border-dashed pb-4">
-          {/* LOGO */}
+        <div className="border-b border-dashed pb-2 text-center">
+          {/* Logo */}
           {restaurant?.logo && (
-            <div className="flex justify-center mb-3">
-              <img
-                src={restaurant.logo}
-                alt={restaurantName}
-                className="h-10 w-10 object-cover rounded-full border"
-              />
-            </div>
+            <img
+              src={restaurant.logo}
+              alt={restaurantName}
+              className="mx-auto mb-1 h-8 w-8 rounded-full border object-cover"
+            />
           )}
 
-          {/* NAME */}
-          <h1 className="text-lg font-bold uppercase">{restaurantName}</h1>
+          {/* Restaurant Name */}
+          <h1 className="text-base font-bold uppercase leading-none">
+            {restaurantName}
+          </h1>
 
-          {/* ADDRESS */}
-          <div className="mt-2 text-xs text-gray-700 leading-5">
-            <p>
-              {restaurant?.address?.street}, {restaurant?.address?.city},{" "}
-              {restaurant?.address?.state} - {restaurant?.address?.pincode}
+          {/* Address */}
+          <p className="mt-1 text-[11px] leading-4 text-gray-700">
+            {restaurant?.address?.street}, {restaurant?.address?.city},{" "}
+            {restaurant?.address?.state} - {restaurant?.address?.pincode}
+          </p>
+
+          {/* Contact */}
+          <p className="text-[11px] leading-4 text-gray-700">
+            {restaurant?.contactPhone || "-"} |{" "}
+            {restaurant?.contactEmail || "-"}
+          </p>
+
+          {/* GST & FSSAI */}
+          <p className="text-[11px] leading-4 text-gray-700">
+            GST: {restaurant?.legal?.gstNumber || "N/A"} &nbsp;|&nbsp; FSSAI:{" "}
+            {restaurant?.legal?.fssaiNumber || "N/A"}
+          </p>
+
+          {/* Invoice Title */}
+          <div className="mt-2 border-t border-dashed pt-1">
+            <h2 className="text-sm font-bold tracking-wide">TAX INVOICE</h2>
+            <p className="text-[10px] text-gray-500">
+              Original Copy for Recipient
             </p>
-
-            <p>Phone: {restaurant?.contactPhone || "-"}</p>
-
-            <p>Email: {restaurant?.contactEmail || "-"}</p>
-          </div>
-
-          {/* LEGAL INFO */}
-          <div className="mt-3 text-xs space-y-1">
-            <p>
-              <span className="font-semibold">GSTIN:</span>{" "}
-              {restaurant?.legal?.gstNumber || "N/A"}
-            </p>
-
-            <p>
-              <span className="font-semibold">FSSAI:</span>{" "}
-              {restaurant?.legal?.fssaiNumber || "N/A"}
-            </p>
-          </div>
-
-          {/* TITLE */}
-          <div className="mt-4">
-            <h2 className="font-bold text-lg tracking-wide">TAX INVOICE</h2>
-
-            <p className="text-xs text-gray-500">Original Copy for Recipient</p>
           </div>
         </div>
 
         {/* ================= ORDER INFORMATION ================= */}
-        <div className="flex justify-between gap-6 py-4 border-b border-dashed">
-          <div className="space-y-1">
-            <p>
-              <span className="font-semibold">Invoice No:</span>{" "}
-              {order.invoiceNumber}
-            </p>
-
-            <p>
-              <span className="font-semibold">Order No:</span>{" "}
-              {order.orderNumber}
-            </p>
-
-            {order.orderType === "dine_in" && order.table && (
+        <div className="border-b border-dashed py-2 text-sm">
+          <div className="grid grid-cols-2 gap-x-6 ">
+            {/* Left */}
+            <div className="space-y-1">
               <p>
-                <span className="font-semibold">Table:</span> {order.table}
+                <span className="font-semibold">Invoice:</span>{" "}
+                {order.invoiceNumber}
               </p>
-            )}
+
+              <p>
+                <span className="font-semibold">Order:</span> #
+                {order.orderNumber.slice(-3)}
+              </p>
+
+              {order.orderType === "dine_in" && order.table && (
+                <p>
+                  <span className="font-semibold">Table:</span> {order.table}
+                </p>
+              )}
+            </div>
+
+            {/* Right */}
+            <div className="space-y-1 text-right">
+              <p>
+                <span className="font-semibold">Date:</span>{" "}
+                {new Date(order.createdAt).toLocaleDateString()}
+              </p>
+
+              <p>
+                <span className="font-semibold">Time:</span>{" "}
+                {new Date(order.createdAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+
+              <p className="capitalize">
+                <span className="font-semibold">Type:</span>{" "}
+                {order.orderType?.replace("_", " ")}
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-1 text-right">
-            <p>
-              <span className="font-semibold">Date:</span>{" "}
-              {new Date(order.createdAt).toLocaleDateString()}
-            </p>
-
-            <p>
-              <span className="font-semibold">Time:</span>{" "}
-              {new Date(order.createdAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </p>
-            <p>
-              <span className="font-semibold">Order Type:</span>{" "}
-              {order.orderType?.toUpperCase() || "Dine-in"}
-            </p>
-            <p>
-              <span className="font-semibold">Status:</span>{" "}
-              {order.status || "Completed"}
-            </p>
-          </div>
+          {/* Delivery Address */}
+          {order.orderType === "delivery" && (
+            <div className="mt-2 border-t border-dashed pt-2">
+              <span className="font-semibold">Address:</span>{" "}
+              {[
+                order.deliveryDetails?.address,
+                order.deliveryDetails?.landmark,
+                order.deliveryDetails?.city,
+                order.deliveryDetails?.pincode,
+              ]
+                .filter(Boolean)
+                .join(", ")}
+            </div>
+          )}
         </div>
-
         {/* ================= CUSTOMER DETAILS ================= */}
         <div className="py-4 border-b border-dashed">
           <h3 className="font-bold text-sm mb-2 uppercase">Customer Details</h3>

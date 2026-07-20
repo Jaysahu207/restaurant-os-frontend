@@ -13,6 +13,8 @@ import {
   Table as TableIcon,
   Loader2,
   QrCode,
+  ShoppingBag,
+  Truck,
 } from "lucide-react";
 import QRCode from "react-qr-code";
 import { toPng } from "html-to-image";
@@ -33,6 +35,8 @@ export default function TablesPage() {
   const [editingTable, setEditingTable] = useState<any>(null);
   const [formData, setFormData] = useState({ number: "", capacity: "" });
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const [copiedType, setCopiedType] = useState("");
 
   const restaurantId = useAuthStore((state) => state.restaurant?._id); // Get restaurant ID from auth store
   const slug = useAuthStore((state) => state.restaurant?.slug) || ""; // Get restaurant ID from auth store
@@ -82,12 +86,23 @@ export default function TablesPage() {
       toast.error(error?.message || "Failed to delete table");
     },
   });
+  const copyLink = async (url: string, type: "takeaway" | "delivery") => {
+    await navigator.clipboard.writeText(url);
 
+    setCopiedType(type);
+
+    toast.success("Copied!");
+
+    setTimeout(() => setCopiedType(""), 2000);
+  };
   const getQRUrl = (tableNumber: number) => {
     return `${process.env.NEXT_PUBLIC_FRONTEND_URL}/menu/${slug}?table=${tableNumber}`;
   };
   const getTakeawayQRUrl = () => {
     return `${process.env.NEXT_PUBLIC_FRONTEND_URL}/menu/${slug}?mode=takeaway`;
+  };
+  const getDeliveryQRUrl = () => {
+    return `${process.env.NEXT_PUBLIC_FRONTEND_URL}/menu/${slug}?mode=delivery`;
   };
   // Download QR as PNG
   const downloadQR = useCallback(async (id: string, tableNumber: number) => {
@@ -120,7 +135,7 @@ export default function TablesPage() {
         pixelRatio: 2,
       });
       const link = document.createElement("a");
-      link.download = `takeaway-qr.png`;
+      link.download = `${slug}-takeaway-qr.png`;
       link.href = dataUrl;
       link.click();
       toast.success("QR code downloaded!", { id: "qr-download" });
@@ -128,10 +143,36 @@ export default function TablesPage() {
       toast.error("Failed to download QR code", { id: "qr-download" });
     }
   }, []);
+  const downloadDeliveryQR = useCallback(async () => {
+    const element = document.getElementById("delivery-qr");
+    if (!element) return;
+
+    try {
+      toast.loading("Generating QR...", { id: "qr-download" });
+
+      const dataUrl = await toPng(element, {
+        quality: 1,
+        pixelRatio: 2,
+      });
+
+      const link = document.createElement("a");
+      link.download = `${slug}-delivery-qr.png`;
+      link.href = dataUrl;
+      link.click();
+
+      toast.success("QR downloaded", {
+        id: "qr-download",
+      });
+    } catch {
+      toast.error("Download failed", {
+        id: "qr-download",
+      });
+    }
+  }, []);
   // Copy QR URL to clipboard
   const copyQRUrl = useCallback(async (tableNumber: number, id: string) => {
     const url = getQRUrl(tableNumber);
-    console.log(url);
+    // console.log(url);
     try {
       await navigator.clipboard.writeText(url);
       setCopiedId(id);
@@ -176,7 +217,7 @@ export default function TablesPage() {
         capacity,
         restaurantId,
       });
-      console.log(tableNumber, capacity, restaurantId);
+      // console.log(tableNumber, capacity, restaurantId);
     }
   };
 
@@ -230,7 +271,7 @@ export default function TablesPage() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <div className="flex flex-col items-center justify-center min-h-100 gap-4">
         <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
         <p className="text-gray-600">Loading tables...</p>
       </div>
@@ -247,22 +288,22 @@ export default function TablesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 p-6">
+      <div className=" mx-auto space-y-8">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-              Table & QR Management
+            <h1 className="text-3xl font-bold bg-linear-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+              QR & Table Management
             </h1>
             <p className="text-gray-600 mt-1">
-              Manage your restaurant tables and generate QR codes for menu
-              access
+              Generate and manage QR codes for dine-in, takeaway and delivery
+              ordering.
             </p>
           </div>
           <button
             onClick={openAddModal}
-            className="bg-gradient-to-br from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-500 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200 font-medium"
+            className="bg-linear-to-br from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-500 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200 font-medium"
           >
             <Plus size={20} />
             Add New Table
@@ -288,14 +329,14 @@ export default function TablesPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {tables.map((table: any) => (
               <div
                 key={table._id}
                 className="group bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-blue-200"
               >
                 {/* Card Header */}
-                <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-5 py-4 text-white">
+                <div className="bg-linear-to-r from-gray-800 to-gray-900 px-5 py-4 text-white">
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-2">
@@ -384,36 +425,132 @@ export default function TablesPage() {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4">Takeaway QR</h2>
-
-          <div
-            id="takeaway-qr"
-            className="bg-white p-4 rounded-xl inline-block"
-          >
-            <QRCode
-              value={getTakeawayQRUrl()}
-              size={160}
-              bgColor="#FFFFFF"
-              fgColor="#111827"
-              level="H"
-            />
+        {/* Online Ordering QR Codes */}
+        <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">
+              Online Ordering QR Codes
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Share these QR codes or links to let customers place takeaway and
+              delivery orders directly from their phones.
+            </p>
           </div>
 
-          <div className="mt-4 flex gap-3">
-            <button
-              onClick={() => downloadTakeawayQR()}
-              className="flex-1 bg-orange-500 text-white py-2 rounded-xl"
-            >
-              Download
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Takeaway QR */}
+            <div className="border border-gray-200 rounded-2xl p-5 hover:shadow-lg transition-all duration-300">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+                  <ShoppingBag className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Takeaway QR</h3>
+                  <p className="text-xs text-gray-500">
+                    Customers can order for pickup
+                  </p>
+                </div>
+              </div>
 
-            <button
-              onClick={() => navigator.clipboard.writeText(getTakeawayQRUrl())}
-              className="flex-1 border py-2 rounded-xl"
-            >
-              Copy URL
-            </button>
+              <div className="flex justify-center">
+                <div
+                  id="takeaway-qr"
+                  className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm"
+                >
+                  <QRCode
+                    value={getTakeawayQRUrl()}
+                    size={170}
+                    bgColor="#FFFFFF"
+                    fgColor="#111827"
+                    level="H"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 flex gap-3">
+                <button
+                  onClick={downloadTakeawayQR}
+                  className="flex-1 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-xl transition"
+                >
+                  <Download size={18} />
+                  Download
+                </button>
+
+                <button
+                  onClick={() => copyLink(getTakeawayQRUrl(), "takeaway")}
+                  className="flex-1 flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 py-2.5 rounded-xl transition"
+                >
+                  {copiedType === "takeaway" ? (
+                    <>
+                      <Check size={18} />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={18} />
+                      Copy Link
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Delivery QR */}
+            <div className="border border-gray-200 rounded-2xl p-5 hover:shadow-lg transition-all duration-300">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                  <Truck className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Delivery QR</h3>
+                  <p className="text-xs text-gray-500">
+                    Customers can order home delivery
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-center">
+                <div
+                  id="delivery-qr"
+                  className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm"
+                >
+                  <QRCode
+                    value={getDeliveryQRUrl()}
+                    size={170}
+                    bgColor="#FFFFFF"
+                    fgColor="#111827"
+                    level="H"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 flex gap-3">
+                <button
+                  onClick={downloadDeliveryQR}
+                  className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl transition"
+                >
+                  <Download size={18} />
+                  Download
+                </button>
+
+                <button
+                  onClick={() => copyLink(getDeliveryQRUrl(), "delivery")}
+                  className="flex-1 flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 py-2.5 rounded-xl transition"
+                >
+                  {copiedType === "delivery" ? (
+                    <>
+                      <Check size={18} />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={18} />
+                      Copy Link
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -430,7 +567,7 @@ export default function TablesPage() {
           >
             {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b border-gray-100">
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+              <h2 className="text-2xl font-bold bg-linear-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
                 {editingTable
                   ? `Edit Table ${editingTable.tableNumber}`
                   : "Add New Table"}
@@ -494,7 +631,7 @@ export default function TablesPage() {
                   disabled={
                     createMutation.isPending || updateMutation.isPending
                   }
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2.5 bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {(createMutation.isPending || updateMutation.isPending) && (
                     <Loader2 size={18} className="animate-spin" />

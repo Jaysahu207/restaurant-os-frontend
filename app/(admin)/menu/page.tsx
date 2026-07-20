@@ -11,6 +11,7 @@ import {
   Filter,
   X,
   Upload,
+  UtensilsCrossed,
 } from "lucide-react";
 
 import {
@@ -196,7 +197,7 @@ export default function MenuPage() {
   // Sorting state
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-
+  const [dateFilter, setDateFilter] = useState("All");
   // Modal state for add/edit
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null); // holds item data when editing
@@ -222,26 +223,90 @@ export default function MenuPage() {
   // Filter and sort items
   const filteredItems = menuItems
     .filter((item) => {
-      // Search filter (name or description)
-
+      // ================= Search =================
       const matchesSearch =
         (item.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
         (item.description?.toLowerCase() || "").includes(
           searchTerm.toLowerCase(),
         );
-      // Category filter
+
+      // ================= Category =================
       const matchesCategory =
         categoryFilter === "All" || item.category === categoryFilter;
-      // Availability filter
+
+      // ================= Availability =================
       const matchesAvailability =
         availabilityFilter === "All" ||
         (availabilityFilter === "Available" && item.isAvailable) ||
         (availabilityFilter === "Unavailable" && !item.isAvailable);
-      return matchesSearch && matchesCategory && matchesAvailability;
+
+      // ================= Date Filter =================
+      let matchesDate = true;
+
+      if (dateFilter !== "All") {
+        const createdAt = new Date(item.createdAt);
+        const updatedAt = new Date(item.updatedAt);
+
+        const today = new Date();
+
+        switch (dateFilter) {
+          case "Added Today":
+            matchesDate = createdAt.toDateString() === today.toDateString();
+            break;
+
+          case "Added Yesterday": {
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+
+            matchesDate = createdAt.toDateString() === yesterday.toDateString();
+            break;
+          }
+
+          case "Added This Week": {
+            const weekAgo = new Date();
+            weekAgo.setDate(today.getDate() - 7);
+
+            matchesDate = createdAt >= weekAgo;
+            break;
+          }
+
+          case "Added This Month":
+            matchesDate =
+              createdAt.getMonth() === today.getMonth() &&
+              createdAt.getFullYear() === today.getFullYear();
+            break;
+
+          case "Updated Today":
+            matchesDate = updatedAt.toDateString() === today.toDateString();
+            break;
+
+          case "Updated This Week": {
+            const weekAgo = new Date();
+            weekAgo.setDate(today.getDate() - 7);
+
+            matchesDate = updatedAt >= weekAgo;
+            break;
+          }
+
+          case "Updated This Month":
+            matchesDate =
+              updatedAt.getMonth() === today.getMonth() &&
+              updatedAt.getFullYear() === today.getFullYear();
+            break;
+
+          default:
+            matchesDate = true;
+        }
+      }
+
+      return (
+        matchesSearch && matchesCategory && matchesAvailability && matchesDate
+      );
     })
     .sort((a, b) => {
       let aValue: any = a[sortField as keyof typeof a];
       let bValue: any = b[sortField as keyof typeof b];
+
       if (sortField === "price") {
         aValue = Number(aValue);
         bValue = Number(bValue);
@@ -249,8 +314,10 @@ export default function MenuPage() {
         aValue = String(aValue).toLowerCase();
         bValue = String(bValue).toLowerCase();
       }
+
       if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
       if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+
       return 0;
     });
 
@@ -341,7 +408,7 @@ export default function MenuPage() {
 
       toast.success("Item deleted successfully");
     } catch (err: any) {
-      console.error("❌ Delete API Error:", err?.response || err);
+      // console.error("❌ Delete API Error:", err?.response || err);
       toast.error("Failed to delete item");
     } finally {
       setIsDeleting(false);
@@ -355,272 +422,334 @@ export default function MenuPage() {
     setItemToDelete(null);
     setIsDeleteModalOpen(false);
   };
+  const totalItems = menuItems.length;
+
+  const availableItems = menuItems.filter((item) => item.isAvailable).length;
+
+  const unavailableItems = totalItems - availableItems;
+
+  const totalCategories = allCategories.length;
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-2xl font-bold text-gray-800">Menu Management</h2>
-        <button
-          onClick={openAddModal}
-          className="inline-flex items-center gap-2 bg-linear-to-br from-orange-400 to-amber-500 text-white px-4 py-2 rounded-lg hover:shadow-md transition"
-        >
-          <Plus className="w-5 h-5" />
-          Add Item
-        </button>
-      </div>
+      <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        {/* Left */}
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+              Menu Management
+            </h1>
 
-      {/* Filters and search */}
-      <div className="bg-white p-4 rounded-xl shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-700 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search items..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border text-gray-700 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Category filter */}
-          <div className="sm:w-48">
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full px-4 py-2 border text-gray-700 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-            >
-              <option value="All">All Categories</option>
-              {allCategories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Availability filter */}
-          <div className="sm:w-40">
-            <select
-              value={availabilityFilter}
-              onChange={(e) => setAvailabilityFilter(e.target.value)}
-              className="w-full px-4 py-2 border text-gray-700 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-            >
-              <option value="All">All Items</option>
-              <option value="Available">Available</option>
-              <option value="Unavailable">Unavailable</option>
-            </select>
+            <p className="mt-1 text-sm text-gray-500">
+              Manage your restaurant's menu, pricing, variants and addons.
+            </p>
           </div>
         </div>
 
-        {/* Sorting info (could be badges) */}
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Filter className="w-4 h-4" />
-          <span>Sort by:</span>
-          <button
-            onClick={() => handleSort("name")}
-            className={`flex items-center gap-1 px-2 py-1 rounded ${
-              sortField === "name"
-                ? "bg-blue-100 text-blue-700"
-                : "hover:bg-gray-100"
-            }`}
+        {/* Right */}
+        <button
+          onClick={openAddModal}
+          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-linear-to-r from-orange-500 to-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-200 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl active:scale-95"
+        >
+          <Plus className="h-5 w-5" />
+          Add Menu Item
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <p className="text-sm text-gray-500">Total Items</p>
+
+          <h2 className="mt-2 text-3xl font-bold text-gray-900">
+            {totalItems}
+          </h2>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <p className="text-sm text-gray-500">Available</p>
+
+          <h2 className="mt-2 text-3xl font-bold text-green-600">
+            {availableItems}
+          </h2>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <p className="text-sm text-gray-500">Unavailable</p>
+
+          <h2 className="mt-2 text-3xl font-bold text-red-500">
+            {unavailableItems}
+          </h2>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <p className="text-sm text-gray-500">Categories</p>
+
+          <h2 className="mt-2 text-3xl font-bold text-indigo-600">
+            {totalCategories}
+          </h2>
+        </div>
+      </div>
+      {/* ====================================================== */}
+      {/* Search & Filters */}
+      {/* ====================================================== */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        {/* Search */}
+        <div className="relative mb-4">
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+
+          <input
+            type="text"
+            placeholder="Search menu items..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full rounded-xl border border-gray-300 bg-gray-50 py-3 pl-11 pr-4 text-sm text-gray-700 transition focus:border-orange-500 focus:bg-white focus:ring-2 focus:ring-orange-100"
+          />
+        </div>
+
+        {/* Filters */}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-700 focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
           >
-            Name
-            {sortField === "name" &&
-              (sortDirection === "asc" ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              ))}
-          </button>
-          <button
-            onClick={() => handleSort("category")}
-            className={`flex items-center gap-1 px-2 py-1 rounded ${
-              sortField === "category"
-                ? "bg-blue-100 text-blue-700"
-                : "hover:bg-gray-100"
-            }`}
+            <option value="All">All Categories</option>
+
+            {allCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={availabilityFilter}
+            onChange={(e) => setAvailabilityFilter(e.target.value)}
+            className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-700 focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
           >
-            Category
-            {sortField === "category" &&
-              (sortDirection === "asc" ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              ))}
-          </button>
-          <button
-            onClick={() => handleSort("price")}
-            className={`flex items-center gap-1 px-2 py-1 rounded ${
-              sortField === "price"
-                ? "bg-blue-100 text-blue-700"
-                : "hover:bg-gray-100"
-            }`}
+            <option value="All">All Status</option>
+            <option value="Available">Available</option>
+            <option value="Unavailable">Unavailable</option>
+          </select>
+
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-700 focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
           >
-            Price
-            {sortField === "price" &&
-              (sortDirection === "asc" ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              ))}
+            <option value="All">Recent</option>
+            <option value="Added Today">Today</option>
+            <option value="Added Yesterday">Yesterday</option>
+            <option value="Added This Week">This Week</option>
+            <option value="Added This Month">This Month</option>
+            <option value="Updated Today">Updated Today</option>
+            <option value="Updated This Week">Updated Week</option>
+          </select>
+
+          <button
+            onClick={() => {
+              setSearchTerm("");
+              setCategoryFilter("All");
+              setAvailabilityFilter("All");
+              setDateFilter("All");
+            }}
+            className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+          >
+            Reset Filters
           </button>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-gray-600">Sort:</span>
+
+            {[
+              { key: "name", label: "Name" },
+              { key: "category", label: "Category" },
+              { key: "price", label: "Price" },
+            ].map((sort) => (
+              <button
+                key={sort.key}
+                onClick={() => handleSort(sort.key)}
+                className={`rounded-full px-4 py-1.5 text-xs font-medium transition
+          ${
+            sortField === sort.key
+              ? "bg-orange-500 text-white"
+              : "bg-gray-100 text-gray-700 hover:bg-orange-100"
+          }`}
+              >
+                {sort.label}
+
+                {sortField === sort.key &&
+                  (sortDirection === "asc" ? " ↑" : " ↓")}
+              </button>
+            ))}
+          </div>
+
+          <p className="text-sm text-gray-500">
+            Showing
+            <span className="mx-1 font-semibold text-orange-600">
+              {filteredItems.length}
+            </span>
+            of
+            <span className="mx-1 font-semibold">{menuItems.length}</span>
+            items
+          </p>
         </div>
       </div>
 
       {/* Menu items table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="px-4 py-3 text-left">Image</th>
-                <th className="px-4 py-3 text-left">Name</th>
-                <th className="px-4 py-3 text-left">Category</th>
-                <th className="px-4 py-3 text-left">Type</th>
-                <th className="px-4 py-3 text-left">Variants</th>
-                <th className="px-4 py-3 text-left">Price</th>
-                <th className="px-4 py-3 text-left">Addons</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredItems.length > 0 ? (
-                filteredItems.map((item) => (
-                  <tr key={item._id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-12 h-12 object-cover rounded-lg"
-                      />
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-800">
-                      {item.name}
-                      <div className="text-xs text-gray-500 truncate max-w-xs">
-                        {item.description}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{item.category}</td>
 
-                    <td className="px-4 py-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+        {filteredItems.map((item) => (
+          <div
+            key={item._id}
+            className="group overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+          >
+            {/* IMAGE */}
+            <div className="relative h-56 overflow-hidden">
+              <img
+                src={item.image}
+                alt={item.name}
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
+              />
+
+              {/* gradient */}
+              <div className="absolute inset-0 bg-linear-to-t from-black/60 via-black/10 to-transparent" />
+
+              {/* type */}
+              <div className="absolute left-4 top-4">
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold backdrop-blur
+            ${
+              item.type === "veg"
+                ? "bg-green-600 text-white"
+                : item.type === "non-veg"
+                  ? "bg-red-600 text-white"
+                  : "bg-yellow-500 text-white"
+            }`}
+                >
+                  {item.type.toUpperCase()}
+                </span>
+              </div>
+
+              {/* status */}
+              <div className="absolute left-4 bottom-4">
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold
+            ${
+              item.isAvailable
+                ? "bg-green-500 text-white"
+                : "bg-red-500 text-white"
+            }`}
+                >
+                  {item.isAvailable ? "Available" : "Unavailable"}
+                </span>
+              </div>
+
+              {/* actions */}
+              <div className="absolute right-4 top-4 flex gap-2">
+                <button
+                  onClick={() => openEditModal(item)}
+                  className="rounded-xl bg-white p-2 shadow hover:bg-blue-50"
+                >
+                  <Edit className="h-4 w-4 text-blue-600" />
+                </button>
+
+                <button
+                  onClick={() => openDeleteModal(item._id)}
+                  className="rounded-xl bg-white p-2 shadow hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4 text-red-600" />
+                </button>
+              </div>
+            </div>
+
+            {/* CONTENT */}
+            <div className="space-y-5 p-5">
+              {/* title */}
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="line-clamp-1 text-xl font-bold text-gray-900">
+                    {item.name}
+                  </h2>
+
+                  <p className="mt-1 line-clamp-2 text-sm text-gray-500">
+                    {item.description}
+                  </p>
+                </div>
+
+                <span className="text-2xl font-bold text-orange-600">
+                  ₹{item.price}
+                </span>
+              </div>
+
+              {/* category */}
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Category
+                </p>
+
+                <span className="rounded-full bg-orange-50 px-3 py-1 text-sm font-medium text-orange-600">
+                  {item.category}
+                </span>
+              </div>
+
+              {/* variants */}
+              {item.variants.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Variants
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    {item.variants.map((variant: any, index: number) => (
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full
-      ${
-        item.type === "veg"
-          ? "bg-green-50 text-green-700"
-          : item.type === "non-veg"
-            ? "bg-red-50 text-red-700"
-            : item.type === "egg"
-              ? "bg-yellow-50 text-yellow-700"
-              : "bg-gray-100 text-gray-600"
-      }
-    `}
+                        key={index}
+                        className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700"
                       >
-                        <span
-                          className={`w-2 h-2 rounded-full
-        ${
-          item.type === "veg"
-            ? "bg-green-600"
-            : item.type === "non-veg"
-              ? "bg-red-600"
-              : item.type === "egg"
-                ? "bg-yellow-500"
-                : "bg-gray-500"
-        }
-      `}
-                        ></span>
-                        {item.type}
+                        {variant.name} • ₹{variant.price}
                       </span>
-                    </td>
-
-                    <td className="px-4 py-3 text-gray-600">
-                      {item.variants.length > 0 ? (
-                        <div className="flex flex-col gap-1 items-start">
-                          {item.variants.map((variant: any, index: number) => (
-                            <span
-                              key={index}
-                              className="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full"
-                            >
-                              {variant.name} - ₹{variant.price}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-gray-800 font-medium">
-                          ₹{item.price}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-800">
-                      ₹{item.price}
-                    </td>
-                    <td className="px-4 py-3">
-                      {item.addons.length > 0 ? (
-                        <div className="flex flex-col gap-2">
-                          {item.addons.map((addon: any, index: number) => (
-                            <div
-                              key={index}
-                              className="flex justify-between items-center bg-gray-50 border rounded-lg px-2 py-2 text-sm"
-                            >
-                              <span className="font-medium text-gray-700">
-                                {addon.name}
-                              </span>
-                              <span className="text-indigo-600 font-semibold">
-                                ₹{addon.price}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 text-sm">No Addons</span>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          item.isAvailable
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {item.isAvailable ? "Available" : "Unavailable"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => openEditModal(item)}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => openDeleteModal(item._id)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-8 text-center text-gray-500"
-                  >
-                    No menu items found.
-                  </td>
-                </tr>
+                    ))}
+                  </div>
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
+
+              {/* addons */}
+              {item.addons.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Addons
+                  </p>
+
+                  <div className="space-y-2">
+                    {item.addons.map((addon: any, index: number) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2"
+                      >
+                        <span className="text-sm font-medium text-gray-700">
+                          {addon.name}
+                        </span>
+
+                        <span className="font-semibold text-indigo-600">
+                          ₹{addon.price}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* footer */}
+              <div className="flex items-center justify-between border-t pt-4 text-xs text-gray-400">
+                <span>
+                  Updated {new Date(item.updatedAt).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Add/Edit Modal */}

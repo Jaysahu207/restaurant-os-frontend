@@ -10,6 +10,8 @@ import {
   ToggleLeft,
   ToggleRight,
   Loader2,
+  CheckCircle2,
+  Settings2,
 } from "lucide-react";
 import {
   getRestaurant,
@@ -29,33 +31,41 @@ import toast from "react-hot-toast";
 interface RestaurantForm {
   name: string;
   slug: string;
+
   address: {
     street: string;
     city: string;
     state: string;
     pincode: string;
   };
+
   contactEmail: string;
   contactPhone: string;
+
   logo: string;
   coverImage: string;
+
   upiId: string;
   currency: string;
+
   business: {
     type: string;
     cuisines: string[];
   };
+
   legal: {
     fssaiNumber: string;
     gstNumber: string;
     panNumber: string;
   };
+
   tax: {
     cgst: number;
     sgst: number;
     igst: number;
     serviceCharge: number;
   };
+
   billing: {
     invoicePrefix: string;
     invoiceStart: number;
@@ -63,13 +73,23 @@ interface RestaurantForm {
     enableServiceCharge: boolean;
     roundOff: boolean;
   };
+
   operations: {
     tableCount: number;
     dineIn: boolean;
     takeaway: boolean;
-    delivery: boolean;
+
+    delivery: {
+      enabled: boolean;
+      minimumOrder: number;
+      deliveryCharge: number;
+      freeDeliveryAbove: number;
+      estimatedDeliveryTime: number;
+    };
+
     preparationTime: number;
   };
+
   timings: {
     openTime: string;
     closeTime: string;
@@ -99,16 +119,41 @@ export default function SettingsPage() {
   const [restaurantForm, setRestaurantForm] = useState<RestaurantForm>({
     name: "",
     slug: "",
-    address: { street: "", city: "", state: "", pincode: "" },
+
+    address: {
+      street: "",
+      city: "",
+      state: "",
+      pincode: "",
+    },
+
     contactEmail: "",
     contactPhone: "",
+
     logo: "",
     coverImage: "",
+
     upiId: "",
     currency: "INR",
-    business: { type: "restaurant", cuisines: [] },
-    legal: { fssaiNumber: "", gstNumber: "", panNumber: "" },
-    tax: { cgst: 0, sgst: 0, igst: 0, serviceCharge: 0 },
+
+    business: {
+      type: "restaurant",
+      cuisines: [],
+    },
+
+    legal: {
+      fssaiNumber: "",
+      gstNumber: "",
+      panNumber: "",
+    },
+
+    tax: {
+      cgst: 0,
+      sgst: 0,
+      igst: 0,
+      serviceCharge: 0,
+    },
+
     billing: {
       invoicePrefix: "INV-",
       invoiceStart: 1001,
@@ -116,15 +161,27 @@ export default function SettingsPage() {
       enableServiceCharge: false,
       roundOff: true,
     },
+
     operations: {
       tableCount: 0,
       dineIn: true,
       takeaway: true,
-      delivery: false,
+
+      delivery: {
+        enabled: false,
+        minimumOrder: 0,
+        deliveryCharge: 0,
+        freeDeliveryAbove: 0,
+        estimatedDeliveryTime: 45,
+      },
+
       preparationTime: 15,
     },
 
-    timings: { openTime: "", closeTime: "" },
+    timings: {
+      openTime: "",
+      closeTime: "",
+    },
   });
 
   const [paymentSettings, setPaymentSettings] = useState({
@@ -228,7 +285,18 @@ export default function SettingsPage() {
           tableCount: restaurant.operations?.tableCount || 0,
           dineIn: restaurant.operations?.dineIn ?? true,
           takeaway: restaurant.operations?.takeaway ?? true,
-          delivery: restaurant.operations?.delivery ?? false,
+
+          delivery: {
+            enabled: restaurant.operations?.delivery?.enabled ?? false,
+            minimumOrder: restaurant.operations?.delivery?.minimumOrder ?? 0,
+            deliveryCharge:
+              restaurant.operations?.delivery?.deliveryCharge ?? 0,
+            freeDeliveryAbove:
+              restaurant.operations?.delivery?.freeDeliveryAbove ?? 0,
+            estimatedDeliveryTime:
+              restaurant.operations?.delivery?.estimatedDeliveryTime ?? 45,
+          },
+
           preparationTime: restaurant.operations?.preparationTime || 15,
         },
         timings: {
@@ -388,15 +456,40 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800">Settings</h2>
-      </div>
-
-      {saveSuccess && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
-          Settings saved successfully!
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900">
+                Restaurant Settings
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Manage your restaurant information, taxes, billing, delivery,
+                branding and operational preferences.
+              </p>
+            </div>
+          </div>
         </div>
-      )}
+
+        {saveSuccess && (
+          <div className="mt-5 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            </div>
+
+            <div className="flex-1">
+              <h4 className="font-semibold text-green-800">
+                Settings Updated Successfully
+              </h4>
+              <p className="text-sm text-green-700 mt-1">
+                Your restaurant settings have been saved successfully and are
+                now active across your QR Menu, Ordering System, Billing and
+                Dashboard.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
@@ -426,592 +519,723 @@ export default function SettingsPage() {
         {/* -------------------- RESTAURANT TAB -------------------- */}
         {activeTab === "restaurant" && (
           <div className="space-y-6">
-            <h3 className={sectionTitleClass}>Restaurant Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Basic Info */}
-              <div>
-                <label className={labelClass}>Restaurant Name</label>
-                <input
-                  type="text"
-                  value={restaurantForm.name}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      name: e.target.value,
-                    })
-                  }
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Phone</label>
-                <input
-                  type="text"
-                  value={restaurantForm.contactPhone}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      contactPhone: e.target.value,
-                    })
-                  }
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Contact Email</label>
-                <input
-                  type="email"
-                  value={restaurantForm.contactEmail}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      contactEmail: e.target.value,
-                    })
-                  }
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Slug</label>
-                <input
-                  type="text"
-                  value={restaurantForm.slug}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      slug: e.target.value,
-                    })
-                  }
-                  disabled
-                  className={`${inputClass} bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200`}
-                />
-              </div>
-
-              {/* Address */}
-              <div>
-                <label className={labelClass}>Street</label>
-                <input
-                  value={restaurantForm.address.street}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      address: {
-                        ...restaurantForm.address,
-                        street: e.target.value,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>City</label>
-                <input
-                  value={restaurantForm.address.city}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      address: {
-                        ...restaurantForm.address,
-                        city: e.target.value,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>State</label>
-                <input
-                  value={restaurantForm.address.state}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      address: {
-                        ...restaurantForm.address,
-                        state: e.target.value,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Pincode</label>
-                <input
-                  value={restaurantForm.address.pincode}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      address: {
-                        ...restaurantForm.address,
-                        pincode: e.target.value,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                />
-              </div>
-
-              {/* Business Details */}
-              <div className="md:col-span-2">
-                <h4 className={subsectionTitleClass}>Business Details</h4>
-              </div>
-              <div>
-                <label className={labelClass}>Business Type</label>
-                <select
-                  value={restaurantForm.business.type}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      business: {
-                        ...restaurantForm.business,
-                        type: e.target.value,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                >
-                  <option value="restaurant">Restaurant</option>
-                  <option value="cafe">Cafe</option>
-                  <option value="dhaba">Dhaba</option>
-                  <option value="hotel">Hotel</option>
-                  <option value="cloud_kitchen">Cloud Kitchen</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Cuisines (comma separated)</label>
-                <input
-                  value={restaurantForm.business.cuisines.join(",")}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      business: {
-                        ...restaurantForm.business,
-                        cuisines: e.target.value
-                          .split(",")
-                          .map((c) => c.trim()),
-                      },
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="e.g. Indian, Chinese, Italian"
-                />
-              </div>
-
-              {/* Legal & Tax */}
-              <div className="md:col-span-2">
-                <h4 className={subsectionTitleClass}>Legal & Tax Details</h4>
-              </div>
-              <div>
-                <label className={labelClass}>FSSAI License Number</label>
-                <input
-                  type="text"
-                  value={restaurantForm.legal.fssaiNumber}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      legal: {
-                        ...restaurantForm.legal,
-                        fssaiNumber: e.target.value,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="Enter FSSAI License"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>GST Number (GSTIN)</label>
-                <input
-                  type="text"
-                  value={restaurantForm.legal.gstNumber}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      legal: {
-                        ...restaurantForm.legal,
-                        gstNumber: e.target.value,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="Enter GST Number"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>PAN Number</label>
-                <input
-                  type="text"
-                  value={restaurantForm.legal.panNumber}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      legal: {
-                        ...restaurantForm.legal,
-                        panNumber: e.target.value,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="Enter PAN Number"
-                />
-              </div>
-
-              {/* Tax Configuration */}
-              <div className="md:col-span-2">
-                <h4 className={subsectionTitleClass}>Tax Configuration</h4>
-              </div>
-              <div>
-                <label className={labelClass}>CGST (%)</label>
-                <input
-                  type="number"
-                  value={restaurantForm.tax.cgst ?? ""}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      tax: {
-                        ...restaurantForm.tax,
-                        cgst: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="e.g. 2.5"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>SGST (%)</label>
-                <input
-                  type="number"
-                  value={restaurantForm.tax.sgst ?? ""}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      tax: {
-                        ...restaurantForm.tax,
-                        sgst: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="e.g. 2.5"
-                />
-              </div>
-              {/* <div>
-                <label className={labelClass}>IGST (%)</label>
-                <input
-                  type="number"
-                  value={restaurantForm.tax.igst ?? ""}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      tax: {
-                        ...restaurantForm.tax,
-                        igst: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="e.g. 5"
-                />
-              </div> */}
-
-              {/* Billing Settings */}
-              <div className="md:col-span-2">
-                <h4 className={subsectionTitleClass}>Billing Settings</h4>
-              </div>
-              <div>
-                <label className={labelClass}>Invoice Prefix</label>
-                <input
-                  type="text"
-                  value={restaurantForm.billing.invoicePrefix}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      billing: {
-                        ...restaurantForm.billing,
-                        invoicePrefix: e.target.value,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="e.g. INV-"
-                />
-              </div>
-              <div className="flex flex-wrap gap-4 col-span-2">
-                {(
-                  ["enableTaxes", "enableServiceCharge", "roundOff"] as const
-                ).map((field) => (
-                  <label
-                    key={field}
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={restaurantForm.billing[field]}
-                      onChange={(e) =>
-                        setRestaurantForm({
-                          ...restaurantForm,
-                          billing: {
-                            ...restaurantForm.billing,
-                            [field]: e.target.checked,
-                          },
-                        })
-                      }
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700">
-                      {field === "enableTaxes" && "Enable Taxes"}
-                      {field === "enableServiceCharge" &&
-                        "Enable Service Charge"}
-                      {field === "roundOff" && "Round Off Invoice"}
-                    </span>
-                  </label>
-                ))}
-              </div>
-              <div>
-                <label className={labelClass}>Service Charge (%)</label>
-                <input
-                  type="number"
-                  value={restaurantForm.tax.serviceCharge ?? ""}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      tax: {
-                        ...restaurantForm.tax,
-                        serviceCharge: parseFloat(e.target.value),
-                      },
-                    })
-                  }
-                  className={inputClass}
-                  step="0.1"
-                />
-              </div>
-
-              {/* Operations */}
-              <div className="md:col-span-2">
-                <h4 className={subsectionTitleClass}>Operations</h4>
-              </div>
-              <div>
-                <label className={labelClass}>Table Count</label>
-                <input
-                  type="number"
-                  value={restaurantForm.operations.tableCount}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      operations: {
-                        ...restaurantForm.operations,
-                        tableCount: parseInt(e.target.value) || 0,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Preparation Time (minutes)</label>
-                <input
-                  type="number"
-                  value={restaurantForm.operations.preparationTime ?? 15}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      operations: {
-                        ...restaurantForm.operations,
-                        preparationTime: parseInt(e.target.value) || 15,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                />
-              </div>
-              <div className="flex flex-wrap gap-4 col-span-2">
-                {(["dineIn", "takeaway", "delivery"] as const).map((field) => (
-                  <label
-                    key={field}
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={restaurantForm.operations[field]}
-                      onChange={(e) =>
-                        setRestaurantForm({
-                          ...restaurantForm,
-                          operations: {
-                            ...restaurantForm.operations,
-                            [field]: e.target.checked,
-                          },
-                        })
-                      }
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700 capitalize">
-                      {field}
-                    </span>
-                  </label>
-                ))}
-              </div>
-
-              {/* Timings */}
-              <div className="md:col-span-2">
-                <h4 className={subsectionTitleClass}>Timings</h4>
-              </div>
-              <div>
-                <label className={labelClass}>Open Time</label>
-                <input
-                  type="time"
-                  value={restaurantForm.timings.openTime}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      timings: {
-                        ...restaurantForm.timings,
-                        openTime: e.target.value,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Close Time</label>
-                <input
-                  type="time"
-                  value={restaurantForm.timings.closeTime}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      timings: {
-                        ...restaurantForm.timings,
-                        closeTime: e.target.value,
-                      },
-                    })
-                  }
-                  className={inputClass}
-                />
-              </div>
-
-              {/* Currency & Logo */}
-              {/* <div>
-                <label className={labelClass}>Currency</label>
-                <select
-                  value={restaurantForm.currency}
-                  onChange={(e) =>
-                    setRestaurantForm({
-                      ...restaurantForm,
-                      currency: e.target.value,
-                    })
-                  }
-                  className={inputClass}
-                >
-                  <option value="INR">INR (₹)</option>
-                  <option value="USD">USD ($)</option>
-                </select>
-              </div> */}
-            </div>
-
-            {/* SAVE BUTTON */}
-            <div className="flex justify-end pt-4">
+            {/* ===== Header ===== */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-2xl font-semibold text-gray-800">
+                Restaurant Information
+              </h3>
               <button
                 onClick={handleUpdateRestaurant}
                 disabled={isSaving}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
                 {isSaving ? "Saving..." : "Save Changes"}
               </button>
             </div>
 
-            {/* Logo & Currency */}
-            <div className="md:col-span-2">
-              <label className={labelClass}>Restaurant Branding</label>
+            {/* ===== Basic Info Card ===== */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                Basic Information
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelClass}>Restaurant Name</label>
+                  <input
+                    type="text"
+                    value={restaurantForm.name}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        name: e.target.value,
+                      })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Phone</label>
+                  <input
+                    type="text"
+                    value={restaurantForm.contactPhone}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        contactPhone: e.target.value,
+                      })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Contact Email</label>
+                  <input
+                    type="email"
+                    value={restaurantForm.contactEmail}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        contactEmail: e.target.value,
+                      })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Slug</label>
+                  <input
+                    type="text"
+                    value={restaurantForm.slug}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        slug: e.target.value,
+                      })
+                    }
+                    disabled
+                    className={`${inputClass} bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200`}
+                  />
+                </div>
+                {/* Add a placeholder div if needed to keep 3-col layout, or let it wrap naturally */}
+              </div>
+            </div>
 
-              <div className="mt-2 bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-                  {/* Logo Preview */}
-                  <div className="relative group">
-                    {restaurantForm.logo ? (
-                      <img
-                        src={restaurantForm.logo}
-                        alt="Restaurant Logo"
-                        className="w-24 h-24 rounded-2xl object-cover border-2 border-orange-100 shadow-md"
+            {/* ===== Address Card ===== */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                Address
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelClass}>Street</label>
+                  <input
+                    value={restaurantForm.address.street}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        address: {
+                          ...restaurantForm.address,
+                          street: e.target.value,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>City</label>
+                  <input
+                    value={restaurantForm.address.city}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        address: {
+                          ...restaurantForm.address,
+                          city: e.target.value,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>State</label>
+                  <input
+                    value={restaurantForm.address.state}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        address: {
+                          ...restaurantForm.address,
+                          state: e.target.value,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Pincode</label>
+                  <input
+                    value={restaurantForm.address.pincode}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        address: {
+                          ...restaurantForm.address,
+                          pincode: e.target.value,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* ===== Business Details Card ===== */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                Business Details
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelClass}>Business Type</label>
+                  <select
+                    value={restaurantForm.business.type}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        business: {
+                          ...restaurantForm.business,
+                          type: e.target.value,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                  >
+                    <option value="restaurant">Restaurant</option>
+                    <option value="cafe">Cafe</option>
+                    <option value="dhaba">Dhaba</option>
+                    <option value="hotel">Hotel</option>
+                    <option value="cloud_kitchen">Cloud Kitchen</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className={labelClass}>
+                    Cuisines (comma separated)
+                  </label>
+                  <input
+                    value={restaurantForm.business.cuisines.join(",")}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        business: {
+                          ...restaurantForm.business,
+                          cuisines: e.target.value
+                            .split(",")
+                            .map((c) => c.trim()),
+                        },
+                      })
+                    }
+                    className={inputClass}
+                    placeholder="e.g. Indian, Chinese, Italian"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* ===== Legal & Tax Card ===== */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                Legal & Tax Details
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelClass}>FSSAI License Number</label>
+                  <input
+                    type="text"
+                    value={restaurantForm.legal.fssaiNumber}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        legal: {
+                          ...restaurantForm.legal,
+                          fssaiNumber: e.target.value,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                    placeholder="Enter FSSAI License"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>GST Number (GSTIN)</label>
+                  <input
+                    type="text"
+                    value={restaurantForm.legal.gstNumber}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        legal: {
+                          ...restaurantForm.legal,
+                          gstNumber: e.target.value,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                    placeholder="Enter GST Number"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>PAN Number</label>
+                  <input
+                    type="text"
+                    value={restaurantForm.legal.panNumber}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        legal: {
+                          ...restaurantForm.legal,
+                          panNumber: e.target.value,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                    placeholder="Enter PAN Number"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* ===== Tax Configuration + Billing Settings (combined) ===== */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                Tax & Billing
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelClass}>CGST (%)</label>
+                  <input
+                    type="number"
+                    value={restaurantForm.tax.cgst ?? ""}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        tax: {
+                          ...restaurantForm.tax,
+                          cgst: Number(e.target.value),
+                        },
+                      })
+                    }
+                    className={inputClass}
+                    placeholder="e.g. 2.5"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>SGST (%)</label>
+                  <input
+                    type="number"
+                    value={restaurantForm.tax.sgst ?? ""}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        tax: {
+                          ...restaurantForm.tax,
+                          sgst: Number(e.target.value),
+                        },
+                      })
+                    }
+                    className={inputClass}
+                    placeholder="e.g. 2.5"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Service Charge (%)</label>
+                  <input
+                    type="number"
+                    value={restaurantForm.tax.serviceCharge ?? ""}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        tax: {
+                          ...restaurantForm.tax,
+                          serviceCharge: parseFloat(e.target.value),
+                        },
+                      })
+                    }
+                    className={inputClass}
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Invoice Prefix</label>
+                  <input
+                    type="text"
+                    value={restaurantForm.billing.invoicePrefix}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        billing: {
+                          ...restaurantForm.billing,
+                          invoicePrefix: e.target.value,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                    placeholder="e.g. INV-"
+                  />
+                </div>
+                <div className="md:col-span-2 flex flex-wrap items-center gap-4 mt-1">
+                  {(
+                    ["enableTaxes", "enableServiceCharge", "roundOff"] as const
+                  ).map((field) => (
+                    <label
+                      key={field}
+                      className="flex items-center gap-2 cursor-pointer text-sm text-gray-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={restaurantForm.billing[field]}
+                        onChange={(e) =>
+                          setRestaurantForm({
+                            ...restaurantForm,
+                            billing: {
+                              ...restaurantForm.billing,
+                              [field]: e.target.checked,
+                            },
+                          })
+                        }
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                       />
-                    ) : (
-                      <div className="w-24 h-24 rounded-2xl bg-linear-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
-                        <Store className="w-10 h-10 text-white" />
-                      </div>
-                    )}
+                      <span>
+                        {field === "enableTaxes" && "Enable Taxes"}
+                        {field === "enableServiceCharge" &&
+                          "Enable Service Charge"}
+                        {field === "roundOff" && "Round Off Invoice"}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-                    <div className="absolute -bottom-2 -right-2 bg-green-500 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center">
-                      <span className="text-white text-[10px]">✓</span>
+            {/* ===== Operations Card ===== */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                Operations
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelClass}>Table Count</label>
+                  <input
+                    type="number"
+                    value={restaurantForm.operations.tableCount}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        operations: {
+                          ...restaurantForm.operations,
+                          tableCount: parseInt(e.target.value) || 0,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>
+                    Preparation Time (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    value={restaurantForm.operations.preparationTime ?? 15}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        operations: {
+                          ...restaurantForm.operations,
+                          preparationTime: parseInt(e.target.value) || 15,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-4 mt-1">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={restaurantForm.operations.dineIn}
+                      onChange={(e) =>
+                        setRestaurantForm({
+                          ...restaurantForm,
+                          operations: {
+                            ...restaurantForm.operations,
+                            dineIn: e.target.checked,
+                          },
+                        })
+                      }
+                      className="w-4 h-4"
+                    />
+                    <span>Dine In</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={restaurantForm.operations.takeaway}
+                      onChange={(e) =>
+                        setRestaurantForm({
+                          ...restaurantForm,
+                          operations: {
+                            ...restaurantForm.operations,
+                            takeaway: e.target.checked,
+                          },
+                        })
+                      }
+                      className="w-4 h-4"
+                    />
+                    <span>Takeaway</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={restaurantForm.operations.delivery.enabled}
+                      onChange={(e) =>
+                        setRestaurantForm({
+                          ...restaurantForm,
+                          operations: {
+                            ...restaurantForm.operations,
+                            delivery: {
+                              ...restaurantForm.operations.delivery,
+                              enabled: e.target.checked,
+                            },
+                          },
+                        })
+                      }
+                      className="w-4 h-4"
+                    />
+                    <span>Delivery</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Delivery Settings (conditional) */}
+              {restaurantForm.operations.delivery.enabled && (
+                <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <h4 className="font-semibold text-orange-700 text-sm mb-3">
+                    🚚 Delivery Settings
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className={labelClass}>Minimum Order (₹)</label>
+                      <input
+                        type="number"
+                        value={
+                          restaurantForm.operations.delivery.minimumOrder ?? ""
+                        }
+                        onChange={(e) =>
+                          setRestaurantForm({
+                            ...restaurantForm,
+                            operations: {
+                              ...restaurantForm.operations,
+                              delivery: {
+                                ...restaurantForm.operations.delivery,
+                                minimumOrder: Number(e.target.value),
+                              },
+                            },
+                          })
+                        }
+                        className={inputClass}
+                        placeholder="e.g. 199"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Delivery Charge (₹)</label>
+                      <input
+                        type="number"
+                        value={
+                          restaurantForm.operations.delivery.deliveryCharge ??
+                          ""
+                        }
+                        onChange={(e) =>
+                          setRestaurantForm({
+                            ...restaurantForm,
+                            operations: {
+                              ...restaurantForm.operations,
+                              delivery: {
+                                ...restaurantForm.operations.delivery,
+                                deliveryCharge: Number(e.target.value),
+                              },
+                            },
+                          })
+                        }
+                        className={inputClass}
+                        placeholder="e.g. 40"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>
+                        Free Delivery Above (₹)
+                      </label>
+                      <input
+                        type="number"
+                        value={
+                          restaurantForm.operations.delivery
+                            .freeDeliveryAbove ?? ""
+                        }
+                        onChange={(e) =>
+                          setRestaurantForm({
+                            ...restaurantForm,
+                            operations: {
+                              ...restaurantForm.operations,
+                              delivery: {
+                                ...restaurantForm.operations.delivery,
+                                freeDeliveryAbove: Number(e.target.value),
+                              },
+                            },
+                          })
+                        }
+                        className={inputClass}
+                        placeholder="e.g. 499"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>
+                        Estimated Delivery Time (Minutes)
+                      </label>
+                      <input
+                        type="number"
+                        value={
+                          restaurantForm.operations.delivery
+                            .estimatedDeliveryTime ?? ""
+                        }
+                        onChange={(e) =>
+                          setRestaurantForm({
+                            ...restaurantForm,
+                            operations: {
+                              ...restaurantForm.operations,
+                              delivery: {
+                                ...restaurantForm.operations.delivery,
+                                estimatedDeliveryTime: Number(e.target.value),
+                              },
+                            },
+                          })
+                        }
+                        className={inputClass}
+                        placeholder="e.g. 45"
+                      />
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
 
-                  {/* Info */}
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900">
-                      Restaurant Logo
-                    </h3>
+            {/* ===== Timings Card ===== */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                Timings
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelClass}>Open Time</label>
+                  <input
+                    type="time"
+                    value={restaurantForm.timings.openTime}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        timings: {
+                          ...restaurantForm.timings,
+                          openTime: e.target.value,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Close Time</label>
+                  <input
+                    type="time"
+                    value={restaurantForm.timings.closeTime}
+                    onChange={(e) =>
+                      setRestaurantForm({
+                        ...restaurantForm,
+                        timings: {
+                          ...restaurantForm.timings,
+                          closeTime: e.target.value,
+                        },
+                      })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+            </div>
 
-                    <p className="text-sm text-gray-500 mt-1">
-                      Upload your restaurant logo to personalize your menu, QR
-                      ordering page and invoices.
-                    </p>
-
-                    <div className="flex flex-wrap gap-3 mt-4">
-                      <button
-                        disabled={uploadingLogo}
-                        type="button"
-                        onClick={() =>
-                          document.getElementById("logoUpload")?.click()
-                        }
-                        className="px-4 py-2 bg-orange-500 text-white rounded-xl"
-                      >
-                        {uploadingLogo ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="w-4 h-4" />
-                            Upload Logo
-                          </>
-                        )}
-                      </button>
-
-                      {restaurantForm.logo && (
-                        <button
-                          type="button"
-                          onClick={handleRemoveLogo}
-                          className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl transition"
-                        >
-                          Remove Logo
-                        </button>
-                      )}
+            {/* ===== Branding (Logo) Card ===== */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                Restaurant Branding
+              </h4>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+                {/* Logo Preview */}
+                <div className="relative group">
+                  {restaurantForm.logo ? (
+                    <img
+                      src={restaurantForm.logo}
+                      alt="Restaurant Logo"
+                      className="w-24 h-24 rounded-2xl object-cover border-2 border-orange-100 shadow-md"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
+                      <Store className="w-10 h-10 text-white" />
                     </div>
-
-                    <p className="text-xs text-gray-400 mt-3">
-                      PNG, JPG or WEBP • Recommended: 512×512px
-                    </p>
+                  )}
+                  <div className="absolute -bottom-2 -right-2 bg-green-500 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center">
+                    <span className="text-white text-[10px]">✓</span>
                   </div>
                 </div>
 
-                <input
-                  type="file"
-                  accept="image/*"
-                  id="logoUpload"
-                  className="hidden"
-                  onChange={handleLogoUpload}
-                />
+                {/* Upload Controls */}
+                <div className="flex-1">
+                  <p className="text-sm text-gray-500 mt-1">
+                    Upload your restaurant logo to personalise your menu, QR
+                    ordering page and invoices.
+                  </p>
+                  <div className="flex flex-wrap gap-3 mt-4">
+                    <button
+                      disabled={uploadingLogo}
+                      type="button"
+                      onClick={() =>
+                        document.getElementById("logoUpload")?.click()
+                      }
+                      className="px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-xl hover:bg-orange-600 transition disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {uploadingLogo ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          Upload Logo
+                        </>
+                      )}
+                    </button>
+                    {restaurantForm.logo && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium rounded-xl transition"
+                      >
+                        Remove Logo
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3">
+                    PNG, JPG or WEBP • Recommended: 512×512px
+                  </p>
+                </div>
               </div>
+              <input
+                type="file"
+                accept="image/*"
+                id="logoUpload"
+                className="hidden"
+                onChange={handleLogoUpload}
+              />
             </div>
-            {/* Marketing Email Section */}
-            <div className="mt-8 border-t pt-6">
-              <h3 className={sectionTitleClass}>Marketing Email</h3>
+
+            {/* ===== Marketing Email Card ===== */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                Marketing Email
+              </h4>
               {restaurant?.marketingEmail?.isConnected ? (
-                <div className="flex items-center justify-between bg-green-50 border border-green-200 p-4 rounded-lg">
+                <div className="flex items-center justify-between bg-green-50 border border-green-200 p-3 rounded-lg">
                   <div>
                     <p className="text-green-700 font-medium">✅ Connected</p>
                     <p className="text-sm text-gray-600">
@@ -1020,13 +1244,13 @@ export default function SettingsPage() {
                   </div>
                   <button
                     onClick={handleDisconnectGmail}
-                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                    className="px-4 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition"
                   >
                     Disconnect
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center justify-between bg-gray-50 border p-4 rounded-lg">
+                <div className="flex items-center justify-between bg-gray-50 border p-3 rounded-lg">
                   <div>
                     <p className="text-gray-800 font-medium">
                       Connect your Gmail
@@ -1038,7 +1262,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleConnectGmail}
                     disabled={connecting}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
                   >
                     {connecting ? "Connecting..." : "Connect Gmail"}
                   </button>
@@ -1047,7 +1271,6 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
-
         {/* -------------------- PAYMENT TAB -------------------- */}
         {activeTab === "payment" && (
           <div className="space-y-6">

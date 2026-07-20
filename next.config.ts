@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   allowedDevOrigins: [
 
-    "192.168.246.1",
+    "10.26.51.1",
   ],
 };
 

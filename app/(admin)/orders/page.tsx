@@ -16,6 +16,8 @@ import {
   ChevronDown,
   TableIcon,
   User,
+  Truck,
+  ShoppingBag,
 } from "lucide-react";
 import {
   getOrders,
@@ -49,13 +51,20 @@ interface Order {
   };
   orderNumber: string;
   table: string;
-  orderType: "dine_in" | "takeaway";
+  orderType: "dine_in" | "takeaway" | "delivery";
   items: OrderItem[];
   total: number; // Grand total after all taxes (final amount)
   subtotal: number; // Subtotal before taxes
   cgstAmount: number; // CGST amount
   sgstAmount: number; // SGST amount
   serviceChargeAmount: number;
+  deliveryDetails?: {
+    address: string;
+    landmark?: string;
+    city?: string;
+    pincode?: string;
+    charge: number;
+  };
   invoiceNumber: string;
   status: OrderStatus;
   createdAt: string;
@@ -87,6 +96,8 @@ type OrderStatus =
   | "ready"
   | "served"
   | "paid"
+  | "out_for_delivery"
+  | "delivered"
   | "completed"
   | "cancelled";
 
@@ -96,6 +107,8 @@ const statusColors: Record<OrderStatus, string> = {
   ready: "bg-green-100 text-green-700 border-green-200",
   served: "bg-purple-100 text-purple-700 border-purple-200",
   paid: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  out_for_delivery: "bg-indigo-100 text-indigo-700 border-indigo-200",
+  delivered: "bg-slate-100 text-slate-600 border-slate-200",
   completed: "bg-gray-100 text-gray-700 border-gray-200",
   cancelled: "bg-red-100 text-red-700 border-red-200",
 };
@@ -108,6 +121,8 @@ const statusLabels: Record<OrderStatus | "all", string> = {
   served: "Served",
   paid: "Paid",
   completed: "Completed",
+  out_for_delivery: "Out for Delivery",
+  delivered: "Delivered",
   cancelled: "Cancelled",
 };
 
@@ -131,7 +146,7 @@ export default function OrdersPage() {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0],
   );
-
+  // console.log("🚀 ~ file: page.tsx:101 ~ OrdersPage ~ orders:", orders);
   // Load orders with optional date filter
   const loadOrders = useCallback(async () => {
     if (!restaurant?._id) return;
@@ -139,6 +154,7 @@ export default function OrdersPage() {
       setLoading(true);
       const dateParam = selectedDate || undefined;
       const data = await getOrders(restaurant._id, dateParam);
+      // console.log("Fetched orders -->>  ", data);
       const formatted: Order[] = data.map((o: any) => mapOrder(o));
       // console.log("Fetched orders -->>  ", formatted);
       setOrders(formatted);
@@ -150,7 +166,7 @@ export default function OrdersPage() {
       setRefreshing(false);
     }
   }, [restaurant?._id, selectedDate]);
-
+  // console.log("🚀 ~ file: page.tsx:101 ~ OrdersPage ~ orders:", orders);
   useEffect(() => {
     loadOrders();
     clearOrders();
@@ -212,10 +228,10 @@ export default function OrdersPage() {
         prev.map((order) =>
           order.id === updatedOrder._id
             ? {
-                ...order,
-                paymentStatus: updatedOrder.paymentStatus,
-                paymentMethod: updatedOrder.paymentMethod,
-              }
+              ...order,
+              paymentStatus: updatedOrder.paymentStatus,
+              paymentMethod: updatedOrder.paymentMethod,
+            }
             : order,
         ),
       );
@@ -251,6 +267,15 @@ export default function OrdersPage() {
       phone: o.customerId?.phone || "",
       email: o.customerId?.email || "",
     },
+    deliveryDetails: o.delivery
+      ? {
+        address: o.delivery.address?.house,
+        landmark: o.delivery.address?.landmark,
+        city: o.delivery.address?.city,
+        pincode: o.delivery.address?.pincode,
+        charge: o.delivery.deliveryCharge ?? 0,
+      }
+      : undefined,
   });
 
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
@@ -320,7 +345,7 @@ export default function OrdersPage() {
         audioRef.current
           .play()
           .then(() => audioRef.current?.pause())
-          .catch(() => {});
+          .catch(() => { });
       }
       window.removeEventListener("click", unlockAudio);
     };
@@ -486,11 +511,10 @@ export default function OrdersPage() {
               <button
                 key={status}
                 onClick={() => setFilter(status)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition flex items-center gap-2 ${
-                  filter === status
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition flex items-center gap-2 ${filter === status
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
               >
                 {statusLabels[status]}
                 {status !== "all" && (
@@ -506,13 +530,13 @@ export default function OrdersPage() {
           {(search ||
             filter !== "all" ||
             selectedDate !== new Date().toISOString().split("T")[0]) && (
-            <button
-              onClick={clearFilters}
-              className="ml-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
-            >
-              <X className="w-4 h-4" /> Clear
-            </button>
-          )}
+              <button
+                onClick={clearFilters}
+                className="ml-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
+              >
+                <X className="w-4 h-4" /> Clear
+              </button>
+            )}
         </div>
       </div>
 
@@ -529,8 +553,8 @@ export default function OrdersPage() {
               </h3>
               <p className="text-gray-500">
                 {search ||
-                filter !== "all" ||
-                selectedDate !== new Date().toISOString().split("T")[0]
+                  filter !== "all" ||
+                  selectedDate !== new Date().toISOString().split("T")[0]
                   ? "Try adjusting your filters or search criteria."
                   : "Waiting for new orders to arrive."}
               </p>
@@ -656,7 +680,7 @@ function StatCard({
   );
 }
 
-// ==================== Order Card ====================
+// ==================== Order Card (Polished) ====================
 function OrderCard({
   order,
   onViewDetails,
@@ -668,26 +692,36 @@ function OrderCard({
   onKOT: () => void;
   onUpdateStatus: (status: OrderStatus) => void;
 }) {
-  const allStatuses: OrderStatus[] = [
-    "pending",
-    "preparing",
-    "ready",
-    "served",
-    "paid",
-    "completed",
-    "cancelled",
-  ];
+  const allStatuses: OrderStatus[] =
+    order.orderType === "delivery"
+      ? [
+        "pending",
+        "preparing",
+        "out_for_delivery",
+        "delivered",
+        "completed",
+        "cancelled",
+      ]
+      : [
+        "pending",
+        "preparing",
+        "ready",
+        "served",
+        "paid",
+        "completed",
+        "cancelled",
+      ];
 
   return (
     <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition h-full flex flex-col">
-      {/* Left accent border based on status */}
+      {/* Top accent border based on status */}
       <div
         className={`h-1 w-full rounded-t-xl ${statusColors[order.status].split(" ")[0]}`}
       />
 
-      <div className="p-4 flex flex-col gap-4 flex-1">
+      <div className="p-5 flex flex-col gap-5 flex-1">
         {/* ---------- TOP ROW: Order ID, status, time & quick actions ---------- */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono font-bold text-sm text-gray-900">
               #{order.orderNumber?.slice(-3)}
@@ -697,13 +731,13 @@ function OrderCard({
             >
               {statusLabels[order.status]}
             </span>
-            <span className="text-xs text-gray-500 flex items-center gap-1">
+            <span className="text-xs text-gray-500 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5" />
               {new Date(order.createdAt).toLocaleString()}
             </span>
           </div>
 
-          {/* View & KOT buttons always visible */}
+          {/* View & KOT buttons */}
           <div className="flex items-center gap-1">
             <button
               onClick={onViewDetails}
@@ -722,30 +756,61 @@ function OrderCard({
           </div>
         </div>
 
-        {/* ---------- MIDDLE SECTION: Customer info + Billing side by side ---------- */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* ---------- MIDDLE SECTION: Customer + Billing (grid) ---------- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* Customer details */}
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
               <User className="w-4 h-4 text-gray-400" />
               {order.customer.name}
             </div>
+
             <div className="flex items-center gap-4 text-xs text-gray-500">
-              <span className="flex items-center gap-1">
-                <TableIcon className="w-3.5 h-3.5" /> Table {order.table}
-              </span>
+              {order.orderType === "delivery" ? (
+                <span className="flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5" />
+                  Delivery
+                </span>
+              ) : order.orderType === "takeaway" ? (
+                <span className="flex items-center gap-1.5">
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  Takeaway
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <TableIcon className="w-3.5 h-3.5" />
+                  Table {order.table}
+                </span>
+              )}
+
               <span>{order.items.length} items</span>
             </div>
+
             {order.specialInstructions && (
-              <p className="text-xs text-gray-400 italic break-words mt-1">
+              <p className="text-xs italic text-gray-400 wrap-break-words">
                 💬 {order.specialInstructions}
               </p>
             )}
+
+            {/* Delivery address (if applicable) */}
+            {order.orderType === "delivery" &&
+              order.deliveryDetails?.address && (
+                <div className="mt-1 rounded-md border border-orange-100 bg-orange-50 px-3 py-2 text-xs text-gray-600 space-y-0.5">
+                  <p>📍 {order.deliveryDetails.address}</p>
+                  {order.deliveryDetails.landmark && (
+                    <p>{order.deliveryDetails.landmark}</p>
+                  )}
+                  <p>
+                    {order.deliveryDetails.city} -{" "}
+                    {order.deliveryDetails.pincode}
+                  </p>
+                </div>
+              )}
           </div>
 
-          {/* Billing (styled like a mini receipt) */}
-          <div className="bg-gray-50 rounded-lg p-3 text-sm">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
+          {/* Billing (styled like a receipt) */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm space-y-1">
+            <div className="flex justify-between text-xs text-gray-500">
               <span>Subtotal</span>
               <span>₹{order.subtotal.toFixed(2)}</span>
             </div>
@@ -767,17 +832,17 @@ function OrderCard({
                 <span>₹{order.serviceChargeAmount.toFixed(2)}</span>
               </div>
             )}
-            <div className="flex justify-between font-bold text-gray-800 border-t border-gray-200 pt-1.5 mt-1.5">
+            <div className="flex justify-between font-bold text-gray-800 border-t border-gray-300 pt-2 mt-2">
               <span>Total</span>
               <span>₹{order.total.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
-        {/* ---------- BOTTOM ROW: Status change, payment verification, badges ---------- */}
-        <div className="flex flex-wrap items-center justify-between gap-2 mt-auto">
+        {/* ---------- BOTTOM ROW: Status control + badges ---------- */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100 mt-auto">
+          {/* Left: status dropdown & verify payment button */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Status dropdown */}
             <select
               value={order.status}
               onChange={(e) => onUpdateStatus(e.target.value as OrderStatus)}
@@ -790,29 +855,28 @@ function OrderCard({
               ))}
             </select>
 
-            {/* Verify Payment button */}
             {order.paymentStatus === "paid" && order.status !== "completed" && (
               <button
                 onClick={async () => {
                   await verifyPayment(order.id);
                   onUpdateStatus("completed");
                 }}
-                className="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-1"
+                className="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-1.5"
               >
                 ✅ Verify Payment
               </button>
             )}
           </div>
 
-          {/* Badges */}
+          {/* Right: payment method & status badges */}
           <div className="flex flex-wrap items-center gap-2">
             {order.paymentMethod && (
-              <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full font-medium whitespace-nowrap">
+              <span className="px-2.5 py-1 text-xs bg-green-100 text-green-700 rounded-full font-medium">
                 {order.paymentMethod.toUpperCase()}
               </span>
             )}
             {order.paymentStatus === "paid" && order.status !== "completed" && (
-              <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full font-medium whitespace-nowrap">
+              <span className="px-2.5 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full font-medium">
                 ⏳ Awaiting Verification
               </span>
             )}

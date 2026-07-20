@@ -17,11 +17,20 @@ type CustomerInfo = {
 
 type OrderPayload = {
   restaurantId: string;
-  orderType: "dine_in" | "takeaway";
+  orderType: "dine_in" | "takeaway" | "delivery";
   tableNumber?: number | null;
   items: OrderItem[];
   customer?: CustomerInfo;
+
   specialInstructions?: string;
+  deliveryDetails?: {
+    address: string;
+    landmark?: string;
+    city?: string;
+    pincode?: string;
+    charge: number;
+  };
+  requestId?: string;
 };
 
 // 🔥 PLACE ORDER
