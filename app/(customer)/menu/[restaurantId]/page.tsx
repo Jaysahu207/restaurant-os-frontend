@@ -58,8 +58,6 @@ import AOS from "aos";
 
 import { Pacifico, Lobster } from "next/font/google";
 
-
-
 const lobster = Lobster({
   subsets: ["latin"],
   weight: "400",
@@ -174,6 +172,7 @@ interface Order {
   preparationTime?: number;
   orderType?: string;
   table?: string;
+  deliveryCharge?: number;
   preparationStartedAt?: string;
 }
 
@@ -202,6 +201,7 @@ const STATUS_FLOW: OrderStatus[] = [
 const DELIVERY_STATUS_FLOW: OrderStatus[] = [
   "pending",
   "preparing",
+  "ready",
   "out_for_delivery",
   "delivered",
   "completed",
@@ -352,14 +352,26 @@ function CustomerMenuContent() {
   );
   const deliveryCharge =
     orderType === "delivery"
-      ? cartTotals.grandTotal >=
+      ? cartTotals.subtotal >=
         (restaurant?.operations?.delivery?.freeDeliveryAbove ?? Infinity)
         ? 0
         : (restaurant?.operations?.delivery?.deliveryCharge ?? 0)
       : 0;
 
-
   const finalTotal = Math.round(cartTotals.grandTotal + deliveryCharge);
+
+  const orderDeliveryCharge =
+    currentOrder?.orderType === "delivery"
+      ? cartTotals.grandTotal >=
+        (restaurant?.operations?.delivery?.freeDeliveryAbove ?? Infinity)
+        ? 0
+        : (restaurant?.operations?.delivery?.deliveryCharge ?? 0)
+      : 0;
+  // console.log(" Free Delivery Above", restaurant?.operations?.delivery?.freeDeliveryAbove)
+  const orderFinalTotal = Math.round(
+    (currentOrder?.finalAmount || 0)
+  );
+  // console.log("Order Delivery Charge:", orderDeliveryCharge);
   // console.log("Restaurant Data:", restaurant);
   // ------------------------------------------------------------
   // Effects
@@ -454,7 +466,7 @@ function CustomerMenuContent() {
         sessionStorage.setItem(`welcome_seen_${restaurant._id}`, "true");
 
         setShowWelcome(false);
-      }, 80000);
+      }, 8000);
 
       return () => clearTimeout(timer);
     }
@@ -1157,6 +1169,12 @@ function CustomerMenuContent() {
         setIsDownloading(false);
       }
     };
+    const invoiceDeliveryCharge =
+      currentOrder.orderType === "delivery"
+        ? currentOrder.deliveryCharge ?? 0
+        : 0;
+    // console.log("Current Order:", currentOrder);
+    // console.log("Delivery Charge:", currentOrder.deliveryCharge);
     const invoiceOrder = currentOrder
       ? {
         ...currentOrder,
@@ -1167,7 +1185,9 @@ function CustomerMenuContent() {
         cgstAmount: currentOrder.cgstAmount ?? 0,
         sgstAmount: currentOrder.sgstAmount ?? 0,
         serviceChargeAmount: currentOrder.serviceChargeAmount ?? 0,
-
+        deliveryCharge: invoiceDeliveryCharge,
+        grandTotal:
+          (currentOrder.finalAmount ?? 0) + invoiceDeliveryCharge,
         customer: {
           name: currentOrder.customerId?.name || "Guest",
           phone: currentOrder.customerId?.phone || "",
@@ -1181,9 +1201,11 @@ function CustomerMenuContent() {
 
         orderType: currentOrder.orderType,
 
+
         table: currentOrder.tableNumber?.toString() ?? "",
       }
       : null;
+
     const estimatedMinutes =
       currentOrder.orderType === "delivery"
         ? (restaurant?.operations?.delivery?.estimatedDeliveryTime ?? 45)
@@ -1207,7 +1229,6 @@ function CustomerMenuContent() {
       completed: "Completed",
       cancelled: "Cancelled",
     };
-
 
     return (
       <div className="min-h-screen bg-linear-to-br from-gray-50 via-white to-indigo-50/30 p-4 flex items-center justify-center">
@@ -1259,11 +1280,11 @@ function CustomerMenuContent() {
                         {isActive ? (
                           <CheckCircle className="w-4 h-4 text-white" />
                         ) : (
-                          <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                          <div className="w-1.75 h-1.75 bg-gray-400 rounded-full" />
                         )}
                       </div>
                       <span
-                        className={`text-[11px] font-medium mt-2 ${isActive ? "text-orange-600" : "text-gray-400"
+                        className={`text-[9px] font-medium mt-2 ${isActive ? "text-orange-600" : "text-gray-400"
                           }`}
                       >
                         {statusLabels[step]}
@@ -1345,18 +1366,21 @@ function CustomerMenuContent() {
                     <span>₹{currentOrder.serviceChargeAmount || 0}</span>
                   </div>
                 )}
-                {deliveryCharge > 0 && (
+                {currentOrder?.orderType === "delivery" && (
                   <div className="flex justify-between">
                     <span>Delivery Fee</span>
-                    <span>₹{deliveryCharge}</span>
-                  </div>)
-                }
+
+                    {orderDeliveryCharge > 0 ? (
+                      <span>₹{orderDeliveryCharge.toFixed(2)}</span>
+                    ) : (
+                      <span className="font-semibold text-green-600">FREE</span>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
                   <span>Grand Total</span>
-                  {currentOrder?.finalAmount && (
-                    <span>₹{currentOrder.finalAmount + deliveryCharge}</span>
-                  )}
-
+                  <span>₹{orderFinalTotal}</span>
                 </div>
               </div>
             </div>
@@ -1389,7 +1413,6 @@ function CustomerMenuContent() {
               {showPayment && currentOrder.orderType !== "delivery" && (
                 <div className="fixed inset-0 z-9999 flex items-center justify-center bg-white/80 rounded-2xl backdrop-blur-sm p-4 animate-in fade-in duration-200">
                   <div className="relative w-full max-w-sm rounded-3xl bg-white border border-orange-100 shadow-2xl p-6 animate-in slide-in-from-bottom-4 duration-300">
-
                     {/* Close button (floating) - keeps your orange theme */}
                     <button
                       onClick={() => {
@@ -1407,9 +1430,15 @@ function CustomerMenuContent() {
                       <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100">
                         <CreditCard className="h-5 w-5 text-orange-600" />
                       </div>
-                      <h3 className="text-lg font-bold text-gray-900">Complete Payment</h3>
-                      <p className="text-xs text-gray-500 mt-1">Amount To Pay</p>
-                      <p className="mt-2 text-3xl font-black text-green-600">₹{paymentAmount}</p>
+                      <h3 className="text-lg font-bold text-gray-900">
+                        Complete Payment
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Amount To Pay
+                      </p>
+                      <p className="mt-2 text-3xl font-black text-green-600">
+                        ₹{paymentAmount}
+                      </p>
                     </div>
 
                     {/* Payment methods - larger touch targets */}
@@ -1439,8 +1468,12 @@ function CustomerMenuContent() {
                     {selectedPayment === "upi" && restaurant?.upiId && (
                       <div className="mt-5 space-y-4">
                         <div className="text-center">
-                          <h4 className="font-semibold text-gray-800">Scan QR To Pay</h4>
-                          <p className="text-xs text-gray-500">Scan using any UPI App</p>
+                          <h4 className="font-semibold text-gray-800">
+                            Scan QR To Pay
+                          </h4>
+                          <p className="text-xs text-gray-500">
+                            Scan using any UPI App
+                          </p>
                         </div>
 
                         <div className="flex justify-center">
@@ -1455,7 +1488,9 @@ function CustomerMenuContent() {
                           </div>
                           <button
                             onClick={() => {
-                              navigator.clipboard.writeText(restaurant.upiId || "");
+                              navigator.clipboard.writeText(
+                                restaurant.upiId || "",
+                              );
                               toast.success("UPI Copied");
                             }}
                             className="bg-orange-500 text-white rounded-lg px-4 py-2 text-xs font-semibold hover:bg-orange-600 transition active:scale-95 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
@@ -1677,8 +1712,6 @@ function CustomerMenuContent() {
             </div>
           </div>
         )}
-
-
       </header>
       {hasBanners && (
         <section className="max-w-2xl mx-auto px-4 pt-4 pb-2">
@@ -2032,8 +2065,6 @@ function CustomerMenuContent() {
                       </div>
                     </div>
 
-
-
                     {/* Checkout / Proceed */}
                     {!isCheckingOut ? (
                       <button
@@ -2260,21 +2291,28 @@ function CustomerMenuContent() {
                           {orderType === "delivery" &&
                             deliveryStep === "payment" && (
                               <div className="space-y-3">
+
                                 <button
                                   onClick={() => {
                                     setDeliveryPaymentMethod("cash");
-                                    handlePlaceOrder("cash"); // COD -> Order directly
+                                    handlePlaceOrder("cash");
                                   }}
                                   disabled={submitting}
-                                  className="w-full py-3 rounded-xl bg-green-500 hover:bg-green-600 text-white font-semibold"
+                                  className="w-full py-3 rounded-xl bg-green-500 hover:bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold flex items-center justify-center gap-2"
                                 >
-                                  💵 Cash on Delivery
+                                  {submitting ? (
+                                    <>
+                                      <Loader2 className="w-5 h-5 animate-spin" />
+                                      Placing Order...
+                                    </>
+                                  ) : (
+                                    <>💵 Cash on Delivery</>
+                                  )}
                                 </button>
 
                                 {restaurant?.upiId && (
                                   <button
                                     onClick={() => {
-
                                       setDeliveryPaymentMethod("upi");
                                       setSelectedPayment("upi");
                                       setPaymentStarted(true);
@@ -2480,10 +2518,8 @@ function CustomerMenuContent() {
 
               <p className="text-xs text-gray-500 mt-1">Amount To Pay</p>
 
-
               <p className="mt-2 text-3xl font-black text-green-600">
                 ₹{finalTotal}
-
               </p>
             </div>
 
@@ -2527,7 +2563,6 @@ function CustomerMenuContent() {
                 <div className="flex justify-center">
                   <div className="bg-white rounded-2xl p-3 shadow">
                     <QRCode value={baseUPI} size={150} />
-
                   </div>
                 </div>
 
@@ -2557,8 +2592,6 @@ function CustomerMenuContent() {
                 </button>
               </div>
             )}
-
-
 
             <button
               onClick={() => {

@@ -18,6 +18,7 @@ import {
   Utensils,
   AlertCircle,
   LogOut,
+  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -36,17 +37,33 @@ interface Order {
   _id: string;
   tableNumber: number;
   items: OrderItem[];
-  orderType: "dine_in" | "takeaway";
-  status: "pending" | "preparing" | "ready" | "served" | "completed";
+  orderType: "dine_in" | "takeaway" | "delivery";
+  status: "pending" | "preparing" | "ready" | "served" | "completed" | "out_for_delivery" | "delivered" | "paid" | "cancelled";
   createdAt: string;
   customerId?: Customer;
+  delivery?: Delivery;
   specialInstructions?: string;
   customerName?: string;
+  finalAmount?: number;
   orderNumber: string;
   currentKotBatch: number;
   hasNewItems: boolean;
-  updatedAt?: string; // added for completed modal sorting
+  updatedAt?: string;
 }
+
+interface Delivery {
+  address?: DeliveryAddress;
+}
+
+interface DeliveryAddress {
+  house?: string;
+  street?: string;
+  area?: string;
+  city?: string;
+  pincode?: string;
+  landmark?: string;
+}
+
 interface Customer {
   _id: string;
   name: string;
@@ -54,7 +71,16 @@ interface Customer {
   email?: string;
 }
 
-type OrderStatus = "pending" | "preparing" | "ready" | "served" | "completed";
+type OrderStatus =
+  | "pending"
+  | "preparing"
+  | "ready"
+  | "served"
+  | "paid"
+  | "out_for_delivery"
+  | "delivered"
+  | "completed"
+  | "cancelled";
 
 // ==================== Main Component ====================
 export default function KitchenPage() {
@@ -65,22 +91,20 @@ export default function KitchenPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [completedModalOpen, setCompletedModalOpen] = useState(false); // NEW
+  const [completedModalOpen, setCompletedModalOpen] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // ─── Audio Setup ──────────────────────────────────────────
   useEffect(() => {
     const unlockAudio = () => {
       const audio = audioRef.current;
       if (audio) {
-        audio
-          .play()
-          .then(() => {
-            audio.pause();
-            audio.currentTime = 0;
-          })
-          .catch(() => {});
+        audio.play().then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+        }).catch(() => { });
       }
       window.removeEventListener("click", unlockAudio);
     };
@@ -88,29 +112,25 @@ export default function KitchenPage() {
     return () => window.removeEventListener("click", unlockAudio);
   }, []);
 
-  // Initialize audio on client side
   useEffect(() => {
     audioRef.current = new Audio("/sounds/new-order.mp3");
     audioRef.current.load();
   }, []);
 
-  // Play sound with user interaction handling
   const playSound = useCallback(() => {
     if (!soundEnabled || !audioRef.current) return;
     try {
       audioRef.current.currentTime = 0;
       const playPromise = audioRef.current.play();
       if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn("Audio play failed:", err);
-        });
+        playPromise.catch(() => { });
       }
-    } catch (err) {
-      console.error("Unexpected audio error:", err);
+    } catch {
+      // Silently fail
     }
   }, [soundEnabled]);
 
-  // Load initial orders
+  // ─── Data Loading ─────────────────────────────────────────
   const loadOrders = useCallback(async () => {
     if (!restaurant?._id) return;
     try {
@@ -119,11 +139,8 @@ export default function KitchenPage() {
       const data = await getOrders(restaurant._id, today);
       const ordersArray = Array.isArray(data) ? data : data.orders || [];
       const kitchenOrders = ordersArray.filter((o: Order) =>
-        ["pending", "preparing", "ready", "served", "completed"].includes(
-          o.status,
-        ),
+        ["pending", "preparing", "ready", "served", "completed", "out_for_delivery", "delivered", "paid"].includes(o.status)
       );
-
       setOrders(kitchenOrders);
     } catch (error) {
       console.error("Failed to load orders:", error);
@@ -138,13 +155,12 @@ export default function KitchenPage() {
     loadOrders();
   }, [loadOrders]);
 
-  // Manual refresh
   const handleRefresh = () => {
     setRefreshing(true);
     loadOrders();
   };
 
-  // Socket connection
+  // ─── Socket ──────────────────────────────────────────────
   useEffect(() => {
     if (!restaurant?._id) return;
 
@@ -156,27 +172,19 @@ export default function KitchenPage() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      // console.log("🔌 Kitchen socket connected");
       setSocketConnected(true);
       socket.emit("joinRestaurant", restaurant._id);
     });
 
     socket.on("disconnect", () => {
-      console.log("🔌 Kitchen socket disconnected");
       setSocketConnected(false);
     });
+
     socket.on("NEW_ORDER", (newOrder: Order) => {
       setOrders((prev) => {
-        if (prev.some((o) => o._id === newOrder._id)) {
-          return prev;
-        }
-
+        if (prev.some((o) => o._id === newOrder._id)) return prev;
         playSound();
-
-        toast.success(`New Order - Table ${newOrder.tableNumber}`, {
-          icon: "🍽️",
-        });
-
+        toast.success(`New Order - Table ${newOrder.tableNumber}`, { icon: "🍽️" });
         return [newOrder, ...prev];
       });
     });
@@ -184,7 +192,6 @@ export default function KitchenPage() {
     socket.on("ORDER_UPDATED", (updatedOrder: Order) => {
       setOrders((prev) => {
         const index = prev.findIndex((o) => o._id === updatedOrder._id);
-
         if (index !== -1) {
           const copy = [...prev];
           copy[index] = updatedOrder;
@@ -195,9 +202,7 @@ export default function KitchenPage() {
 
       if (updatedOrder.hasNewItems) {
         playSound();
-        toast.success(`New items added on Table ${updatedOrder.tableNumber}`, {
-          icon: "🍽️",
-        });
+        toast.success(`New items added on Table ${updatedOrder.tableNumber}`, { icon: "🍽️" });
       }
     });
 
@@ -206,12 +211,12 @@ export default function KitchenPage() {
     };
   }, [restaurant?._id, playSound]);
 
-  // Update order status with optimistic UI
+  // ─── Handlers ─────────────────────────────────────────────
   const updateStatus = async (orderId: string, newStatus: string) => {
     setOrders((prev) =>
       prev.map((o) =>
-        o._id === orderId ? { ...o, status: newStatus as OrderStatus } : o,
-      ),
+        o._id === orderId ? { ...o, status: newStatus as OrderStatus } : o
+      )
     );
     try {
       await updateOrderStatus(orderId, newStatus);
@@ -239,69 +244,65 @@ export default function KitchenPage() {
     window.location.href = "/";
   };
 
-  // Group orders by status
+  // ─── Derived Data ────────────────────────────────────────
   const pendingOrders = orders.filter((o) => o.status === "pending");
   const preparingOrders = orders.filter((o) => o.status === "preparing");
   const readyOrders = orders.filter((o) => o.status === "ready");
+  const servedOrders = orders.filter((o) => o.status === "served");
+  const completedOrders = orders.filter((o) => o.status === "completed");
 
-  // Loading skeleton
   if (loading && !refreshing) {
     return <KitchenSkeleton />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100/80">
       <div className="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-6">
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        {/* ─── Header ───────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-orange-600 to-orange-800 bg-clip-text text-transparent truncate">
+            <h1 className="text-2xl md:text-3xl font-bold bg-linear-to-r from-orange-600 to-orange-800 bg-clip-text text-transparent truncate">
               {restaurant?.name || "The Grand Kitchen"}
             </h1>
-            <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
-              <span className="flex items-center gap-1">
-                <ChefHat size={12} />
-                Chef: {user?.name || "Gordon"}
+            <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
+              <span className="flex items-center gap-1.5">
+                <ChefHat size={14} className="text-orange-500" />
+                <span>Chef: {user?.name || "Gordon"}</span>
               </span>
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1.5">
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${socketConnected ? "bg-green-500 animate-pulse" : "bg-red-500"}`}
+                  className={`w-2 h-2 rounded-full ${socketConnected ? "bg-emerald-500 animate-pulse" : "bg-red-400"}`}
                 />
-                {socketConnected ? "Live" : "Offline"}
+                <span className="font-medium">
+                  {socketConnected ? "Live" : "Offline"}
+                </span>
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Sound Toggle */}
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2 rounded-full transition-all ${
-                soundEnabled
-                  ? "bg-orange-100 text-orange-600"
-                  : "bg-gray-200 text-gray-500"
-              }`}
+              className={`p-2.5 rounded-xl transition-all ${soundEnabled
+                ? "bg-orange-100 text-orange-600 hover:bg-orange-200"
+                : "bg-gray-200 text-gray-500 hover:bg-gray-300"
+                }`}
               title={soundEnabled ? "Sound On" : "Sound Off"}
             >
               {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
             </button>
 
-            {/* Refresh */}
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="p-2 rounded-full bg-white shadow-sm text-gray-600 active:scale-95 transition"
+              className="p-2.5 rounded-xl bg-white shadow-sm text-gray-600 hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-50"
             >
-              <RefreshCw
-                size={18}
-                className={refreshing ? "animate-spin" : ""}
-              />
+              <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
             </button>
 
-            {/* Logout */}
             <button
               onClick={handleLogout}
-              className="p-2 rounded-full bg-red-50 text-red-600 active:scale-95 transition"
+              className="p-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 active:scale-95 transition-all"
               title="Logout"
             >
               <LogOut size={18} />
@@ -309,110 +310,77 @@ export default function KitchenPage() {
           </div>
         </div>
 
-        {/* Stats Overview - Responsive Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
-          <StatCard
-            label="Pending"
-            value={pendingOrders.length}
-            color="bg-amber-500"
-            icon={Clock}
-          />
-          <StatCard
-            label="Preparing"
-            value={preparingOrders.length}
-            color="bg-blue-500"
-            icon={ChefHat}
-          />
-          <StatCard
-            label="Ready"
-            value={readyOrders.length}
-            color="bg-emerald-500"
-            icon={CheckCircle2}
-          />
-          <StatCard
-            label="Served"
-            value={orders.filter((o) => o.status === "served").length}
-            color="bg-purple-500"
-            icon={CheckCircle}
-          />
-          {/* Completed Stat Card - now clickable */}
+        {/* ─── Stats ────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-8">
+          <StatCard label="Pending" value={pendingOrders.length} color="amber" icon={Clock} />
+          <StatCard label="Preparing" value={preparingOrders.length} color="blue" icon={ChefHat} />
+          <StatCard label="Ready" value={readyOrders.length} color="emerald" icon={CheckCircle2} />
+          <StatCard label="Served" value={servedOrders.length} color="purple" icon={CheckCircle} />
           <div
             onClick={() => setCompletedModalOpen(true)}
-            className="cursor-pointer"
+            className="cursor-pointer transition-transform hover:scale-[1.02] active:scale-95"
           >
             <StatCard
               label="Completed"
-              value={orders.filter((o) => o.status === "completed").length}
-              color="bg-gray-500"
+              value={completedOrders.length}
+              color="gray"
               icon={CheckCircle}
             />
           </div>
         </div>
 
-        {/* Kanban Columns */}
-        <div className="flex overflow-x-auto lg:overflow-visible lg:grid lg:grid-cols-3 gap-5 pb-4 -mx-4 px-4 lg:mx-0 lg:px-0">
-          {/* Pending Column */}
-          <div className="min-w-[280px] lg:min-w-0 flex-1">
-            <Column
-              title="Pending"
-              subtitle="New orders waiting"
-              orders={pendingOrders}
-              onUpdate={updateStatus}
-              onViewDetail={openDetail}
-              nextStatus="preparing"
-              statusColor="border-amber-400"
-              buttonColor="bg-blue-600 hover:bg-blue-700"
-            />
-          </div>
-
-          {/* Preparing Column */}
-          <div className="min-w-[280px] lg:min-w-0 flex-1">
-            <Column
-              title="Preparing"
-              subtitle="Currently cooking"
-              orders={preparingOrders}
-              onUpdate={updateStatus}
-              onViewDetail={openDetail}
-              nextStatus="ready"
-              statusColor="border-blue-400"
-              buttonColor="bg-emerald-600 hover:bg-emerald-700"
-            />
-          </div>
-
-          {/* Ready Column */}
-          <div className="min-w-[280px] lg:min-w-0 flex-1">
-            <Column
-              title="Ready"
-              subtitle="Ready for serving"
-              orders={readyOrders}
-              onUpdate={updateStatus}
-              onViewDetail={openDetail}
-              nextStatus="served"
-              statusColor="border-emerald-400"
-              buttonColor="bg-purple-600 hover:bg-purple-700"
-            />
-          </div>
+        {/* ─── Kanban Columns ───────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <Column
+            title="Pending"
+            subtitle="New orders waiting"
+            orders={pendingOrders}
+            onUpdate={updateStatus}
+            onViewDetail={openDetail}
+            nextStatus="preparing"
+            accentColor="border-l-amber-400"
+            buttonColor="bg-blue-600 hover:bg-blue-700"
+          />
+          <Column
+            title="Preparing"
+            subtitle="Currently cooking"
+            orders={preparingOrders}
+            onUpdate={updateStatus}
+            onViewDetail={openDetail}
+            nextStatus="ready"
+            accentColor="border-l-blue-400"
+            buttonColor="bg-emerald-600 hover:bg-emerald-700"
+          />
+          <Column
+            title="Ready"
+            subtitle="Ready for serving"
+            orders={readyOrders}
+            onUpdate={updateStatus}
+            onViewDetail={openDetail}
+            nextStatus="served"
+            accentColor="border-l-emerald-400"
+            buttonColor="bg-purple-600 hover:bg-purple-700"
+          />
         </div>
 
-        {/* Empty State */}
+        {/* ─── Empty State ──────────────────────────────────── */}
         {orders.length === 0 && !loading && (
-          <div className="mt-12 text-center py-12 bg-white/60 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100">
-            <Utensils className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-gray-800">
-              No active orders
-            </h3>
-            <p className="text-gray-500 text-sm">
-              New orders will appear here automatically
+          <div className="mt-12 text-center py-16 px-4 bg-white/60 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Utensils className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-800">No active orders</h3>
+            <p className="text-gray-500 text-sm mt-1 max-w-sm mx-auto">
+              New orders will appear here automatically as they come in.
             </p>
           </div>
         )}
 
-        {/* Order Detail Modal */}
+        {/* ─── Modals ────────────────────────────────────────── */}
         {detailModalOpen && selectedOrder && (
           <OrderDetailModal order={selectedOrder} onClose={closeDetail} />
         )}
 
-        {/* Completed Orders Modal */}
         {completedModalOpen && (
           <CompletedOrdersModal
             orders={orders}
@@ -437,14 +405,24 @@ function StatCard({
   color: string;
   icon: any;
 }) {
+  const colorMap: Record<string, string> = {
+    amber: "bg-amber-100 text-amber-600",
+    blue: "bg-blue-100 text-blue-600",
+    emerald: "bg-emerald-100 text-emerald-600",
+    purple: "bg-purple-100 text-purple-600",
+    gray: "bg-gray-100 text-gray-600",
+  };
+
   return (
-    <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-4 hover:shadow-md transition-shadow duration-200">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500">{label}</p>
-          <p className="text-2xl font-bold text-gray-800">{value}</p>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            {label}
+          </p>
+          <p className="text-2xl font-bold text-gray-800 mt-0.5">{value}</p>
         </div>
-        <div className={`p-2 rounded-full ${color} text-white`}>
+        <div className={`p-2.5 rounded-xl ${colorMap[color] || "bg-gray-100 text-gray-600"}`}>
           <Icon className="w-5 h-5" />
         </div>
       </div>
@@ -460,7 +438,7 @@ function Column({
   onUpdate,
   onViewDetail,
   nextStatus,
-  statusColor,
+  accentColor,
   buttonColor,
 }: {
   title: string;
@@ -469,25 +447,37 @@ function Column({
   onUpdate: (id: string, status: string) => void;
   onViewDetail: (order: Order) => void;
   nextStatus: string;
-  statusColor: string;
+  accentColor: string;
   buttonColor: string;
 }) {
   const sortedOrders = [...orders].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border-t-4 ${statusColor}`}>
-      <div className="p-4 border-b">
-        <h2 className="font-semibold text-gray-800 text-lg">{title}</h2>
-        <p className="text-sm text-gray-500">{subtitle}</p>
-        <p className="text-xs text-gray-400 mt-1">{orders.length} orders</p>
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-200/80 border-l-4 ${accentColor} overflow-hidden flex flex-col max-h-[calc(100vh-320px)]`}>
+      <div className="px-4 py-3.5 border-b border-gray-200/80 shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-gray-800 text-lg leading-tight">
+              {title}
+            </h2>
+            <p className="text-sm text-gray-500">{subtitle}</p>
+          </div>
+          <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
+            {orders.length}
+          </span>
+        </div>
       </div>
 
-      <div className="p-4 space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+      <div className="p-4 space-y-3 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
         {sortedOrders.length === 0 ? (
-          <div className="text-center py-8 text-gray-400 text-sm">
-            No orders in this column
+          <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+            <div className="bg-gray-50 rounded-full p-4 mb-3">
+              <Utensils className="w-6 h-6" strokeWidth={1.5} />
+            </div>
+            <p className="text-sm font-medium">No orders</p>
+            <p className="text-xs text-gray-400">All caught up!</p>
           </div>
         ) : (
           sortedOrders.map((order) => (
@@ -533,90 +523,158 @@ function OrderCard({
   };
 
   const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = order.finalAmount || order.items.reduce((s, i) => s + i.price * i.quantity, 0);
+
   const sortedItems = [...order.items].sort((a, b) => {
-    if (a.kotPrinted !== b.kotPrinted) {
-      return a.kotPrinted ? 1 : -1;
-    }
+    if (a.kotPrinted !== b.kotPrinted) return a.kotPrinted ? 1 : -1;
     return b.kotBatch - a.kotBatch;
   });
 
+  const statusColorMap: Record<string, string> = {
+    pending: "bg-amber-100 text-amber-800 border-amber-200",
+    preparing: "bg-blue-100 text-blue-800 border-blue-200",
+    ready: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    served: "bg-purple-100 text-purple-800 border-purple-200",
+    out_for_delivery: "bg-indigo-100 text-indigo-800 border-indigo-200",
+    delivered: "bg-teal-100 text-teal-800 border-teal-200",
+    paid: "bg-green-100 text-green-800 border-green-200",
+    completed: "bg-gray-100 text-gray-700 border-gray-200",
+    cancelled: "bg-rose-100 text-rose-700 border-rose-200",
+  };
+
+  const getActionLabel = (orderType: string, nextStatus: string) => {
+    if (orderType === "delivery") {
+      switch (nextStatus) {
+        case "preparing": return "Start Preparing";
+        case "out_for_delivery": return "Dispatch";
+        case "delivered": return "Mark Delivered";
+        case "completed": return "Complete";
+        default: return "Update";
+      }
+    }
+    if (orderType === "takeaway") {
+      switch (nextStatus) {
+        case "preparing": return "Start Preparing";
+        case "ready": return "Ready for Pickup";
+        case "completed": return "Complete";
+        default: return "Update";
+      }
+    }
+    switch (nextStatus) {
+      case "preparing": return "Start Preparing";
+      case "ready": return "Ready to Serve";
+      case "served": return "Mark Served";
+      case "paid": return "Payment Received";
+      case "completed": return "Complete";
+      default: return "Update";
+    }
+  };
+
   return (
-    <div className="border rounded-lg bg-gray-50 hover:shadow-md transition">
+    <div className="bg-white rounded-xl border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
       {order.hasNewItems && (
-        <div className="mb-3 rounded-lg bg-red-100 text-red-700 px-3 py-2 text-sm font-semibold animate-pulse">
-          🔔 New Items Added
+        <div className="bg-red-50 border-b border-red-200/80 px-4 py-2.5 flex items-center gap-2.5 text-sm text-red-700">
+          <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <span className="font-semibold">New items added</span>
+          <span className="text-xs text-red-600 font-medium">· check KOT</span>
         </div>
       )}
-      <div className="p-4">
+
+      <div className="p-4 space-y-3">
         {/* Header */}
-        <div className="flex items-start justify-between mb-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-800">
-                {order.orderType === "dine_in"
-                  ? `🍽️ Table ${order.tableNumber}`
-                  : "🥡 Takeaway"}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center flex-wrap gap-2">
+              <span className="font-semibold text-gray-800 text-sm flex items-center gap-1.5">
+                {order.orderType === "dine_in" && <>🍽️ Table {order.tableNumber}</>}
+                {order.orderType === "takeaway" && <>🥡 Takeaway</>}
+                {order.orderType === "delivery" && (
+                  <span className="text-blue-600">🚚 Delivery</span>
+                )}
               </span>
-              <span className="text-xs bg-gray-200 px-2 py-0.5 rounded-full">
-                #{order.orderNumber.slice(-3)}
+              <span className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded-full text-gray-600">
+                #{order.orderNumber.slice(-4)}
               </span>
+              {(order.customerId?.name || order.customerName) && (
+                <span className="text-xs text-gray-500 truncate max-w-30">
+                  · {order.customerId?.name || order.customerName}
+                </span>
+              )}
             </div>
-            {order.customerName && (
-              <p className="text-sm text-gray-600">{order.customerName}</p>
-            )}
+
+            <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+              <span>{totalItems} item{totalItems > 1 ? "s" : ""}</span>
+              {totalPrice > 0 && (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <span className="font-medium text-gray-700">
+                    ₹{totalPrice.toFixed(2)}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
+
           <button
             onClick={() => onViewDetail(order)}
-            className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-lg transition"
-            title="View details"
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
+            aria-label="View order details"
           >
             <Eye className="w-4 h-4" />
           </button>
         </div>
 
         {/* Items Summary */}
-        <div className="text-sm text-gray-700 mb-2">
-          <p className="font-medium">{totalItems} items:</p>
-          <ul className="mt-1 space-y-0.5">
-            {sortedItems.slice(0, 3).map((item) => (
-              <li key={item._id} className="flex justify-between items-center">
-                <span className="truncate">
-                  {item.quantity} × {item.name}
+        <div className="bg-gray-50/70 rounded-lg px-3 py-2.5 border border-gray-200/60">
+          <ul className="space-y-1 text-sm">
+            {sortedItems.slice(0, 4).map((item) => (
+              <li key={item._id} className="flex justify-between items-center gap-3">
+                <span className="text-gray-700 truncate flex-1">
+                  {item.quantity}× {item.name}
                 </span>
                 {!item.kotPrinted && (
-                  <span className="ml-2 px-2 py-0.5 rounded bg-red-500 text-white text-[10px]">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white shrink-0">
                     NEW
                   </span>
                 )}
               </li>
             ))}
-            {order.items.length > 3 && (
-              <li className="text-gray-500 text-xs">
-                +{sortedItems.length - 4} more items
+            {order.items.length > 4 && (
+              <li className="text-xs text-gray-400 pt-0.5 border-t border-gray-200/50">
+                +{order.items.length - 4} more item{order.items.length - 4 > 1 ? "s" : ""}
               </li>
             )}
           </ul>
         </div>
 
-        {/* Special instructions indicator */}
+        {/* Special instructions */}
         {order.specialInstructions && (
-          <div className="mb-2 text-xs text-orange-600 bg-orange-50 p-1.5 rounded flex items-start gap-1">
-            <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-            <span className="line-clamp-2">{order.specialInstructions}</span>
+          <div className="flex items-start gap-2 text-xs bg-amber-50/70 border border-amber-200/70 rounded-lg px-3 py-2 text-amber-700">
+            <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" />
+            <span className="line-clamp-2 leading-relaxed">{order.specialInstructions}</span>
           </div>
         )}
 
-        {/* Footer with timer and action */}
-        <div className="flex items-center justify-between mt-3 pt-2 border-t">
-          <span className="text-xs text-gray-500 flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            {getElapsedTime()}
-          </span>
+        {/* Footer */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/60">
+          <div className="flex items-center gap-3">
+            <span
+              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusColorMap[order.status] || "bg-gray-100 text-gray-700 border-gray-200"
+                }`}
+            >
+              {order.status.replaceAll("_", " ").toUpperCase()}
+            </span>
+            <span className="text-xs text-gray-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {getElapsedTime()}
+            </span>
+          </div>
+
           <button
             onClick={() => onUpdate(order._id, nextStatus)}
-            className={`px-3 py-1.5 text-white text-sm rounded-lg transition ${buttonColor}`}
+            className={`px-4 py-1.5 text-white text-xs font-medium rounded-lg transition-colors hover:brightness-110 focus:ring-2 focus:ring-offset-2 focus:ring-${buttonColor.replace('bg-', '').replace(/\s.*$/, '')} ${buttonColor}`}
           >
-            Mark {nextStatus}
+            {getActionLabel(order.orderType, nextStatus)}
           </button>
         </div>
       </div>
@@ -625,13 +683,7 @@ function OrderCard({
 }
 
 // ==================== Order Detail Modal ====================
-function OrderDetailModal({
-  order,
-  onClose,
-}: {
-  order: Order;
-  onClose: () => void;
-}) {
+function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => void }) {
   const batches = order.items.reduce(
     (acc, item) => {
       if (!acc[item.kotBatch]) {
@@ -641,7 +693,7 @@ function OrderDetailModal({
       if (!item.kotPrinted) acc[item.kotBatch].hasNew = true;
       return acc;
     },
-    {} as Record<number, { items: OrderItem[]; hasNew: boolean }>,
+    {} as Record<number, { items: OrderItem[]; hasNew: boolean }>
   );
 
   const sortedBatchEntries = Object.entries(batches).sort(
@@ -649,102 +701,161 @@ function OrderDetailModal({
       if (dataA.hasNew && !dataB.hasNew) return -1;
       if (!dataA.hasNew && dataB.hasNew) return 1;
       return Number(batchB) - Number(batchA);
-    },
+    }
   );
 
   const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
   const newItemsCount = order.items.filter((i) => !i.kotPrinted).length;
+  const totalAmount = order.finalAmount || order.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
-  const statusColor = {
-    pending: "bg-yellow-100 text-yellow-800",
-    preparing: "bg-blue-100 text-blue-800",
-    ready: "bg-green-100 text-green-800",
-    served: "bg-purple-100 text-purple-800",
-    completed: "bg-gray-200 text-gray-700",
+  const statusColor: Record<string, string> = {
+    pending: "bg-amber-100 text-amber-800 border-amber-200",
+    preparing: "bg-blue-100 text-blue-800 border-blue-200",
+    ready: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    served: "bg-purple-100 text-purple-800 border-purple-200",
+    completed: "bg-gray-100 text-gray-700 border-gray-200",
   };
+
+  const formatDate = (date: string | Date) =>
+    new Date(date).toLocaleString([], {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+  const customerName = order.customerId?.name || order.customerName || "Walk-in Customer";
+  const address = order.delivery?.address;
+  const fullAddress = address
+    ? [address.house, address.street, address.area, address.city, address.pincode]
+      .filter(Boolean)
+      .join(", ")
+    : "";
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-gray-100"
+        className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200/50"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-2xl">
-          <div>
-            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <span>Order No : </span>
-              <span className="text-gray-700 font-mono">
-                {order.orderNumber.slice(-3)}
-              </span>
-              <span className="text-sm font-normal text-gray-700 ml-2">
-                · Table {order.tableNumber}
-              </span>
-            </h3>
-            <p className="text-sm text-gray-500 mt-0.5">
-              <p>
-                {order.customerId?.name ||
-                  order.customerName ||
-                  "Walk-in Customer"}
-              </p>{" "}
-              · {totalItems} item
-              {totalItems > 1 ? "s" : ""}
-              {newItemsCount > 0 && (
-                <span className="ml-2 text-red-500 font-semibold">
-                  ({newItemsCount} new)
+        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-gray-200/80 px-6 py-5 rounded-t-2xl">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
+                <h3 className="text-xl font-bold text-gray-900">
+                  Order <span className="font-mono">#{order.orderNumber.slice(-3)}</span>
+                </h3>
+                <span className="text-sm font-medium text-gray-600 flex items-center gap-1.5">
+                  {order.orderType === "dine_in" && <>🍽️ Table {order.tableNumber}</>}
+                  {order.orderType === "takeaway" && <>🥡 Takeaway</>}
+                  {order.orderType === "delivery" && (
+                    <span className="text-blue-600">🚚 Delivery</span>
+                  )}
                 </span>
-              )}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <XCircle className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
+                <span className="text-xs text-gray-400 flex items-center gap-1">
+                  🕒 {formatDate(order.createdAt)}
+                </span>
+              </div>
 
-        {/* Body */}
-        <div className="p-6 space-y-5">
-          <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                <span className="text-gray-700 font-medium">{customerName}</span>
+                <span className="text-gray-300">·</span>
+                <span className="text-gray-600">
+                  {totalItems} item{totalItems > 1 ? "s" : ""}
+                </span>
+                {newItemsCount > 0 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                    {newItemsCount} new
+                  </span>
+                )}
+                {totalAmount > 0 && (
+                  <>
+                    <span className="text-gray-300">·</span>
+                    <span className="font-semibold text-gray-800">
+                      ₹{totalAmount.toFixed(2)}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors -mr-2 shrink-0"
+              aria-label="Close modal"
+            >
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-3">
             <span
-              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${
-                statusColor[order.status]
-              }`}
+              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider border ${statusColor[order.status] || "bg-gray-100 text-gray-700 border-gray-200"
+                }`}
             >
               {order.status}
             </span>
             {order.specialInstructions && (
-              <span className="inline-flex items-center text-sm text-amber-700 bg-amber-50 px-3 py-1 rounded-full">
+              <span className="inline-flex items-center text-sm text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
                 ⚠️ Special instructions
               </span>
             )}
           </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-6">
+          {order.orderType === "delivery" && address && (
+            <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-5 space-y-2">
+              <h4 className="font-semibold text-blue-800 flex items-center gap-2 text-sm">
+                <span className="text-lg">🚚</span> Delivery Details
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                <p>
+                  <span className="font-medium text-gray-600">Customer:</span>{" "}
+                  {order.customerId?.name || customerName}
+                </p>
+                <p>
+                  <span className="font-medium text-gray-600">Phone:</span>{" "}
+                  {order.customerId?.phone || "—"}
+                </p>
+                <p className="sm:col-span-2">
+                  <span className="font-medium text-gray-600">Address:</span>{" "}
+                  <span className="text-gray-700">{fullAddress}</span>
+                </p>
+                {address.landmark && (
+                  <p className="sm:col-span-2">
+                    <span className="font-medium text-gray-600">Landmark:</span>{" "}
+                    <span className="text-gray-700">{address.landmark}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           <div>
-            <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              Kitchen Order Tickets
+            <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <span>Kitchen Order Tickets</span>
+              <span className="h-px flex-1 bg-gray-200" />
             </h4>
             <div className="space-y-4">
               {sortedBatchEntries.map(([batch, { items, hasNew }]) => (
                 <div
                   key={batch}
-                  className={`rounded-xl border ${
-                    hasNew
-                      ? "border-red-200 bg-red-50/40"
-                      : "border-gray-200 bg-white"
-                  } shadow-sm overflow-hidden transition-all`}
+                  className={`rounded-xl border shadow-sm overflow-hidden transition-all ${hasNew ? "border-red-200 bg-red-50/30" : "border-gray-200 bg-white"
+                    }`}
                 >
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50/80 border-b border-gray-100">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-gray-800">
+                  <div className="flex items-center justify-between px-4 py-3 bg-gray-50/80 border-b border-gray-200/60">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono font-bold text-gray-800 text-sm">
                         KOT #{batch}
                       </span>
                       {hasNew && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white animate-pulse">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white animate-pulse">
                           NEW
                         </span>
                       )}
@@ -753,16 +864,16 @@ function OrderDetailModal({
                       {items.length} item{items.length > 1 ? "s" : ""}
                     </span>
                   </div>
-                  <div className="divide-y divide-gray-100">
+
+                  <div className="divide-y divide-gray-200/60">
                     {items.map((item) => (
                       <div
                         key={item._id}
-                        className={`px-4 py-3 flex justify-between items-center ${
-                          !item.kotPrinted ? "bg-red-50/20" : ""
-                        }`}
+                        className={`px-4 py-3 flex items-start gap-3 ${!item.kotPrinted ? "bg-red-50/40" : ""
+                          }`}
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5">
                             <span className="font-medium text-gray-800">
                               {item.quantity}× {item.name}
                             </span>
@@ -771,10 +882,16 @@ function OrderDetailModal({
                                 NEW
                               </span>
                             )}
+                            {item.price > 0 && (
+                              <span className="text-xs text-gray-400 ml-auto">
+                                ₹{item.price.toFixed(2)}
+                              </span>
+                            )}
                           </div>
                           {item.specialInstructions && (
-                            <p className="text-xs text-orange-600 mt-1 flex items-start gap-1">
-                              <span>📌</span> {item.specialInstructions}
+                            <p className="text-xs text-amber-600 mt-1 flex items-start gap-1.5">
+                              <span>📌</span>
+                              <span>{item.specialInstructions}</span>
                             </p>
                           )}
                         </div>
@@ -787,21 +904,20 @@ function OrderDetailModal({
           </div>
 
           {order.specialInstructions && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-2">
-              <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider">
-                Order Instructions
+            <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 space-y-1">
+              <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider flex items-center gap-2">
+                <span>📋</span> Order Instructions
               </p>
-              <p className="text-sm text-amber-700 mt-0.5">
-                {order.specialInstructions}
-              </p>
+              <p className="text-sm text-amber-700">{order.specialInstructions}</p>
             </div>
           )}
         </div>
 
-        <div className="border-t border-gray-100 px-6 py-4 flex justify-end bg-gray-50/80 rounded-b-2xl">
+        {/* Footer */}
+        <div className="border-t border-gray-200/60 px-6 py-4 flex justify-end bg-gray-50/80 rounded-b-2xl">
           <button
             onClick={onClose}
-            className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-colors text-sm"
+            className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-colors text-sm"
           >
             Close
           </button>
@@ -815,15 +931,10 @@ function OrderDetailModal({
 interface CompletedOrdersModalProps {
   orders: Order[];
   onClose: () => void;
-  onViewOrder: (order: Order) => void; // to open detail modal
+  onViewOrder: (order: Order) => void;
 }
 
-function CompletedOrdersModal({
-  orders,
-  onClose,
-  onViewOrder,
-}: CompletedOrdersModalProps) {
-  // Filter completed/served orders and sort by latest update
+function CompletedOrdersModal({ orders, onClose, onViewOrder }: CompletedOrdersModalProps) {
   const completedOrders = orders
     .filter((o) => o.status === "completed" || o.status === "served")
     .sort((a, b) => {
@@ -845,48 +956,45 @@ function CompletedOrdersModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-gray-100"
+        className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-gray-200/50"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Sticky Header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-2xl">
-          <div>
-            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-              <span>✅ Completed Orders</span>
-              <span className="bg-green-100 text-green-700 text-sm font-semibold px-3 py-0.5 rounded-full">
-                {completedOrders.length}
-              </span>
-            </h3>
-            <p className="text-sm text-gray-500 mt-0.5">
-              All finished orders – newest first. Click any order to view
-              details.
-            </p>
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-gray-200/80 px-6 py-5 rounded-t-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
+                <span>✅ Completed Orders</span>
+                <span className="bg-emerald-100 text-emerald-700 text-sm font-semibold px-3 py-0.5 rounded-full">
+                  {completedOrders.length}
+                </span>
+              </h3>
+              <p className="text-sm text-gray-500 mt-0.5">
+                All finished orders – newest first. Click any order to view details.
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors -mr-2"
+            >
+              <XCircle className="w-5 h-5 text-gray-400" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <XCircle className="w-5 h-5 text-gray-400" />
-          </button>
         </div>
 
-        {/* Scrollable Body */}
+        {/* Body */}
         <div className="p-6 overflow-y-auto flex-1">
           {completedOrders.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
               <div className="bg-gray-50 rounded-full p-6 mb-4">
                 <Clock className="w-10 h-10" strokeWidth={1.5} />
               </div>
-              <p className="text-lg font-medium text-gray-500">
-                No completed orders yet
-              </p>
-              <p className="text-sm text-gray-400">
-                Completed orders will appear here for review.
-              </p>
+              <p className="text-lg font-medium text-gray-500">No completed orders yet</p>
+              <p className="text-sm text-gray-400">Completed orders will appear here for review.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -895,17 +1003,16 @@ function CompletedOrdersModal({
                   key={order._id}
                   onClick={() => {
                     onViewOrder(order);
-                    onClose(); // close completed modal after opening detail
+                    onClose();
                   }}
-                  className="bg-gray-50/70 hover:bg-gray-100 border border-gray-200 rounded-xl p-4 transition-all cursor-pointer flex items-center justify-between"
+                  className="bg-gray-50/70 hover:bg-gray-100/80 border border-gray-200/80 rounded-xl p-4 transition-all cursor-pointer flex flex-wrap items-center justify-between gap-4"
                 >
-                  {/* Order Info Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 min-w-50">
                     <div>
                       <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
                         Order #
                       </p>
-                      <p className="font-bold text-gray-800">
+                      <p className="font-bold text-gray-800 font-mono">
                         #{order.orderNumber.slice(-4)}
                       </p>
                     </div>
@@ -921,12 +1028,8 @@ function CompletedOrdersModal({
                       <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
                         Customer
                       </p>
-                      <p className="font-semibold text-gray-800">
-                        <p>
-                          {order.customerId?.name ||
-                            order.customerName ||
-                            "Walk-in "}
-                        </p>
+                      <p className="font-semibold text-gray-800 truncate">
+                        {order.customerId?.name || order.customerName || "Walk-in"}
                       </p>
                     </div>
                     <div>
@@ -939,15 +1042,14 @@ function CompletedOrdersModal({
                     </div>
                   </div>
 
-                  {/* Right side: time + status icon */}
-                  <div className="flex items-center gap-4 ml-4 flex-shrink-0">
+                  <div className="flex items-center gap-4 shrink-0 ml-auto">
                     <div className="text-right">
                       <p className="text-xs text-gray-400">Completed</p>
                       <p className="text-sm font-medium text-gray-700 whitespace-nowrap">
                         {formatTime(order.updatedAt)}
                       </p>
                     </div>
-                    <CheckCircle2 className="w-6 h-6 text-green-500 flex-shrink-0" />
+                    <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />
                   </div>
                 </div>
               ))}
@@ -956,10 +1058,10 @@ function CompletedOrdersModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-100 px-6 py-4 flex justify-end bg-gray-50/80 rounded-b-2xl">
+        <div className="border-t border-gray-200/60 px-6 py-4 flex justify-end bg-gray-50/80 rounded-b-2xl">
           <button
             onClick={onClose}
-            className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-colors text-sm"
+            className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-colors text-sm"
           >
             Close
           </button>
@@ -972,35 +1074,52 @@ function CompletedOrdersModal({
 // ==================== Loading Skeleton ====================
 function KitchenSkeleton() {
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-6 animate-pulse">
-      <div className="max-w-[1600px] mx-auto">
-        <div className="flex justify-between mb-6">
-          <div className="h-8 w-48 bg-gray-200 rounded" />
-          <div className="h-10 w-24 bg-gray-200 rounded" />
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100/80 p-4 md:p-6 animate-pulse">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-start mb-8">
+          <div className="space-y-2">
+            <div className="h-8 w-56 bg-gray-200 rounded-lg" />
+            <div className="h-4 w-40 bg-gray-200 rounded" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-10 w-10 bg-gray-200 rounded-xl" />
+            <div className="h-10 w-10 bg-gray-200 rounded-xl" />
+            <div className="h-10 w-10 bg-gray-200 rounded-xl" />
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white p-4 rounded-xl">
-              <div className="flex justify-between">
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-8">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl p-4 border border-gray-200/80">
+              <div className="flex justify-between items-center">
                 <div className="space-y-2">
-                  <div className="h-4 w-16 bg-gray-200 rounded" />
-                  <div className="h-6 w-8 bg-gray-200 rounded" />
+                  <div className="h-3 w-16 bg-gray-200 rounded" />
+                  <div className="h-7 w-8 bg-gray-200 rounded" />
                 </div>
-                <div className="h-10 w-10 bg-gray-200 rounded-full" />
+                <div className="h-10 w-10 bg-gray-200 rounded-xl" />
               </div>
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl p-4">
-              <div className="h-6 w-24 bg-gray-200 rounded mb-4" />
+            <div key={i} className="bg-white rounded-xl border border-gray-200/80 p-4">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <div className="h-5 w-24 bg-gray-200 rounded" />
+                  <div className="h-3 w-20 bg-gray-200 rounded mt-1" />
+                </div>
+                <div className="h-6 w-8 bg-gray-200 rounded-full" />
+              </div>
               <div className="space-y-3">
                 {[...Array(2)].map((_, j) => (
-                  <div key={j} className="border rounded-lg p-4">
-                    <div className="h-4 w-3/4 bg-gray-200 rounded mb-2" />
-                    <div className="h-4 w-1/2 bg-gray-200 rounded mb-3" />
-                    <div className="h-8 w-full bg-gray-200 rounded" />
+                  <div key={j} className="bg-gray-50/70 rounded-xl p-4 border border-gray-200/60">
+                    <div className="space-y-2">
+                      <div className="h-4 w-3/4 bg-gray-200 rounded" />
+                      <div className="h-3 w-1/2 bg-gray-200 rounded" />
+                      <div className="h-8 w-full bg-gray-200 rounded-lg" />
+                    </div>
                   </div>
                 ))}
               </div>

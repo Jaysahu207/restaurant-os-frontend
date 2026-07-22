@@ -35,7 +35,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       {showSidebar && <Sidebar />}
 
       <div className="flex-1 overflow-hidden">
-        <main className={`transition-all ${showTopBar ? "pt-16" : "pt-0"} m-2`}>
+        <main className="flex-1 overflow-y-auto focus:outline-none">
           {children}
         </main>
       </div>

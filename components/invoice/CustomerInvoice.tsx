@@ -26,19 +26,14 @@ interface Customer {
 
 interface Order {
   orderNumber: string;
-
   invoiceNumber: string;
-
   createdAt: string;
 
   table?: string;
-
   status?: string;
-
   orderType?: string;
 
   paymentStatus?: string;
-
   paymentMethod?: string;
 
   specialInstructions?: string;
@@ -50,10 +45,10 @@ interface Order {
   subtotal: number;
 
   cgstAmount: number;
-
   sgstAmount: number;
-
   serviceChargeAmount: number;
+
+  deliveryCharge?: number;   // <-- Add this
 
   total: number;
 }
@@ -101,6 +96,8 @@ const CustomerInvoice = forwardRef<HTMLDivElement, Props>(
       (acc, item) => acc + item.quantity,
       0,
     );
+    // console.log("Invoice Component Order:", order);
+    // console.log("Invoice Delivery:", order.deliveryCharge);
     // console.log("Restaurant =", restaurant);
     // console.log("Order =", order);
     // console.log("Customer =", order.customer);
@@ -331,9 +328,20 @@ const CustomerInvoice = forwardRef<HTMLDivElement, Props>(
                 <span>{formatCurrency(order.serviceChargeAmount)}</span>
               </div>
             )}
+            {order.orderType === "delivery" && (
+              <div className="flex justify-between">
+                <span>Delivery Fee</span>
+
+                {order.deliveryCharge && order.deliveryCharge > 0 ? (
+                  <span>{formatCurrency(order.deliveryCharge)}</span>
+                ) : (
+                  <span className="font-semibold text-green-600">FREE</span>
+                )}
+              </div>
+            )}
 
             <div className="border-t border-dashed pt-3 flex justify-between text-lg font-bold">
-              <span>GRAND TOTAL</span>
+              <span>GRAND TOTAL </span>
 
               <span>{formatCurrency(order.total)}</span>
             </div>

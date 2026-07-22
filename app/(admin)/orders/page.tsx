@@ -58,6 +58,7 @@ interface Order {
   cgstAmount: number; // CGST amount
   sgstAmount: number; // SGST amount
   serviceChargeAmount: number;
+  deliveryCharge: number;
   deliveryDetails?: {
     address: string;
     landmark?: string;
@@ -156,7 +157,7 @@ export default function OrdersPage() {
       const data = await getOrders(restaurant._id, dateParam);
       // console.log("Fetched orders -->>  ", data);
       const formatted: Order[] = data.map((o: any) => mapOrder(o));
-      // console.log("Fetched orders -->>  ", formatted);
+      console.log("Fetched orders -->>  ", formatted);
       setOrders(formatted);
     } catch (error) {
       console.error("Failed to load orders:", error);
@@ -267,6 +268,7 @@ export default function OrdersPage() {
       phone: o.customerId?.phone || "",
       email: o.customerId?.email || "",
     },
+    deliveryCharge: o.deliveryCharge ?? "Free Delivery",
     deliveryDetails: o.delivery
       ? {
         address: o.delivery.address?.house,
@@ -830,6 +832,19 @@ function OrderCard({
               <div className="flex justify-between text-xs text-gray-500">
                 <span>Service</span>
                 <span>₹{order.serviceChargeAmount.toFixed(2)}</span>
+              </div>
+            )}
+
+            {order.orderType === "delivery" && (
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>Delivery</span>
+                <span>
+                  {order.deliveryCharge > 0 ? (
+                    `₹${order.deliveryCharge.toFixed(2)}`
+                  ) : (
+                    <span className="font-semibold text-green-600">FREE</span>
+                  )}
+                </span>
               </div>
             )}
             <div className="flex justify-between font-bold text-gray-800 border-t border-gray-300 pt-2 mt-2">

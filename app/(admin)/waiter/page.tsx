@@ -9,7 +9,7 @@ import {
   placeOrder,
 } from "@/services/orderService";
 import {
-  getMenuItems, // Assuming this service exists
+  getMenuItems,
 } from "@/services/menuService";
 import {
   Plus,
@@ -31,8 +31,8 @@ import {
   UtensilsCrossed,
   Eye,
   LogOut,
-  CandyCaneIcon,
   XCircle,
+  Utensils,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import TableManagement from "@/components/super-admin/TableManagement";
@@ -64,13 +64,14 @@ interface MenuItem {
 }
 
 interface OrderItem {
+  _id?: string;
   menuItemId: string;
   name: string;
   price: number;
   quantity: number;
   specialInstructions?: string;
-  kotBatch?: number;
-  kotPrinted?: boolean;
+  kotBatch: number;        // ✅ Added
+  kotPrinted: boolean;     // ✅ Added
   addedAt?: string;
 }
 
@@ -99,15 +100,19 @@ interface Order {
   items: OrderItem[];
   orderNumber: string;
   status:
-    | "pending"
-    | "preparing"
-    | "ready"
-    | "served"
-    | "completed"
-    | "cancelled";
+  | "pending"
+  | "preparing"
+  | "ready"
+  | "served"
+  | "completed"
+  | "cancelled"
+  | "out_for_delivery"
+  | "delivered"
+  | "paid";
   totalAmount: number;
   finalAmount: number;
-  currentKotBatch?: number;
+  customerName?: string;
+  currentKotBatch: number;  // ✅ Added
   updatedAt?: string;
   cgstRate: number;
   sgstRate: number;
@@ -120,6 +125,7 @@ interface Order {
   customerId?: Customer;
   specialInstructions?: string;
 }
+
 interface Customer {
   _id: string;
   name: string;
@@ -127,13 +133,6 @@ interface Customer {
   email?: string;
 }
 
-interface KotBatchItem {
-  menuItemId: string;
-  name: string;
-  quantity: number;
-  price: number;
-  specialInstructions?: string;
-}
 // ==================== Main Component ====================
 export default function WaiterPage() {
   const { restaurant, user } = useAuthStore();
@@ -147,7 +146,7 @@ export default function WaiterPage() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const socketRef = useRef<Socket | null>(null);
-  const [completedModalOpen, setCompletedModalOpen] = useState(false); // NEW
+  const [completedModalOpen, setCompletedModalOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [selectedTable, setSelectedTable] = useState<any>(null);
 
@@ -160,7 +159,7 @@ export default function WaiterPage() {
   const playSound = useCallback(() => {
     if (!soundEnabled || !audioRef.current) return;
     audioRef.current.currentTime = 0;
-    audioRef.current.play().catch(() => {});
+    audioRef.current.play().catch(() => { });
   }, [soundEnabled]);
 
   // Load orders and menu
@@ -229,11 +228,9 @@ export default function WaiterPage() {
     socket.on("ORDER_UPDATED", (updatedOrder) => {
       setOrders((prev) => {
         const exists = prev.some((o) => o._id === updatedOrder._id);
-
         if (!exists) {
           return [updatedOrder, ...prev];
         }
-
         return prev.map((o) => (o._id === updatedOrder._id ? updatedOrder : o));
       });
     });
@@ -254,8 +251,8 @@ export default function WaiterPage() {
   const updateStatus = async (orderId: string, newStatus: string) => {
     setOrders((prev) =>
       prev.map((o) =>
-        o._id === orderId ? { ...o, status: newStatus as Order["status"] } : o,
-      ),
+        o._id === orderId ? { ...o, status: newStatus as Order["status"] } : o
+      )
     );
     try {
       await updateOrderStatus(orderId, newStatus);
@@ -293,10 +290,10 @@ export default function WaiterPage() {
         specialInstructions: orderData.specialInstructions,
         customer: orderData.customer
           ? {
-              name: orderData.customer.name ?? "",
-              phone: orderData.customer.phone ?? "",
-              email: orderData.customer.email ?? "",
-            }
+            name: orderData.customer.name ?? "",
+            phone: orderData.customer.phone ?? "",
+            email: orderData.customer.email ?? "",
+          }
           : undefined,
       };
       await placeOrder(payload);
@@ -315,24 +312,17 @@ export default function WaiterPage() {
   };
 
   const servedOrders = orders.filter((o) => o.status === "served");
-
   const completedOrders = orders.filter((o) => o.status === "completed");
   const cancelledOrders = orders.filter((o) => o.status === "cancelled");
 
   const sortByTime = (orders: Order[]) =>
     [...orders].sort(
       (a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
 
-  const pendingOrders = sortByTime(
-    orders.filter((o) => o.status === "pending"),
-  );
-
-  const preparingOrders = sortByTime(
-    orders.filter((o) => o.status === "preparing"),
-  );
-
+  const pendingOrders = sortByTime(orders.filter((o) => o.status === "pending"));
+  const preparingOrders = sortByTime(orders.filter((o) => o.status === "preparing"));
   const readyOrders = sortByTime(orders.filter((o) => o.status === "ready"));
 
   if (loading && !refreshing) {
@@ -340,12 +330,14 @@ export default function WaiterPage() {
   }
 
   return (
-    <div className="min-h-screen ">
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100/80  border-amber-600 border">
+
       <div className="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-2 lg:px-8">
+
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-orange-600 to-orange-800 bg-clip-text text-transparent truncate">
+            <h1 className="text-xl md:text-2xl font-bold bg-linear-to-r from-orange-600 to-orange-800 bg-clip-text text-transparent truncate">
               {restaurant?.name || "Restaurant"}
             </h1>
             <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
@@ -355,13 +347,26 @@ export default function WaiterPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Live Connection Status */}
+            <div className=" text-right text-xs">
+              {socketConnected ? (
+                <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                  Live
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
+                  <AlertCircle size={12} />
+                  Reconnecting...
+                </span>
+              )}
+            </div>
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2 rounded-full transition-all ${
-                soundEnabled
-                  ? "bg-orange-100 text-orange-600"
-                  : "bg-gray-200 text-gray-500"
-              }`}
+              className={`p-2 rounded-full transition-all ${soundEnabled
+                ? "bg-orange-100 text-orange-600"
+                : "bg-gray-200 text-gray-500"
+                }`}
               title={soundEnabled ? "Sound On" : "Sound Off"}
             >
               {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
@@ -372,10 +377,7 @@ export default function WaiterPage() {
               disabled={refreshing}
               className="p-2 rounded-full bg-white shadow-sm text-gray-600 active:scale-95 transition"
             >
-              <RefreshCw
-                size={18}
-                className={refreshing ? "animate-spin" : ""}
-              />
+              <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
             </button>
 
             <button
@@ -388,20 +390,7 @@ export default function WaiterPage() {
           </div>
         </div>
 
-        {/* Live Connection Status */}
-        <div className="mb-5 text-right text-xs">
-          {socketConnected ? (
-            <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-              Live
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
-              <AlertCircle size={12} />
-              Reconnecting...
-            </span>
-          )}
-        </div>
+
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
@@ -427,7 +416,7 @@ export default function WaiterPage() {
           <StatCard
             label="Served Today"
             value={servedOrders.length}
-            color="bg-gray-500"
+            color="bg-purple-500"
             icon={CheckCircle2}
           />
           <div
@@ -444,8 +433,8 @@ export default function WaiterPage() {
           <StatCard
             label="Cancelled"
             value={cancelledOrders.length}
-            color="bg-gray-500"
-            icon={CandyCaneIcon}
+            color="bg-rose-500"
+            icon={XCircle}
           />
         </div>
 
@@ -455,7 +444,7 @@ export default function WaiterPage() {
             title="Pending"
             icon={Clock}
             orders={pendingOrders}
-            statusColor="border-amber-400"
+            statusColor="border-l-amber-400"
             onViewDetail={openDetail}
           />
 
@@ -463,7 +452,7 @@ export default function WaiterPage() {
             title="Preparing"
             icon={ChefHat}
             orders={preparingOrders}
-            statusColor="border-blue-400"
+            statusColor="border-l-blue-400"
             onViewDetail={openDetail}
           />
 
@@ -471,16 +460,15 @@ export default function WaiterPage() {
             title="Ready to Serve"
             icon={CheckCircle2}
             orders={readyOrders}
-            statusColor="border-emerald-400"
+            statusColor="border-l-emerald-400"
             onViewDetail={openDetail}
-            // onServe={(id) => updateStatus(id, "served")}
           />
 
           <StatusColumn
             title="Recently Served"
             icon={CheckCircle2}
             orders={servedOrders.slice(0, 10)}
-            statusColor="border-gray-400"
+            statusColor="border-l-gray-400"
             onViewDetail={openDetail}
           />
         </div>
@@ -518,7 +506,6 @@ export default function WaiterPage() {
           <TableManagement
             onTableClick={(table) => {
               if (table.status !== "available") return;
-
               setSelectedTable(table);
               setCreateModalOpen(true);
             }}
@@ -553,9 +540,8 @@ function StatCard({
 }) {
   return (
     <div
-      className={`bg-white rounded-xl shadow-sm p-4 border ${
-        highlight ? "border-green-300 ring-1 ring-green-200" : "border-gray-100"
-      }`}
+      className={`bg-white rounded-xl shadow-sm p-4 border ${highlight ? "border-green-300 ring-1 ring-green-200" : "border-gray-100"
+        }`}
     >
       <div className="flex items-center justify-between">
         <div>
@@ -585,17 +571,28 @@ function StatusColumn({
   onViewDetail: (order: Order) => void;
 }) {
   return (
-    <div className={`bg-white rounded-xl shadow-sm border-t-4 ${statusColor}`}>
-      <div className="p-4 border-b">
-        <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-          <Icon className="w-5 h-5" />
-          {title}
-          <span className="ml-auto text-sm text-gray-500">{orders.length}</span>
-        </h3>
+    <div
+      className={`bg-white rounded-xl shadow-sm border border-gray-200/80 ${statusColor} overflow-hidden flex flex-col max-h-[500px]`}
+    >
+      <div className="px-4 py-3.5 border-b border-gray-200/80 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Icon className="w-5 h-5 text-gray-600" />
+            <h3 className="font-semibold text-gray-800 text-lg">{title}</h3>
+          </div>
+          <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
+            {orders.length}
+          </span>
+        </div>
       </div>
-      <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
+
+      <div className="p-4 space-y-3 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
         {orders.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">No orders</p>
+          <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+            <Utensils className="w-8 h-8 mb-2" strokeWidth={1.5} />
+            <p className="text-sm font-medium">No orders</p>
+            <p className="text-xs text-gray-400">All caught up!</p>
+          </div>
         ) : (
           orders.map((order) => (
             <CompactOrderCard
@@ -618,33 +615,291 @@ function CompactOrderCard({
   order: Order;
   onViewDetail: () => void;
 }) {
+  const getElapsedTime = () => {
+    const created = new Date(order.createdAt);
+    const now = new Date();
+    const diffMs = now.getTime() - created.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    return `${hours}h ${mins}m ago`;
+  };
+
+  const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = order.finalAmount || order.items.reduce((s, i) => s + i.price * i.quantity, 0);
+
+  const sortedItems = [...order.items].sort((a, b) => {
+    if (a.kotPrinted !== b.kotPrinted) return a.kotPrinted ? 1 : -1;
+    return (b.kotBatch || 0) - (a.kotBatch || 0);
+  });
+
+  const statusColorMap: Record<string, string> = {
+    pending: "bg-amber-100 text-amber-800 border-amber-200",
+    preparing: "bg-blue-100 text-blue-800 border-blue-200",
+    ready: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    served: "bg-purple-100 text-purple-800 border-purple-200",
+    out_for_delivery: "bg-indigo-100 text-indigo-800 border-indigo-200",
+    delivered: "bg-teal-100 text-teal-800 border-teal-200",
+    paid: "bg-green-100 text-green-800 border-green-200",
+    completed: "bg-gray-100 text-gray-700 border-gray-200",
+    cancelled: "bg-rose-100 text-rose-700 border-rose-200",
+  };
+
+  const customerName = order.customerId?.name || order.customerName || "";
+
   return (
-    <div className="border rounded-lg p-3 bg-gray-50 hover:shadow-sm transition">
+    <div className="bg-white rounded-xl border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
       {order.hasNewItems && (
-        <span className="bg-red-500 text-white text-[10px] px-2 py-1 rounded-full animate-pulse">
-          NEW ITEMS
-        </span>
-      )}
-      <div className="flex justify-between items-start">
-        <div>
-          <p className="font-medium">Table {order.tableNumber}</p>
-          <p className="text-xs text-gray-500">
-            {new Date(order.createdAt).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </p>
+        <div className="bg-red-50 border-b border-red-200/80 px-3 py-1.5 flex items-center gap-2 text-xs text-red-700">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+          <span className="font-semibold">New items</span>
         </div>
-        <button
-          onClick={onViewDetail}
-          className="p-1 text-gray-500 hover:bg-gray-200 rounded"
-        >
-          <Eye className="w-4 h-4" />
-        </button>
+      )}
+
+      <div className="p-3 space-y-2">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center flex-wrap gap-1.5">
+              <span className="font-semibold text-gray-800 text-sm flex items-center gap-1">
+                {order.orderType === "dine_in" && <>🍽️ Table {order.tableNumber}</>}
+                {order.orderType === "takeaway" && <>🥡 Takeaway</>}
+                {order.orderType === "delivery" && (
+                  <span className="text-blue-600">🚚 Delivery</span>
+                )}
+              </span>
+              <span className="text-xs font-mono bg-gray-100 px-1.5 py-0.5 rounded-full text-gray-600">
+                #{order.orderNumber.slice(-3)}
+              </span>
+              {customerName && (
+                <span className="text-xs text-gray-500 truncate max-w-[100px]">
+                  · {customerName}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
+              <span>{totalItems} item{totalItems > 1 ? "s" : ""}</span>
+              {totalPrice > 0 && (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <span className="font-medium text-gray-700">₹{totalPrice.toFixed(2)}</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={onViewDetail}
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
+            aria-label="View details"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Items Summary */}
+        <div className="bg-gray-50/70 rounded-lg px-2.5 py-1.5 border border-gray-200/60">
+          <ul className="space-y-0.5 text-xs">
+            {sortedItems.slice(0, 2).map((item) => (
+              <li key={item._id || item.menuItemId} className="flex justify-between items-center gap-2">
+                <span className="text-gray-700 truncate flex-1">
+                  {item.quantity}× {item.name}
+                </span>
+                {!item.kotPrinted && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-500 text-white shrink-0">
+                    NEW
+                  </span>
+                )}
+              </li>
+            ))}
+            {order.items.length > 2 && (
+              <li className="text-gray-400 text-[10px] pt-0.5 border-t border-gray-200/50">
+                +{order.items.length - 2} more
+              </li>
+            )}
+          </ul>
+        </div>
+
+        {/* Special instructions */}
+        {order.specialInstructions && (
+          <div className="flex items-start gap-1.5 text-[10px] bg-amber-50/70 border border-amber-200/70 rounded-lg px-2.5 py-1.5 text-amber-700">
+            <AlertCircle className="w-3 h-3 mt-0.5 shrink-0 text-amber-500" />
+            <span className="line-clamp-1 leading-relaxed">{order.specialInstructions}</span>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-1.5 border-t border-gray-200/60">
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusColorMap[order.status] || "bg-gray-100 text-gray-700 border-gray-200"
+                }`}
+            >
+              {order.status.replaceAll("_", " ").toUpperCase()}
+            </span>
+            <span className="text-[10px] text-gray-400 flex items-center gap-1">
+              <Clock className="w-2.5 h-2.5" />
+              {getElapsedTime()}
+            </span>
+          </div>
+        </div>
       </div>
-      <p className="text-sm mt-1 truncate">
-        {order.items.length} item{order.items.length !== 1 ? "s" : ""}
-      </p>
+    </div>
+  );
+}
+
+// ==================== Variant Selection Modal (extracted) ====================
+function VariantSelectionModal({
+  item,
+  onClose,
+  onAddToCart,
+}: {
+  item: MenuItem;
+  onClose: () => void;
+  onAddToCart: (customized: SelectedItem) => void;
+}) {
+  const [selectedVariant, setSelectedVariant] = useState<MenuVariant | undefined>(undefined);
+  const [selectedAddons, setSelectedAddons] = useState<MenuAddon[]>([]);
+
+  const toggleAddon = (addon: MenuAddon) => {
+    setSelectedAddons((prev) =>
+      prev.some((a) => a._id === addon._id)
+        ? prev.filter((a) => a._id !== addon._id)
+        : [...prev, addon]
+    );
+  };
+
+  const handleAdd = () => {
+    onAddToCart({
+      _id: item._id,
+      name: item.name,
+      quantity: 1,
+      selectedVariant,
+      selectedAddons,
+      specialInstructions: "",
+      price: selectedVariant?.price ?? item.price,
+    });
+    onClose();
+  };
+
+  const totalPrice = (selectedVariant?.price ?? item.price) +
+    selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center">
+      <div className="w-full sm:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[90vh] flex flex-col animate-in slide-in-from-bottom duration-300">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-3xl z-10">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">{item.name}</h3>
+            <p className="text-sm text-gray-500">Customize your order</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {/* Variants */}
+          {item.variants && item.variants.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-900 mb-3">Choose Size / Variant</h4>
+              <div className="space-y-3">
+                {item.variants.map((variant) => (
+                  <label
+                    key={variant._id}
+                    className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${selectedVariant?._id === variant._id
+                      ? "border-orange-500 bg-orange-50 shadow-sm"
+                      : "border-gray-200 hover:border-orange-300"
+                      }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="variant"
+                        checked={selectedVariant?._id === variant._id}
+                        onChange={() => setSelectedVariant(variant)}
+                        className="accent-orange-500"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">{variant.name}</p>
+                        <p className="text-xs text-gray-500">Upgrade option</p>
+                      </div>
+                    </div>
+                    <span className="font-semibold text-orange-600">+₹{variant.price}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Addons */}
+          {item.addons && item.addons.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-3">Add Extras</h4>
+              <div className="space-y-3">
+                {item.addons.map((addon) => {
+                  const selected = selectedAddons.some((a) => a._id === addon._id);
+                  return (
+                    <label
+                      key={addon._id}
+                      className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${selected
+                        ? "border-green-500 bg-green-50 shadow-sm"
+                        : "border-gray-200 hover:border-green-300"
+                        }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleAddon(addon)}
+                          className="accent-green-600"
+                        />
+                        <div>
+                          <p className="font-medium text-gray-900">{addon.name}</p>
+                          <p className="text-xs text-gray-500">Optional addon</p>
+                        </div>
+                      </div>
+                      <span className="font-semibold text-green-600">+₹{addon.price}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4 rounded-b-3xl">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-gray-500 text-sm">Total Price</span>
+            <span className="text-xl font-bold text-gray-900">₹{totalPrice}</span>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 h-12 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleAdd}
+              className="flex-1 h-12 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow-lg transition"
+            >
+              Add to Order
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -663,9 +918,7 @@ function CreateOrderModal({
   onSubmit: (data: any) => Promise<void>;
   restaurantId: string;
 }) {
-  const [tableNumber, setTableNumber] = useState<number>(
-    selectedTable?.tableNumber || 1,
-  );
+  const [tableNumber, setTableNumber] = useState<number>(selectedTable?.tableNumber || 1);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -675,18 +928,20 @@ function CreateOrderModal({
   const [submitting, setSubmitting] = useState(false);
   const [variantModalOpen, setVariantModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+
   const categories: string[] = [
     "All",
     ...Array.from(
       new Set(
         menuItems
           .filter((item): item is MenuItem & { category: string } =>
-            Boolean(item.category),
+            Boolean(item.category)
           )
-          .map((item) => item.category),
-      ),
+          .map((item) => item.category)
+      )
     ),
   ];
+
   useEffect(() => {
     if (selectedTable) {
       setTableNumber(selectedTable.tableNumber);
@@ -696,20 +951,14 @@ function CreateOrderModal({
   const [selectedCategory, setSelectedCategory] = useState("All");
 
   const filteredMenu = menuItems.filter((item) => {
-    const matchesSearch = item.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-
-    const matchesCategory =
-      selectedCategory === "All" || item.category === selectedCategory;
-
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
     return matchesSearch && matchesCategory && item.isAvailable !== false;
   });
 
   const calculateItemTotal = (item: SelectedItem) => {
     const variantPrice = item.selectedVariant?.price ?? item.price;
-    const addonsPrice =
-      item.selectedAddons?.reduce((sum, a) => sum + a.price, 0) ?? 0;
+    const addonsPrice = item.selectedAddons?.reduce((sum, a) => sum + a.price, 0) ?? 0;
     return (variantPrice + addonsPrice) * item.quantity;
   };
 
@@ -719,17 +968,14 @@ function CreateOrderModal({
         .map((item) =>
           item._id === id
             ? { ...item, quantity: Math.max(0, item.quantity + delta) }
-            : item,
+            : item
         )
-        .filter((item) => item.quantity > 0),
+        .filter((item) => item.quantity > 0)
     );
   };
 
   const calculateTotal = () => {
-    return selectedItems.reduce(
-      (sum, item) => sum + calculateItemTotal(item),
-      0,
-    );
+    return selectedItems.reduce((sum, item) => sum + calculateItemTotal(item), 0);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -747,9 +993,9 @@ function CreateOrderModal({
           name: item.name,
           price: item.price,
           quantity: item.quantity,
-          // include addons if backend accepts them, otherwise remove
-          addons: item.selectedAddons || [],
           specialInstructions: item.specialInstructions || "",
+          kotBatch: 1,
+          kotPrinted: false,
         })),
         customer: {
           name: customerName,
@@ -765,318 +1011,98 @@ function CreateOrderModal({
     }
   };
 
-  // Variant Selection Modal (nested)
-  function VariantSelectionModal({
-    item,
-    onClose,
-    onAddToCart,
-  }: {
-    item: MenuItem;
-    onClose: () => void;
-    onAddToCart: (customized: SelectedItem) => void;
-  }) {
-    const [selectedVariant, setSelectedVariant] = useState<
-      MenuVariant | undefined
-    >(undefined);
-    const [selectedAddons, setSelectedAddons] = useState<MenuAddon[]>([]);
-
-    const toggleAddon = (addon: MenuAddon) => {
-      setSelectedAddons((prev) =>
-        prev.some((a) => a._id === addon._id)
-          ? prev.filter((a) => a._id !== addon._id)
-          : [...prev, addon],
-      );
-    };
-
-    const handleAdd = () => {
-      onAddToCart({
-        _id: item._id,
-        name: item.name,
-        quantity: 1,
-        selectedVariant,
-        selectedAddons,
-        specialInstructions: "",
-        price: selectedVariant?.price ?? item.price,
-      });
-      onClose();
-    };
-
-    return (
-      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center">
-        <div className="w-full sm:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[90vh] flex flex-col animate-in slide-in-from-bottom duration-300">
-          {/* Header */}
-          <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-3xl z-10">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">{item.name}</h3>
-
-              <p className="text-sm text-gray-500">Customize your order</p>
-            </div>
-
-            <button
-              onClick={onClose}
-              className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto px-5 py-4">
-            {/* Variants */}
-            {item.variants && item.variants.length > 0 && (
-              <div className="mb-6">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                  Choose Size / Variant
-                </h4>
-
-                <div className="space-y-3">
-                  {item.variants.map((variant) => (
-                    <label
-                      key={variant._id}
-                      className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all duration-200
-                  ${
-                    selectedVariant?._id === variant._id
-                      ? "border-orange-500 bg-orange-50 shadow-sm"
-                      : "border-gray-200 hover:border-orange-300"
-                  }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          name="variant"
-                          checked={selectedVariant?._id === variant._id}
-                          onChange={() => setSelectedVariant(variant)}
-                          className="accent-orange-500"
-                        />
-
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {variant.name}
-                          </p>
-
-                          <p className="text-xs text-gray-500">
-                            Upgrade option
-                          </p>
-                        </div>
-                      </div>
-
-                      <span className="font-semibold text-orange-600">
-                        +₹{variant.price}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Addons */}
-            {item.addons && item.addons.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                  Add Extras
-                </h4>
-
-                <div className="space-y-3">
-                  {item.addons.map((addon) => {
-                    const selected = selectedAddons.some(
-                      (a) => a._id === addon._id,
-                    );
-
-                    return (
-                      <label
-                        key={addon._id}
-                        className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all duration-200
-                    ${
-                      selected
-                        ? "border-green-500 bg-green-50 shadow-sm"
-                        : "border-gray-200 hover:border-green-300"
-                    }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => toggleAddon(addon)}
-                            className="accent-green-600"
-                          />
-
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {addon.name}
-                            </p>
-
-                            <p className="text-xs text-gray-500">
-                              Optional addon
-                            </p>
-                          </div>
-                        </div>
-
-                        <span className="font-semibold text-green-600">
-                          +₹{addon.price}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4 rounded-b-3xl">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-gray-500 text-sm">Total Price</span>
-
-              <span className="text-xl font-bold text-gray-900">
-                ₹
-                {(selectedVariant?.price ?? item.price) +
-                  selectedAddons.reduce((sum, addon) => sum + addon.price, 0)}
-              </span>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 h-12 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={handleAdd}
-                className="flex-1 h-12 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow-lg transition"
-              >
-                Add to Order
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="fixed inset-0 z-[100] bg-white">
+    <div className="fixed inset-0 z-100 bg-white">
       <div className="w-full h-screen flex flex-col bg-white">
         {/* Header */}
-        <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-xl">
-              <UtensilsCrossed className="w-6 h-6 text-white" />
-            </div>
-            <h2 className="text-xl font-bold text-white">Create New Order</h2>
+        <div className="relative bg-linear-to-r from-orange-500 via-orange-600 to-red-500 px-3 py-3 flex items-center justify-between">
+
+          {/* Background Decoration */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-white"></div>
+            <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full bg-white"></div>
           </div>
+
+          {/* Left Section */}
+          <div className="relative flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
+              <UtensilsCrossed className="w-7 h-7 text-white" />
+            </div>
+
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                Create New Order
+              </h2>
+
+              <p className="text-sm text-orange-100 mt-0.5">
+                Select table, add items and place the order.
+              </p>
+            </div>
+          </div>
+
+          {/* Close Button */}
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/20 rounded-full transition text-white"
+            className="relative w-10 h-10 rounded-xl bg-white/15 hover:bg-white/25 transition-all duration-200 flex items-center justify-center"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 text-white" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-gradient-to-b from-gray-50 to-white ">
-          <form
-            onSubmit={handleSubmit}
-            className="flex-1
-overflow-hidden
-lg:grid
-lg:grid-cols-3 "
-          >
+        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-gradient-to-b from-gray-50 to-white p-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Customer Details */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-1 h-5 bg-gradient-to-b from-orange-500 to-pink-500 rounded-full" />
-                <h3 className="font-semibold text-gray-800">
-                  Customer Details
-                </h3>
+                <h3 className="font-semibold text-gray-800">Customer Details</h3>
               </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* Table */}
-                <div className="bg-orange-50 border border-orange-200 rounded-2xl p-2">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="text-sm font-bold">
-                        Table No.{selectedTable?.tableNumber}
-                      </h3>
-                    </div>
-
-                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
-                      Available
-                    </span>
+                <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">Table</p>
+                    <p className="font-bold text-lg">#{selectedTable?.tableNumber || tableNumber}</p>
                   </div>
+                  <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
+                    Available
+                  </span>
                 </div>
 
                 {/* Name */}
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" />
-
                   <input
                     type="text"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="Customer Name"
-                    className="
-          w-full
-          h-12
-          pl-10
-          pr-3
-          rounded-xl
-          border
-          border-gray-200
-          bg-gray-50
-          focus:ring-2
-          focus:ring-blue-500
-        "
+                    className="w-full h-12 pl-10 pr-3 rounded-xl border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
 
                 {/* Phone */}
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
-
                   <input
                     type="tel"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     placeholder="Phone Number"
-                    className="
-          w-full
-          h-12
-          pl-10
-          pr-3
-          rounded-xl
-          border
-          border-gray-200
-          bg-gray-50
-          focus:ring-2
-          focus:ring-green-500
-        "
+                    className="w-full h-12 pl-10 pr-3 rounded-xl border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none"
                   />
                 </div>
 
                 {/* Email */}
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-500" />
-
                   <input
                     type="email"
                     value={customerEmail}
                     onChange={(e) => setCustomerEmail(e.target.value)}
                     placeholder="Email"
-                    className="
-          w-full
-          h-12
-          pl-10
-          pr-3
-          rounded-xl
-          border
-          border-gray-200
-          bg-gray-50
-          focus:ring-2
-          focus:ring-purple-500
-        "
+                    className="w-full h-12 pl-10 pr-3 rounded-xl border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-purple-500 outline-none"
                   />
                 </div>
               </div>
@@ -1088,6 +1114,7 @@ lg:grid-cols-3 "
                 <div className="w-1 h-5 bg-gradient-to-b from-green-500 to-emerald-500 rounded-full" />
                 Add Menu Items *
               </h3>
+
               <div className="relative mb-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
@@ -1095,38 +1122,29 @@ lg:grid-cols-3 "
                   placeholder="🔍 Search for dishes..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white outline-none"
                 />
               </div>
+
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 {categories.map((category) => (
                   <button
                     key={category}
                     type="button"
                     onClick={() => setSelectedCategory(category)}
-                    className={`
-        whitespace-nowrap px-4 py-2 rounded-full
-        text-sm font-medium transition-all
-        ${
-          selectedCategory === category
-            ? "bg-orange-500 text-white shadow-lg"
-            : "bg-gray-100 text-gray-600"
-        }
-      `}
+                    className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all ${selectedCategory === category
+                      ? "bg-orange-500 text-white shadow-lg"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
                   >
                     {category}
                   </button>
                 ))}
               </div>
-              <div
-                className="grid
-  grid-cols-2
-  md:grid-cols-3
-  xl:grid-cols-4
-  gap-3 border border-gray-200 rounded-lg divide-y divide-gray-100"
-              >
+
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                 {filteredMenu.length === 0 ? (
-                  <div className="p-6 text-center text-gray-400">
+                  <div className="col-span-full p-6 text-center text-gray-400">
                     <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     No items found
                   </div>
@@ -1138,48 +1156,31 @@ lg:grid-cols-3 "
                         setEditingItem(item);
                         setVariantModalOpen(true);
                       }}
-                      className="
-    bg-white
-    rounded-2xl
-    border
-    overflow-hidden
-    cursor-pointer
-    hover:shadow-lg
-    transition-all
-    group
-  "
+                      className="bg-white rounded-2xl border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg transition-all group"
                     >
                       <div className="aspect-square bg-gray-100">
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
+                        {item.image ? (
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400">
+                            <UtensilsCrossed className="w-8 h-8" />
+                          </div>
+                        )}
                       </div>
-
                       <div className="p-3">
-                        <h4 className="font-semibold text-sm line-clamp-1">
-                          {item.name}
-                        </h4>
-
-                        <p>
+                        <h4 className="font-semibold text-sm line-clamp-1">{item.name}</h4>
+                        <p className="text-xs text-gray-500">
                           {item.isAvailable ? "Available" : "Not Available"}
                         </p>
-
                         <div className="flex justify-between items-center mt-2">
-                          <span className="font-bold text-orange-600">
-                            ₹{item.price}
-                          </span>
-
+                          <span className="font-bold text-orange-600">₹{item.price}</span>
                           <button
                             type="button"
-                            className="
-          w-8 h-8
-          rounded-full
-          bg-green-500
-          text-white
-          flex items-center justify-center
-        "
+                            className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition"
                           >
                             <PlusIcon size={16} />
                           </button>
@@ -1207,14 +1208,12 @@ lg:grid-cols-3 "
                       <div className="flex-1">
                         <p className="font-medium text-gray-800">{item.name}</p>
                         <p className="text-xs text-gray-500">
-                          {item.selectedVariant
-                            ? `Variant: ${item.selectedVariant.name}`
-                            : ""}
+                          {item.selectedVariant ? `Variant: ${item.selectedVariant.name}` : ""}
                           {item.selectedAddons && item.selectedAddons.length > 0
                             ? ` | Add‑ons: ${item.selectedAddons.map((a) => a.name).join(", ")}`
                             : ""}
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm font-medium text-gray-700">
                           ₹{calculateItemTotal(item).toFixed(2)}
                         </p>
                       </div>
@@ -1241,9 +1240,7 @@ lg:grid-cols-3 "
                   ))}
                 </div>
                 <div className="mt-4 pt-3 border-t border-gray-200 flex justify-between items-center">
-                  <span className="text-gray-600 font-medium">
-                    Total Amount
-                  </span>
+                  <span className="text-gray-600 font-medium">Total Amount</span>
                   <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
                     ₹{calculateTotal().toFixed(2)}
                   </span>
@@ -1256,100 +1253,32 @@ lg:grid-cols-3 "
               <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                 <div className="w-1 h-5 bg-gradient-to-b from-amber-500 to-orange-500 rounded-full" />
                 Special Instructions
-                <span className="text-xs text-gray-400 font-normal">
-                  (Optional)
-                </span>
+                <span className="text-xs text-gray-400 font-normal">(Optional)</span>
               </h3>
               <textarea
                 value={specialInstructions}
                 onChange={(e) => setSpecialInstructions(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-gray-50 resize-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-gray-50 resize-none outline-none"
                 rows={2}
                 placeholder="Any special requests, allergies, or preferences..."
               />
             </div>
-          </form>
-        </div>
-
-        {/* Footer */}
-        <div className="sticky bottom-0 z-20 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-          <div className="px-4 md:px-6 py-4">
-            {/* Order Summary */}
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">
-                  Order Total
-                </p>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-3xl font-bold text-gray-900">
-                    ₹{calculateTotal().toFixed(0)}
-                  </span>
-
-                  <span className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-700 rounded-full">
-                    {selectedItems.length} Items
-                  </span>
-                </div>
-              </div>
-
-              {selectedTable && (
-                <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-xl">
-                  <span className="text-lg">🪑</span>
-                  <div>
-                    <p className="text-xs text-orange-600">Table</p>
-                    <p className="font-semibold text-orange-800">
-                      #{selectedTable.tableNumber}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={submitting}
-                className="
-          h-12 md:h-14
-          rounded-2xl
-          border
-          border-gray-300
-          bg-white
-          font-semibold
-          text-gray-700
-          hover:bg-gray-50
-          transition-all
-          disabled:opacity-50
-        "
+                className="h-12 md:h-14 rounded-2xl border border-gray-300 bg-white font-semibold text-gray-700 hover:bg-gray-50 transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
-
               <button
-                onClick={(e) => handleSubmit(e)}
+                onClick={handleSubmit}
                 type="button"
                 disabled={submitting || selectedItems.length === 0}
-                className="
-          h-12 md:h-14
-          rounded-2xl
-          bg-gradient-to-r
-          from-green-600
-          to-emerald-600
-          text-white
-          font-semibold
-          shadow-lg
-          hover:shadow-xl
-          active:scale-[0.98]
-          transition-all
-          disabled:opacity-50
-          disabled:cursor-not-allowed
-          flex
-          items-center
-          justify-center
-          gap-2
-        "
+                className="h-12 md:h-14 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold shadow-lg hover:shadow-xl active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <>
@@ -1364,7 +1293,7 @@ lg:grid-cols-3 "
                 )}
               </button>
             </div>
-          </div>
+          </form>
         </div>
       </div>
 
@@ -1377,16 +1306,12 @@ lg:grid-cols-3 "
           }}
           onAddToCart={(customizedItem) => {
             setSelectedItems((prev) => {
-              const existing = prev.find(
-                (i) => i._id === customizedItem._id,
-                // For simplicity, we don't check variant/addon equality; if you need distinct items,
-                // you should compare variants/addons as well.
-              );
+              const existing = prev.find((i) => i._id === customizedItem._id);
               if (existing) {
                 return prev.map((i) =>
                   i._id === customizedItem._id
                     ? { ...i, quantity: i.quantity + 1 }
-                    : i,
+                    : i
                 );
               }
               return [...prev, customizedItem];
@@ -1411,64 +1336,58 @@ function OrderDetailModal({
   onUpdateStatus: (status: string) => void;
 }) {
   const getStatusColor = (status: string) => {
-    const colors: Record<string, { bg: string; text: string; border: string }> =
-      {
-        pending: {
-          bg: "bg-yellow-100",
-          text: "text-yellow-700",
-          border: "border-yellow-300",
-        },
-        preparing: {
-          bg: "bg-blue-100",
-          text: "text-blue-700",
-          border: "border-blue-300",
-        },
-        ready: {
-          bg: "bg-green-100",
-          text: "text-green-700",
-          border: "border-green-300",
-        },
-        served: {
-          bg: "bg-purple-100",
-          text: "text-purple-700",
-          border: "border-purple-300",
-        },
-        completed: {
-          bg: "bg-gray-100",
-          text: "text-gray-700",
-          border: "border-gray-300",
-        },
-      };
+    const colors: Record<string, { bg: string; text: string; border: string }> = {
+      pending: { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-300" },
+      preparing: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-300" },
+      ready: { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-300" },
+      served: { bg: "bg-purple-100", text: "text-purple-700", border: "border-purple-300" },
+      completed: { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" },
+      out_for_delivery: { bg: "bg-indigo-100", text: "text-indigo-700", border: "border-indigo-300" },
+      delivered: { bg: "bg-teal-100", text: "text-teal-700", border: "border-teal-300" },
+      paid: { bg: "bg-green-100", text: "text-green-700", border: "border-green-300" },
+      cancelled: { bg: "bg-rose-100", text: "text-rose-700", border: "border-rose-300" },
+    };
     return colors[status] || colors.pending;
   };
 
   const statusStyle = getStatusColor(order.status);
- 
-  const currentBatch = order.currentKotBatch as number;
+
+  const currentBatch = order.currentKotBatch || 0;
   const latestItems = order.items.filter(
-    (item) => item.kotBatch === currentBatch && currentBatch > 1,
+    (item) => (item.kotBatch || 0) === currentBatch && currentBatch > 1
   );
+
+  const subtotal = order.totalAmount || order.items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const cgst = order.cgstAmount || 0;
+  const sgst = order.sgstAmount || 0;
+  const finalAmount = order.finalAmount || subtotal + cgst + sgst;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+        className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-xl">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="bg-white/20 p-2.5 rounded-xl">
               <UtensilsCrossed className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-white">
-                Order - {order.orderNumber.slice(-3)}
+              <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                Order #{order.orderNumber.slice(-3)}
+                <span className="text-sm font-normal text-white/80">
+                  {order.orderType === "dine_in" && <>🍽️ Table {order.tableNumber}</>}
+                  {order.orderType === "takeaway" && <>🥡 Takeaway</>}
+                  {order.orderType === "delivery" && <>🚚 Delivery</>}
+                </span>
               </h3>
               <p className="text-white/80 text-sm flex items-center gap-1">
-                <Clock className="w-3 h-3" />
+                <Clock className="w-3.5 h-3.5" />
                 {new Date(order.createdAt).toLocaleString()}
               </p>
             </div>
@@ -1481,54 +1400,45 @@ function OrderDetailModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-gray-50 to-white space-y-5">
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50 space-y-5">
           {/* Order Info */}
           <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
               <div className="w-1 h-5 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full" />
               Order Information
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
-                  Table
-                </p>
-                <p className="text-lg font-semibold text-gray-800 flex items-center gap-1">
-                  <span className="text-2xl">🪑</span> {order.tableNumber}
-                </p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Table</p>
+                <p className="text-lg font-semibold text-gray-800">#{order.tableNumber}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
-                  Status
-                </p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Status</p>
                 <span
                   className={`inline-flex items-center px-2.5 py-1 mt-1 rounded-full text-sm font-medium border ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}
                 >
-                  {order.status === "ready" && (
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                  )}
-                  {order.status === "preparing" && (
-                    <ChefHat className="w-3.5 h-3.5 mr-1" />
-                  )}
-                  {order.status === "pending" && (
-                    <Clock className="w-3.5 h-3.5 mr-1" />
-                  )}
+                  {order.status === "ready" && <CheckCircle2 className="w-3.5 h-3.5 mr-1" />}
+                  {order.status === "preparing" && <ChefHat className="w-3.5 h-3.5 mr-1" />}
+                  {order.status === "pending" && <Clock className="w-3.5 h-3.5 mr-1" />}
                   {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                 </span>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
-                  Total Items
-                </p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Total Items</p>
                 <p className="text-lg font-semibold text-gray-800">
                   {order.items.reduce((sum, item) => sum + item.quantity, 0)}
                 </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Total Amount</p>
+                <p className="text-lg font-semibold text-gray-800">₹{finalAmount.toFixed(2)}</p>
               </div>
             </div>
           </div>
 
           {/* Customer Info */}
-          {order.customerId?.name && (
+          {(order.customerId?.name || order.customerName) && (
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
               <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                 <div className="w-1 h-5 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-full" />
@@ -1536,19 +1446,15 @@ function OrderDetailModal({
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider">
-                    Name
-                  </p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">Name</p>
                   <p className="font-medium text-gray-800 flex items-center gap-1">
                     <User className="w-4 h-4 text-emerald-500" />
-                    {order.customerId.name}
+                    {order.customerId?.name || order.customerName}
                   </p>
                 </div>
-                {order.customerId.phone && (
+                {order.customerId?.phone && (
                   <div>
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">
-                      Phone
-                    </p>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Phone</p>
                     <p className="font-medium text-gray-800 flex items-center gap-1">
                       <Phone className="w-4 h-4 text-emerald-500" />
                       {order.customerId.phone}
@@ -1565,19 +1471,18 @@ function OrderDetailModal({
               <div className="w-1 h-5 bg-gradient-to-b from-amber-500 to-orange-500 rounded-full" />
               Order Items
             </h3>
+
             {/* Newly Added Items */}
             {currentBatch > 1 && latestItems.length > 0 && (
               <div className="mb-5 rounded-xl border-2 border-orange-300 bg-orange-50 p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <ChefHat className="w-5 h-5 text-orange-600" />
-
                   <h4 className="font-bold text-orange-700">
                     Newly Added Items (KOT #{currentBatch})
                   </h4>
                 </div>
-
                 <div className="space-y-2">
-                  {latestItems.map((item: KotBatchItem, index: number) => (
+                  {latestItems.map((item, index) => (
                     <div
                       key={index}
                       className="flex justify-between rounded-lg bg-white p-3 border"
@@ -1586,20 +1491,18 @@ function OrderDetailModal({
                         <p className="font-semibold">
                           {item.quantity} × {item.name}
                         </p>
-
                         {item.specialInstructions && (
-                          <p className="text-xs text-red-500 mt-1">
-                            {item.specialInstructions}
-                          </p>
+                          <p className="text-xs text-red-500 mt-1">{item.specialInstructions}</p>
                         )}
                       </div>
-
                       <span className="font-semibold text-orange-600">NEW</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
+
+            {/* Item Table */}
             <div className="overflow-hidden rounded-lg border border-gray-200">
               <table className="w-full text-sm">
                 <thead className="bg-gradient-to-r from-amber-50 to-orange-50">
@@ -1620,10 +1523,7 @@ function OrderDetailModal({
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {order.items.map((item, idx) => (
-                    <tr
-                      key={idx}
-                      className="hover:bg-orange-50/50 transition-colors"
-                    >
+                    <tr key={idx} className="hover:bg-orange-50/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-800">
                         {item.name}
                         {item.specialInstructions && (
@@ -1632,9 +1532,7 @@ function OrderDetailModal({
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center text-gray-600">
-                        {item.quantity}
-                      </td>
+                      <td className="px-4 py-3 text-center text-gray-600">{item.quantity}</td>
                       <td className="px-4 py-3 text-right text-gray-600">
                         ₹{item.price.toFixed(2)}
                       </td>
@@ -1646,32 +1544,29 @@ function OrderDetailModal({
                 </tbody>
               </table>
             </div>
+
             {/* Bill Summary */}
             <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Subtotal</span>
-                <span className="font-medium">
-                  ₹{order.totalAmount.toFixed(2)}
-                </span>
+                <span className="font-medium">₹{subtotal.toFixed(2)}</span>
               </div>
-
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">CGST ({order.cgstRate}%)</span>
-                <span>₹{order.cgstAmount.toFixed(2)}</span>
-              </div>
-
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">SGST ({order.sgstRate}%)</span>
-                <span>₹{order.sgstAmount.toFixed(2)}</span>
-              </div>
-
+              {order.cgstRate > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">CGST ({order.cgstRate}%)</span>
+                  <span>₹{cgst.toFixed(2)}</span>
+                </div>
+              )}
+              {order.sgstRate > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">SGST ({order.sgstRate}%)</span>
+                  <span>₹{sgst.toFixed(2)}</span>
+                </div>
+              )}
               <div className="border-t border-dashed border-gray-300 pt-3 flex justify-between items-center">
-                <span className="text-lg font-bold text-gray-800">
-                  Final Amount
-                </span>
-
+                <span className="text-lg font-bold text-gray-800">Final Amount</span>
                 <span className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-                  ₹{order.finalAmount.toFixed(2)}
+                  ₹{finalAmount.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -1684,16 +1579,14 @@ function OrderDetailModal({
                 <AlertCircle className="w-4 h-4 text-orange-600" />
                 Special Instructions
               </h3>
-              <p className="text-gray-700 italic">
-                "{order.specialInstructions}"
-              </p>
+              <p className="text-gray-700 italic">"{order.specialInstructions}"</p>
             </div>
           )}
         </div>
 
         {/* Footer Actions */}
-        <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-t border-gray-200 px-6 py-5 flex justify-between items-center">
-          <div className="flex gap-3">
+        <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-t border-gray-200 px-6 py-4 flex flex-wrap justify-between items-center gap-3 shrink-0">
+          <div className="flex flex-wrap gap-3">
             {order.status === "ready" && (
               <button
                 onClick={() => {
@@ -1716,6 +1609,18 @@ function OrderDetailModal({
               >
                 <ChefHat className="w-4 h-4" />
                 Start Preparing
+              </button>
+            )}
+            {order.status === "preparing" && (
+              <button
+                onClick={() => {
+                  onUpdateStatus("ready");
+                  onClose();
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-medium hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Mark Ready
               </button>
             )}
           </div>
@@ -1745,12 +1650,12 @@ function EmptyState({ message }: { message: string }) {
 function WaiterSkeleton() {
   return (
     <div className="min-h-screen bg-gray-50 p-6 animate-pulse">
-      <div className="max-w-[1600px] mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="flex justify-between mb-6">
           <div className="h-8 w-48 bg-gray-200 rounded" />
           <div className="h-10 w-32 bg-gray-200 rounded" />
         </div>
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="bg-white p-4 rounded-xl">
               <div className="flex justify-between">
@@ -1763,7 +1668,22 @@ function WaiterSkeleton() {
             </div>
           ))}
         </div>
-        <div className="h-64 bg-gray-200 rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl p-4">
+              <div className="h-6 w-24 bg-gray-200 rounded mb-4" />
+              <div className="space-y-3">
+                {[...Array(2)].map((_, j) => (
+                  <div key={j} className="border rounded-lg p-4">
+                    <div className="h-4 w-3/4 bg-gray-200 rounded mb-2" />
+                    <div className="h-4 w-1/2 bg-gray-200 rounded mb-3" />
+                    <div className="h-8 w-full bg-gray-200 rounded" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -1773,14 +1693,14 @@ function WaiterSkeleton() {
 interface CompletedOrdersModalProps {
   orders: Order[];
   onClose: () => void;
-  onViewOrder: (order: Order) => void; // to open detail modal
+  onViewOrder: (order: Order) => void;
 }
+
 function CompletedOrdersModal({
   orders,
   onClose,
   onViewOrder,
 }: CompletedOrdersModalProps) {
-  // Filter completed/served orders and sort by latest update
   const completedOrders = orders
     .filter((o) => o.status === "completed" || o.status === "served")
     .sort((a, b) => {
@@ -1809,7 +1729,6 @@ function CompletedOrdersModal({
         className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-gray-100"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Sticky Header */}
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-2xl">
           <div>
             <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
@@ -1819,8 +1738,7 @@ function CompletedOrdersModal({
               </span>
             </h3>
             <p className="text-sm text-gray-500 mt-0.5">
-              All finished orders – newest first. Click any order to view
-              details.
+              All finished orders – newest first. Click any order to view details.
             </p>
           </div>
           <button
@@ -1831,19 +1749,14 @@ function CompletedOrdersModal({
           </button>
         </div>
 
-        {/* Scrollable Body */}
         <div className="p-6 overflow-y-auto flex-1">
           {completedOrders.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
               <div className="bg-gray-50 rounded-full p-6 mb-4">
                 <Clock className="w-10 h-10" strokeWidth={1.5} />
               </div>
-              <p className="text-lg font-medium text-gray-500">
-                No completed orders yet
-              </p>
-              <p className="text-sm text-gray-400">
-                Completed orders will appear here for review.
-              </p>
+              <p className="text-lg font-medium text-gray-500">No completed orders yet</p>
+              <p className="text-sm text-gray-400">Completed orders will appear here for review.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -1852,55 +1765,47 @@ function CompletedOrdersModal({
                   key={order._id}
                   onClick={() => {
                     onViewOrder(order);
-                    onClose(); // close completed modal after opening detail
+                    onClose();
                   }}
-                  className="bg-gray-50/70 hover:bg-gray-100 border border-gray-200 rounded-xl p-4 transition-all cursor-pointer flex items-center justify-between"
+                  className="bg-gray-50/70 hover:bg-gray-100 border border-gray-200 rounded-xl p-4 transition-all cursor-pointer flex items-center justify-between flex-wrap gap-4"
                 >
-                  {/* Order Info Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 min-w-[200px]">
                     <div>
                       <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
                         Order No
                       </p>
-                      <p className="font-bold text-gray-800">
-                        #{order.orderNumber.slice(-3)}
-                      </p>
+                      <p className="font-bold text-gray-800">#{order.orderNumber.slice(-3)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
                         Table
                       </p>
-                      <p className="font-semibold text-gray-800">
-                        {order.tableNumber}
-                      </p>
+                      <p className="font-semibold text-gray-800">{order.tableNumber}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
                         Customer
                       </p>
-                      <p className="font-semibold text-gray-800">
-                        <p>{order.customerId?.name || "Walk-in "}</p>
+                      <p className="font-semibold text-gray-800 truncate">
+                        {order.customerId?.name || "Walk-in"}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
                         Items
                       </p>
-                      <p className="font-semibold text-gray-800">
-                        {totalItems(order)}
-                      </p>
+                      <p className="font-semibold text-gray-800">{totalItems(order)}</p>
                     </div>
                   </div>
 
-                  {/* Right side: time + status icon */}
-                  <div className="flex items-center gap-4 ml-4 flex-shrink-0">
+                  <div className="flex items-center gap-4 ml-4 shrink-0">
                     <div className="text-right">
                       <p className="text-xs text-gray-400">Completed</p>
                       <p className="text-sm font-medium text-gray-700 whitespace-nowrap">
                         {formatTime(order.updatedAt)}
                       </p>
                     </div>
-                    <CheckCircle2 className="w-6 h-6 text-green-500 flex-shrink-0" />
+                    <CheckCircle2 className="w-6 h-6 text-green-500 shrink-0" />
                   </div>
                 </div>
               ))}
@@ -1908,7 +1813,6 @@ function CompletedOrdersModal({
           )}
         </div>
 
-        {/* Footer */}
         <div className="border-t border-gray-100 px-6 py-4 flex justify-end bg-gray-50/80 rounded-b-2xl">
           <button
             onClick={onClose}
