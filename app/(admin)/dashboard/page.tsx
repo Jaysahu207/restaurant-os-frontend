@@ -25,6 +25,7 @@ import { redirect } from "next/navigation";
 import TableManagement from "@/components/super-admin/TableManagement";
 import { getRestaurant } from "@/services/restaurantService";
 import toast from "react-hot-toast";
+import DashboardSkeleton from "@/components/skeleton/DashboardSkeleton";
 
 interface DashboardData {
   revenue: { total: number; trend: number };
@@ -77,7 +78,7 @@ const StatCard = ({
   return (
     <div className="relative overflow-hidden bg-white p-6 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 group">
       <div
-        className={`absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r ${color}`}
+        className={`absolute top-0 left-0 w-full h-1.5 bg-linear-to-r ${color}`}
       />
       <div className="flex justify-between items-start">
         <div>
@@ -417,14 +418,7 @@ export default function DashboardPage() {
   }, [restaurant?._id, refreshDashboard]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!data) return null;
@@ -463,7 +457,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 border border-gray-200 rounded-lg p-4 md:p-6">
       <div>
         <h2 className="text-3xl font-bold text-gray-800">Dashboard Overview</h2>
         <p className="text-gray-500 mt-1">

@@ -25,6 +25,7 @@ import {
 } from "@/services/inventoryService";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import InventorySkeleton from "@/components/skeleton/InventorySkeleton";
 
 const CATEGORIES = [
   "All",
@@ -428,12 +429,7 @@ export default function InventoryPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-600">Loading inventory...</span>
-      </div>
-    );
+    return <InventorySkeleton />;
   }
 
   if (error) {
@@ -460,7 +456,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 md:p-6  mx-auto">
       {toast && (
         <Toast
           message={toast.message}
@@ -482,6 +478,18 @@ export default function InventoryPage() {
           </p>
         </div>
       )}
+      <div className="flex items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+            Inventory Management
+          </h1>
+
+          <p className="mt-1 text-sm text-gray-500">
+            Manage your restaurant's inventory and stock levels
+          </p>
+        </div>
+      </div>
+
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

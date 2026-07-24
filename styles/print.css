@@ -1,114 +1,176 @@
-/* ================= THERMAL PRINT ================= */
+/* ==========================================
+   QRasoi Thermal Print CSS
+   ReactToPrint + Chrome + Edge
+   58mm / 80mm Printer
+========================================== */
 
 @media print {
-  * {
+  /* Print colors exactly */
+  *,
+  *::before,
+  *::after {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    box-sizing: border-box !important;
   }
+
+  /* Paper */
   @page {
     size: 80mm auto;
     margin: 0;
   }
-  #print-root {
-    display: block !important;
-  }
+
   html,
   body {
-    width: 80mm !important;
-    max-width: 80mm !important;
     margin: 0 !important;
     padding: 0 !important;
-    background: #ffffff !important;
-    overflow: visible !important;
-    font-family: Arial, sans-serif !important;
-  }
-
-  /* Hide everything */
-
-  body * {
-    visibility: hidden !important;
-  }
-
-  /* Show invoice & KOT only */
-  #invoice-print,
-  #invoice-print *,
-  #kot-print,
-  #kot-print * {
-    visibility: visible !important;
-  }
-
-  /* Main print container */
-  #invoice-print,
-  #kot-print {
-    position: static !important;
-    margin: 0 auto !important;
-
-    width: 72mm !important;
-    max-width: 72mm !important;
-    min-width: 72mm !important;
-
-    margin: 0 !important;
-    padding: 2mm !important;
-
+    width: 80mm !important;
+    max-width: 80mm !important;
     background: #fff !important;
-
-    box-sizing: border-box !important;
-
     overflow: visible !important;
-
-    page-break-after: auto !important;
-    break-after: auto !important;
+    font-family: Arial, Helvetica, sans-serif !important;
   }
 
-  /* Tables */
-  table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    table-layout: auto;
-  }
-
-  th,
-  td {
-    word-break: break-word !important;
-    overflow-wrap: break-word !important;
-    font-size: 10px;
-    line-height: 1.2;
-    padding-top: 2px !important;
-    padding-bottom: 2px !important;
-  }
-
-  /* Images */
-  img {
-    max-width: 100% !important;
-    display: block !important;
-  }
-
-  /* Remove buttons */
-  button,
-  .no-print {
+  /* Hide modal/buttons only */
+  .no-print,
+  button {
     display: none !important;
   }
 
-  /* Prevent extra blank pages */
-  #invoice-print:last-child,
-  #kot-print:last-child {
+  /* Main Receipt */
+  #invoice-print,
+  #kot-print {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    min-width: 80mm !important;
+
+    margin: 0 !important;
+    padding: 3mm !important;
+
+    background: #fff !important;
+
+    position: relative !important;
+
+    left: 0 !important;
+    top: 0 !important;
+
+    overflow: visible !important;
+
+    box-sizing: border-box !important;
+
     page-break-after: avoid !important;
     break-after: avoid !important;
   }
 
-  /* Prevent content cutting */
-  tr,
-  td,
-  th,
+  /* Typography */
+
+  h1 {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+  }
+
+  h2 {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+  }
+
+  h3 {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+  }
+
+  p,
+  span,
   div,
-  p {
+  td,
+  th {
+    font-size: 11px !important;
+
+    line-height: 1.35 !important;
+  }
+
+  /* Tables */
+
+  table {
+    width: 100% !important;
+
+    border-collapse: collapse !important;
+
+    table-layout: fixed !important;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tbody {
+    display: table-row-group;
+  }
+
+  tr {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
-  img,
+
+  th,
+  td {
+    padding: 2px 0 !important;
+
+    vertical-align: top !important;
+
+    word-break: normal !important;
+
+    overflow-wrap: anywhere !important;
+  }
+
+  /* Images */
+
+  img {
+    display: block !important;
+
+    max-width: 100% !important;
+
+    height: auto !important;
+
+    object-fit: contain !important;
+
+    page-break-inside: avoid !important;
+  }
+
   svg,
   canvas {
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
+    max-width: 100% !important;
+  }
+
+  /* Dashed Borders */
+
+  .border-dashed {
+    border-style: dashed !important;
+  }
+
+  /* Prevent awkward page breaks */
+
+  p,
+  h1,
+  h2,
+  h3,
+  img {
+    page-break-inside: avoid !important;
+
+    break-inside: avoid !important;
+  }
+
+  /* Long Addresses */
+
+  .address {
+    overflow-wrap: anywhere !important;
+  }
+
+  /* Remove Shadows */
+
+  * {
+    box-shadow: none !important;
+
+    text-shadow: none !important;
   }
 }

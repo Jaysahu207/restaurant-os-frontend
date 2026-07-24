@@ -123,7 +123,7 @@ export default function Sidebar() {
     <>
       {/* Mobile/Tablet Top Bar (appears when sidebar is closed) */}
       {showTopBar && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm px-4 py-3 flex items-center justify-between">
+        <div className="fixed top-0 left-0 right-0 h-16 z-50 bg-white border-b border-gray-200 shadow-sm px-4 flex items-center justify-between">
           <button
             onClick={() => setSidebarMobileOpen(true)}
             className="p-2 rounded-xl hover:bg-gray-100 transition active:scale-95"
@@ -157,13 +157,12 @@ export default function Sidebar() {
           bg-white border-r border-gray-200 flex flex-col h-screen shadow-xl
           transition-all duration-300 ease-in-out
           ${sidebarWidth}
-          ${
-            isMobile || isTablet
-              ? `
+          ${isMobile || isTablet
+            ? `
               fixed top-0 left-0 z-50
               ${sidebarMobileOpen ? "translate-x-0" : "-translate-x-full"}
             `
-              : "sticky top-0"
+            : "sticky top-0"
           }
         `}
       >
@@ -259,10 +258,9 @@ export default function Sidebar() {
                       className={`
                         flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
                         group relative
-                        ${
-                          active
-                            ? "bg-linear-to-r from-orange-500 to-amber-500 text-white shadow-md"
-                            : "text-gray-600 hover:bg-gray-100"
+                        ${active
+                          ? "bg-linear-to-r from-orange-500 to-amber-500 text-white shadow-md"
+                          : "text-gray-600 hover:bg-gray-100"
                         }
                         ${sidebarCollapsed ? "justify-center" : ""}
                       `}

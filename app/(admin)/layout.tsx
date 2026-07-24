@@ -34,8 +34,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen bg-gray-100">
       {showSidebar && <Sidebar />}
 
-      <div className="flex-1 overflow-hidden">
-        <main className="flex-1 overflow-y-auto focus:outline-none">
+      <div className="flex-1 overflow-hidden ">
+        <main
+          className={`flex-1 overflow-y-auto focus:outline-none ${showTopBar ? "pt-16" : ""
+            }`}
+        >
           {children}
         </main>
       </div>

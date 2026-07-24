@@ -28,6 +28,7 @@ import {
 import toast from "react-hot-toast";
 
 import { useAuthStore } from "@/store/useAuthStore";
+import TableQRSkeleton from "@/components/skeleton/TableQRSkeleton";
 
 export default function TablesPage() {
   const queryClient = useQueryClient();
@@ -270,12 +271,7 @@ export default function TablesPage() {
 
   // Loading state
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-100 gap-4">
-        <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
-        <p className="text-gray-600">Loading tables...</p>
-      </div>
-    );
+    return <TableQRSkeleton />;
   }
 
   // Error state

@@ -430,7 +430,7 @@ export default function MenuPage() {
 
   const totalCategories = allCategories.length;
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 p-4 md:p-6">
       {/* Header */}
       <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         {/* Left */}
@@ -572,11 +572,10 @@ export default function MenuPage() {
                 key={sort.key}
                 onClick={() => handleSort(sort.key)}
                 className={`rounded-full px-4 py-1.5 text-xs font-medium transition
-          ${
-            sortField === sort.key
-              ? "bg-orange-500 text-white"
-              : "bg-gray-100 text-gray-700 hover:bg-orange-100"
-          }`}
+          ${sortField === sort.key
+                    ? "bg-orange-500 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-orange-100"
+                  }`}
               >
                 {sort.label}
 
@@ -621,13 +620,12 @@ export default function MenuPage() {
               <div className="absolute left-4 top-4">
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-semibold backdrop-blur
-            ${
-              item.type === "veg"
-                ? "bg-green-600 text-white"
-                : item.type === "non-veg"
-                  ? "bg-red-600 text-white"
-                  : "bg-yellow-500 text-white"
-            }`}
+            ${item.type === "veg"
+                      ? "bg-green-600 text-white"
+                      : item.type === "non-veg"
+                        ? "bg-red-600 text-white"
+                        : "bg-yellow-500 text-white"
+                    }`}
                 >
                   {item.type.toUpperCase()}
                 </span>
@@ -637,11 +635,10 @@ export default function MenuPage() {
               <div className="absolute left-4 bottom-4">
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-semibold
-            ${
-              item.isAvailable
-                ? "bg-green-500 text-white"
-                : "bg-red-500 text-white"
-            }`}
+            ${item.isAvailable
+                      ? "bg-green-500 text-white"
+                      : "bg-red-500 text-white"
+                    }`}
                 >
                   {item.isAvailable ? "Available" : "Unavailable"}
                 </span>
@@ -1196,11 +1193,10 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
               onClick={onClose}
               disabled={isSaving}
               className={`px-4 py-2 border border-gray-300 rounded-lg transition
-      ${
-        isSaving
-          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-          : "text-gray-700 hover:bg-gray-50"
-      }`}
+      ${isSaving
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "text-gray-700 hover:bg-gray-50"
+                }`}
             >
               Cancel
             </button>
@@ -1209,11 +1205,10 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
               type="submit"
               disabled={isSaving}
               className={`px-4 py-2 rounded-lg text-white shadow-sm transition flex items-center gap-2
-    ${
-      isSaving
-        ? "bg-orange-300 cursor-not-allowed opacity-70"
-        : "bg-linear-to-br from-orange-400 to-amber-500 hover:opacity-90"
-    }`}
+    ${isSaving
+                  ? "bg-orange-300 cursor-not-allowed opacity-70"
+                  : "bg-linear-to-br from-orange-400 to-amber-500 hover:opacity-90"
+                }`}
             >
               {isSaving ? (
                 <>

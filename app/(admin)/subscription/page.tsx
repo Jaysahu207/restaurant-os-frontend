@@ -27,6 +27,7 @@ import {
   verifyPayment,
   cancelSubscription,
 } from "@/services/subscriptionService";
+import SubscriptionSkeleton from "@/components/skeleton/SubscriptionSkeleton";
 
 declare global {
   interface Window {
@@ -220,21 +221,17 @@ export default function SubscriptionPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[70vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      </div>
-    );
+    return <SubscriptionSkeleton />;
   }
 
   const isActiveSubscription = subscription && subscription.status === "active";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6 ">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">
+          <h1 className="text-3xl font-bold text-slate-900">
             Subscription & Billing
           </h1>
           <p className="text-slate-500 text-sm">
@@ -265,13 +262,12 @@ export default function SubscriptionPage() {
                   <div>
                     <span className="text-slate-500">Status:</span>
                     <span
-                      className={`ml-2 inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        subscription.status === "active"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : subscription.status === "trial"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-rose-100 text-rose-800"
-                      }`}
+                      className={`ml-2 inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${subscription.status === "active"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : subscription.status === "trial"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-rose-100 text-rose-800"
+                        }`}
                     >
                       {subscription.status === "trial" && "Trial"}
                       {subscription.status === "active" && "Active"}
@@ -425,22 +421,20 @@ export default function SubscriptionPage() {
           <div className="inline-flex rounded-xl bg-slate-100 p-1">
             <button
               onClick={() => setBillingCycle("monthly")}
-              className={`px-5 py-2 rounded-lg text-sm font-medium transition ${
-                billingCycle === "monthly"
-                  ? "bg-white shadow text-slate-900"
-                  : "text-slate-500"
-              }`}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition ${billingCycle === "monthly"
+                ? "bg-white shadow text-slate-900"
+                : "text-slate-500"
+                }`}
             >
               Monthly
             </button>
 
             <button
               onClick={() => setBillingCycle("yearly")}
-              className={`px-5 py-2 rounded-lg text-sm font-medium transition ${
-                billingCycle === "yearly"
-                  ? "bg-white shadow text-slate-900"
-                  : "text-slate-500"
-              }`}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition ${billingCycle === "yearly"
+                ? "bg-white shadow text-slate-900"
+                : "text-slate-500"
+                }`}
             >
               Yearly
             </button>
@@ -456,11 +450,10 @@ export default function SubscriptionPage() {
             return (
               <div
                 key={plan.code}
-                className={`relative bg-white rounded-xl border shadow-sm transition-all hover:shadow-md ${
-                  isPopular
-                    ? "border-indigo-300 ring-2 ring-indigo-100"
-                    : "border-slate-200"
-                } ${isCurrentPlan ? "ring-2 ring-emerald-500" : ""}`}
+                className={`relative bg-white rounded-xl border shadow-sm transition-all hover:shadow-md ${isPopular
+                  ? "border-indigo-300 ring-2 ring-indigo-100"
+                  : "border-slate-200"
+                  } ${isCurrentPlan ? "ring-2 ring-emerald-500" : ""}`}
               >
                 {isPopular && (
                   <div className="absolute -top-3 left-6 bg-indigo-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-sm">
@@ -532,13 +525,12 @@ export default function SubscriptionPage() {
                   <button
                     onClick={() => handleBuyPlan(plan.code, billingCycle)}
                     disabled={paymentLoading || isCurrentPlan}
-                    className={`w-full py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
-                      isCurrentPlan
-                        ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                        : paymentLoading
-                          ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                          : "bg-slate-800 hover:bg-slate-900 text-white"
-                    }`}
+                    className={`w-full py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2 ${isCurrentPlan
+                      ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                      : paymentLoading
+                        ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                        : "bg-slate-800 hover:bg-slate-900 text-white"
+                      }`}
                   >
                     {paymentLoading ? (
                       <>

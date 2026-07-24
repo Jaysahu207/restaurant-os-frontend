@@ -373,7 +373,7 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-8xl mx-auto shadow-sm rounded-xl bg-gray-50">
+    <div className="space-y-6 p-4 md:p-6 max-w-8xl mx-auto shadow-sm  bg-gray-50">
       {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* Left: Title + subtitle */}
@@ -918,6 +918,21 @@ function OrderDetailModal({
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `Invoice-${order.invoiceNumber}`,
+    pageStyle: `
+    @page {
+      size: 80mm auto;
+      margin: 0;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 80mm;
+      background: white;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  `,
   });
 
   return (
@@ -986,6 +1001,21 @@ function KOTModal({
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `KOT-${kot.orderNumber}-Batch-${kot.batch}`,
+    pageStyle: `
+    @page {
+      size: 80mm auto;
+      margin: 0;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 80mm;
+      background: white;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  `,
     onAfterPrint: () => {
       onClose();
     },

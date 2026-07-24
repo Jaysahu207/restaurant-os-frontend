@@ -52,10 +52,10 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6 md:p-10">
       {/* Header with date range */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-2xl font-bold text-gray-800">
+        <h2 className="text-3xl font-bold text-gray-900">
           Reports & Analytics
         </h2>
         <div className="flex items-center gap-3">
@@ -193,30 +193,26 @@ export default function ReportsPage() {
                 style={{
                   background: `conic-gradient(
                     #22c55e 0deg ${(mockOrdersByStatus.data[0] / 202) * 360}deg,
-                    #3b82f6 ${(mockOrdersByStatus.data[0] / 202) * 360}deg ${
-                      ((mockOrdersByStatus.data[0] +
-                        mockOrdersByStatus.data[1]) /
-                        202) *
-                      360
+                    #3b82f6 ${(mockOrdersByStatus.data[0] / 202) * 360}deg ${((mockOrdersByStatus.data[0] +
+                      mockOrdersByStatus.data[1]) /
+                      202) *
+                    360
                     }deg,
-                    #eab308 ${
-                      ((mockOrdersByStatus.data[0] +
-                        mockOrdersByStatus.data[1]) /
-                        202) *
-                      360
-                    }deg ${
-                      ((mockOrdersByStatus.data[0] +
-                        mockOrdersByStatus.data[1] +
-                        mockOrdersByStatus.data[2]) /
-                        202) *
-                      360
+                    #eab308 ${((mockOrdersByStatus.data[0] +
+                      mockOrdersByStatus.data[1]) /
+                      202) *
+                    360
+                    }deg ${((mockOrdersByStatus.data[0] +
+                      mockOrdersByStatus.data[1] +
+                      mockOrdersByStatus.data[2]) /
+                      202) *
+                    360
                     }deg,
-                    #ef4444 ${
-                      ((mockOrdersByStatus.data[0] +
-                        mockOrdersByStatus.data[1] +
-                        mockOrdersByStatus.data[2]) /
-                        202) *
-                      360
+                    #ef4444 ${((mockOrdersByStatus.data[0] +
+                      mockOrdersByStatus.data[1] +
+                      mockOrdersByStatus.data[2]) /
+                      202) *
+                    360
                     }deg 360deg
                   )`,
                 }}

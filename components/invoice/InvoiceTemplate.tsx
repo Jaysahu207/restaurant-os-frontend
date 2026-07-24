@@ -88,7 +88,15 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
       <div
         ref={ref}
         id="invoice-print"
-        className="bg-white text-black w-full p-2 text-xs"
+        className="bg-white text-black"
+        style={{
+          width: "80mm",
+          maxWidth: "80mm",
+          minWidth: "80mm",
+          padding: "3mm",
+          boxSizing: "border-box",
+          margin: "0 auto",
+        }}
       >
         {/* ================= RESTAURANT HEADER ================= */}
         <div className="border-b border-dashed pb-2 text-center">
