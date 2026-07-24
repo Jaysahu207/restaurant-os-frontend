@@ -157,7 +157,7 @@ export default function OrdersPage() {
       const data = await getOrders(restaurant._id, dateParam);
       // console.log("Fetched orders -->>  ", data);
       const formatted: Order[] = data.map((o: any) => mapOrder(o));
-      console.log("Fetched orders -->>  ", formatted);
+      // console.log("Fetched orders -->>  ", formatted);
       setOrders(formatted);
     } catch (error) {
       console.error("Failed to load orders:", error);

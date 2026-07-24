@@ -17,6 +17,7 @@ import {
   Printer,
   IndianRupee,
   Calendar,
+  Download,
 } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -30,17 +31,19 @@ import {
 import toast from "react-hot-toast";
 import { debounce } from "lodash"; // or implement a simple debounce
 import { useAuthStore } from "@/store/useAuthStore";
-
+import * as XLSX from "xlsx";
 // ==================== Types ====================
 interface Customer {
   _id: string;
   name: string;
   phone: string;
   email: string;
-  lastOrder: string;
-  totalOrders?: number;
-  totalSpent?: number;
   lastVisit?: string;
+  totalOrders: number;
+  totalSpent: number;
+  isRegular: boolean;
+  orders: string[];
+  createdAt: string;
 }
 
 interface OrderItem {
@@ -61,11 +64,12 @@ interface Order {
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
-  const [lastSearched, setLastSearched] = useState("");
+
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [dateFilter, setDateFilter] = useState("");
+  const [mainDateFilter, setMainDateFilter] = useState(""); // for main customer list
+  const [modalDateFilter, setModalDateFilter] = useState(""); // for order history inside modal
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   // Modal state
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -74,8 +78,14 @@ export default function CustomersPage() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [orderDateFilter, setOrderDateFilter] = useState(""); // For filtering orders within modal
   const [modalLoading, setModalLoading] = useState(false);
-
+  const [exporting, setExporting] = useState(false); // new state
   const { restaurant } = useAuthStore();
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [customerType, setCustomerType] = useState("all");
+  const [ordersFilter, setOrdersFilter] = useState("all");
+  const [spentFilter, setSpentFilter] = useState("all");
+  const [emailFilter, setEmailFilter] = useState("all");
 
   // Debounced search handler
   const debouncedSearch = useMemo(() => {
@@ -130,30 +140,110 @@ export default function CustomersPage() {
   useEffect(() => {
     let filtered = [...customers];
 
-    // 🔍 Search filter (name + phone + email)
+    // Search
     if (search) {
+      const q = search.toLowerCase();
+
       filtered = filtered.filter(
         (c) =>
-          c.name.toLowerCase().includes(search.toLowerCase()) ||
+          c.name.toLowerCase().includes(q) ||
           c.phone.includes(search) ||
-          c.email?.toLowerCase().includes(search.toLowerCase()),
+          c.email?.toLowerCase().includes(q),
       );
     }
 
-    // 📅 Date filter (lastVisit)
-    if (dateFilter) {
+    // From Date
+    if (fromDate) {
       filtered = filtered.filter((c) => {
         if (!c.lastVisit) return false;
-        const d = new Date(c.lastVisit);
-        const customerDate = formatLocalDate(d);
 
-        return customerDate === dateFilter;
+        return new Date(c.lastVisit) >= new Date(fromDate);
       });
     }
 
-    setFilteredCustomers(filtered);
-  }, [search, dateFilter, customers]);
+    // To Date
+    if (toDate) {
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
 
+      filtered = filtered.filter((c) => {
+        if (!c.lastVisit) return false;
+
+        return new Date(c.lastVisit) <= end;
+      });
+    }
+
+    // Customer Type
+    if (customerType === "new") {
+      filtered = filtered.filter((c) => c.totalOrders === 1);
+    }
+
+    if (customerType === "regular") {
+      filtered = filtered.filter((c) => c.totalOrders > 1);
+    }
+
+    // Orders Filter
+    switch (ordersFilter) {
+      case "1":
+        filtered = filtered.filter((c) => c.totalOrders === 1);
+        break;
+
+      case "2-5":
+        filtered = filtered.filter(
+          (c) => c.totalOrders >= 2 && c.totalOrders <= 5,
+        );
+        break;
+
+      case "5-10":
+        filtered = filtered.filter(
+          (c) => c.totalOrders >= 5 && c.totalOrders <= 10,
+        );
+        break;
+
+      case "10+":
+        filtered = filtered.filter((c) => c.totalOrders > 10);
+        break;
+    }
+
+    // Spent Filter
+    switch (spentFilter) {
+      case "0-500":
+        filtered = filtered.filter(
+          (c) => c.totalSpent >= 0 && c.totalSpent <= 500,
+        );
+        break;
+
+      case "500-2000":
+        filtered = filtered.filter(
+          (c) => c.totalSpent >= 500 && c.totalSpent <= 2000,
+        );
+        break;
+
+      case "2000+":
+        filtered = filtered.filter((c) => c.totalSpent > 2000);
+        break;
+    }
+
+    // Email Filter
+    if (emailFilter === "has") {
+      filtered = filtered.filter((c) => c.email && c.email.trim() !== "");
+    }
+
+    if (emailFilter === "no") {
+      filtered = filtered.filter((c) => !c.email || c.email.trim() === "");
+    }
+
+    setFilteredCustomers(filtered);
+  }, [
+    customers,
+    search,
+    fromDate,
+    toDate,
+    customerType,
+    ordersFilter,
+    spentFilter,
+    emailFilter,
+  ]);
   const formatLocalDate = (date: Date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -188,13 +278,11 @@ export default function CustomersPage() {
 
   // Filter orders within modal by date
   const filteredOrders = useMemo(() => {
-    if (!orderDateFilter) return orders;
+    if (!modalDateFilter) return orders;
     return orders.filter((order) => {
-      const d = new Date(order.createdAt);
-      const orderDate = formatLocalDate(d);
-      return orderDate === orderDateFilter;
+      return formatLocalDate(new Date(order.createdAt)) === modalDateFilter;
     });
-  }, [orders, orderDateFilter]);
+  }, [orders, modalDateFilter]);
 
   // Calculate stats for customer card
   const customerStats = useMemo(() => {
@@ -213,12 +301,100 @@ export default function CustomersPage() {
   // Clear all filters
   const clearFilters = () => {
     setSearch("");
-    setDateFilter("");
     setInputValue("");
-    // Trigger immediate search clear
+
+    setFromDate("");
+    setToDate("");
+
+    setCustomerType("all");
+    setOrdersFilter("all");
+    setSpentFilter("all");
+    setEmailFilter("all");
+
     debouncedSearch("");
   };
 
+  // console.log("Filtered Customers -> ", filteredCustomers);
+  // console.log("Customer Data -> ", selectedCustomer, orders);
+  // ==================== EXPORT HANDLER ====================
+  const handleExport = useCallback(() => {
+    setExporting(true);
+    // 1. Get the currently displayed customers (filtered by search & date)
+    try {
+      const baseData = filteredCustomers;
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const activeCustomers = baseData.filter((c) => {
+        if (!c.lastVisit) return false;
+        return new Date(c.lastVisit) >= sixMonthsAgo;
+      });
+      if (activeCustomers.length === 0) {
+        toast.error("No customers with orders in the last 6 months.");
+        return;
+      }
+
+      const rows = activeCustomers.map((c) => ({
+        Name: c.name,
+        Phone: c.phone,
+        Email: c.email || "",
+
+        "Customer Type": c.isRegular ? "Regular" : "New",
+
+        "Total Orders": c.totalOrders ?? 0,
+
+        "Total Visits": c.orders?.length ?? 0,
+
+        "Total Spent (₹)": (c.totalSpent ?? 0).toFixed(2),
+
+        "Average Order Value (₹)":
+          c.totalOrders && c.totalOrders > 0
+            ? ((c.totalSpent ?? 0) / c.totalOrders).toFixed(2)
+            : "0.00",
+
+        "Last Visit": c.lastVisit
+          ? new Date(c.lastVisit).toLocaleDateString("en-IN")
+          : "Never",
+
+        "Customer Since": c.createdAt
+          ? new Date(c.createdAt).toLocaleDateString("en-IN")
+          : "-",
+
+        "Email Available": c.email ? "Yes" : "No",
+      }));
+      // 4. Create workbook & sheet
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
+
+      // 5. Generate Excel file and download
+      const excelBuffer = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+      const blob = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const fileName = `${restaurant?.name ?? "Restaurant"}_Customers_${new Date()
+        .toISOString()
+        .slice(0, 10)}.xlsx`;
+      link.href = url;
+      link.download = 0 < fileName.length ? fileName : "customers.xlsx";
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
+
+      toast.success(`Exported ${activeCustomers.length} customers.`);
+    } catch (error) {
+      toast.error("Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }, [filteredCustomers, restaurant?.name]);
   // Print order history for selected customer
   const handlePrintHistory = () => {
     const printContent = document.getElementById("customer-history-print");
@@ -257,27 +433,39 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-7xl mx-auto">
+    <div className="space-y-6 p-4 md:p-6  mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">
+          <h2 className="text-3xl font-bold text-gray-800">
             Customer Management
           </h2>
           <p className="text-sm text-gray-500 mt-1">
             View and manage your customer base
           </p>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
-          title="Refresh"
-        >
-          <RefreshCw
-            className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`}
-          />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Export Button */}
+          <button
+            onClick={handleExport}
+            disabled={exporting || filteredCustomers.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4" />
+            {exporting ? "Exporting..." : "Export Data"}
+          </button>
+          {/* Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
+            title="Refresh"
+          >
+            <RefreshCw
+              className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Stats Overview */}
@@ -302,100 +490,163 @@ export default function CustomersPage() {
         />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search Input */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+      {/* ================= Filters ================= */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+
+        {/* Top Row */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+
+          {/* Search */}
+          <div className="relative md:col-span-5">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by name or phone number, email..."
+              placeholder="Search customer..."
               value={inputValue}
               onChange={handleSearchChange}
-              className="w-full pl-10 pr-4 py-2.5 border text-gray-700 border-gray-300 rounded-lg"
+              className="w-full h-10 pl-9 pr-3 rounded-lg border border-gray-300 text-sm text-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
 
-          {/* Date Filter */}
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              {/* Calendar Icon */}
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+          {/* From Date */}
+          <DatePicker
+            selected={fromDate ? new Date(fromDate) : null}
+            onChange={(date: any) =>
+              setFromDate(date ? formatLocalDate(date) : "")
+            }
+            placeholderText="From"
+            dateFormat="yyyy-MM-dd"
+            className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm text-gray-700"
+          />
 
-              {/* Date Picker */}
-              <DatePicker
-                selected={orderDateFilter ? new Date(orderDateFilter) : null}
-                onChange={(date: Date | null) =>
-                  setOrderDateFilter(date ? formatLocalDate(date) : "")
-                }
-                placeholderText="Select date"
-                dateFormat="yyyy-MM-dd"
-                className="
-        w-[160px]
-        pl-9 pr-3 py-2
-        text-sm text-gray-900
-        bg-white
-        border border-gray-300
-        rounded-xl
-        shadow-sm
-        outline-none
-        transition-all
-        focus:ring-2 focus:ring-indigo-500
-        focus:border-indigo-500
-        hover:border-gray-400
-      "
-                popperClassName="z-50"
-              />
-            </div>
+          {/* To Date */}
+          <DatePicker
+            selected={toDate ? new Date(toDate) : null}
+            onChange={(date: any) =>
+              setToDate(date ? formatLocalDate(date) : "")
+            }
+            placeholderText="To"
+            dateFormat="yyyy-MM-dd"
+            className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm text-gray-700"
+          />
 
-            {/* Clear Button */}
-            {orderDateFilter && (
-              <button
-                onClick={() => setDateFilter("")}
-                className="
-        p-2 rounded-lg
-        text-gray-400
-        hover:text-red-500
-        hover:bg-red-50
-        transition
-      "
-                title="Clear date"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+          {/* Clear */}
+          <button
+            onClick={clearFilters}
+            className="h-10 px-4 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium transition"
+          >
+            Clear
+          </button>
+
         </div>
 
-        {/* Active Filters & Clear */}
-        {(search || dateFilter) && (
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-500">Active filters:</span>
-            {search && (
-              <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs flex items-center gap-1">
-                Search: {search}
-                <button onClick={() => setSearch("")}>
-                  <X className="w-3 h-3" />
-                </button>
+        {/* Bottom Row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+
+          <select
+            value={customerType}
+            onChange={(e) => setCustomerType(e.target.value)}
+            className="h-10 rounded-lg border border-gray-300 px-3 text-sm text-gray-700"
+          >
+            <option value="all">Customer Type</option>
+            <option value="new">New</option>
+            <option value="regular">Regular</option>
+          </select>
+
+          <select
+            value={ordersFilter}
+            onChange={(e) => setOrdersFilter(e.target.value)}
+            className="h-10 rounded-lg border border-gray-300 px-3 text-sm text-gray-700"
+          >
+            <option value="all">Orders</option>
+            <option value="1">1 Order</option>
+            <option value="2-5">2 - 5</option>
+            <option value="5-10">5 - 10</option>
+            <option value="10+">10+</option>
+          </select>
+
+          <select
+            value={spentFilter}
+            onChange={(e) => setSpentFilter(e.target.value)}
+            className="h-10 rounded-lg border border-gray-300 px-3 text-sm text-gray-700"
+          >
+            <option value="all">Spent</option>
+            <option value="0-500">₹0 - ₹500</option>
+            <option value="500-2000">₹500 - ₹2K</option>
+            <option value="2000+">₹2K+</option>
+          </select>
+
+          <select
+            value={emailFilter}
+            onChange={(e) => setEmailFilter(e.target.value)}
+            className="h-10 rounded-lg border border-gray-300 px-3 text-sm text-gray-700"
+          >
+            <option value="all">Email</option>
+            <option value="has">Has Email</option>
+            <option value="no">No Email</option>
+          </select>
+
+        </div>
+
+        {/* Active Filters */}
+        {(search ||
+          fromDate ||
+          toDate ||
+          customerType !== "all" ||
+          ordersFilter !== "all" ||
+          spentFilter !== "all" ||
+          emailFilter !== "all") && (
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
+
+              <span className="text-xs font-medium text-gray-500">
+                Active:
               </span>
-            )}
-            {dateFilter && (
-              <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs flex items-center gap-1">
-                Last order: {dateFilter}
-                <button onClick={() => setDateFilter("")}>
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            <button
-              onClick={clearFilters}
-              className="ml-auto text-blue-600 hover:text-blue-800 text-sm"
-            >
-              Clear all
-            </button>
-          </div>
-        )}
+
+              {search && (
+                <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs">
+                  🔍 {search}
+                </span>
+              )}
+
+              {fromDate && (
+                <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs">
+                  📅 {fromDate}
+                </span>
+              )}
+
+              {toDate && (
+                <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs">
+                  📅 {toDate}
+                </span>
+              )}
+
+              {customerType !== "all" && (
+                <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-700 text-xs">
+                  {customerType}
+                </span>
+              )}
+
+              {ordersFilter !== "all" && (
+                <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-700 text-xs">
+                  {ordersFilter} Orders
+                </span>
+              )}
+
+              {spentFilter !== "all" && (
+                <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs">
+                  {spentFilter}
+                </span>
+              )}
+
+              {emailFilter !== "all" && (
+                <span className="px-2 py-1 rounded-full bg-pink-100 text-pink-700 text-xs">
+                  {emailFilter === "has" ? "Has Email" : "No Email"}
+                </span>
+              )}
+
+            </div>
+          )}
+
       </div>
 
       {/* Customers Grid */}
@@ -409,14 +660,20 @@ export default function CustomersPage() {
               No customers found
             </h3>
             <p className="text-gray-500">
-              {search || dateFilter
+              {search ||
+                fromDate ||
+                toDate ||
+                customerType !== "all" ||
+                ordersFilter !== "all" ||
+                spentFilter !== "all" ||
+                emailFilter !== "all"
                 ? "Try adjusting your filters."
                 : "Start by adding customers or wait for orders to create customer records."}
             </p>
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {filteredCustomers.map((customer) => (
             <CustomerCard
               key={customer._id}
@@ -507,27 +764,6 @@ export default function CustomersPage() {
                   </div>
                 </div>
 
-                {/* Order Date Filter within Modal */}
-                {/* <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-gray-700">Order History</h4>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <input
-                      type="date"
-                      value={orderDateFilter}
-                      onChange={(e) => setOrderDateFilter(e.target.value)}
-                      className="text-sm border text-gray-700 border-gray-400 rounded-lg px-2 py-1"
-                    />
-                    {orderDateFilter && (
-                      <button
-                        onClick={() => setOrderDateFilter("")}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div> */}
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium text-gray-700">Order History</h4>
 
@@ -535,18 +771,20 @@ export default function CustomersPage() {
                     <Calendar className="w-4 h-4 text-gray-500" />
 
                     <DatePicker
-                      selected={dateFilter ? new Date(dateFilter) : null}
-                      onChange={(date: Date | null) =>
-                        setDateFilter(date ? formatLocalDate(date) : "")
+                      selected={
+                        mainDateFilter ? new Date(mainDateFilter) : null
+                      }
+                      onChange={(date: any) =>
+                        setMainDateFilter(date ? formatLocalDate(date) : "")
                       }
                       placeholderText="Select date"
                       className="text-sm outline-none bg-transparent text-gray-800"
                       dateFormat="yyyy-MM-dd"
                     />
 
-                    {dateFilter && (
+                    {mainDateFilter && (
                       <button
-                        onClick={() => setOrderDateFilter("")}
+                        onClick={() => setMainDateFilter("")}
                         className="text-gray-400 hover:text-gray-600"
                       >
                         <X className="w-4 h-4" />
@@ -623,53 +861,93 @@ function CustomerCard({
   onViewHistory: () => void;
 }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition p-5 border border-gray-100 group">
-      <div className="flex justify-between items-start mb-3">
-        <h3 className="text-lg font-semibold text-gray-800 truncate">
-          {customer.name}
-        </h3>
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 p-5">
+
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-gray-800">
+            {customer.name}
+          </h3>
+
+          <div className="mt-1">
+            {customer.isRegular ? (
+              <span className="inline-flex items-center rounded-full bg-green-100 text-green-700 px-2.5 py-1 text-xs font-medium">
+                ⭐ Regular Customer
+              </span>
+            ) : (
+              <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 px-2.5 py-1 text-xs font-medium">
+                🆕 New Customer
+              </span>
+            )}
+          </div>
+        </div>
+
         <button
           onClick={onViewHistory}
-          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-          title="View Order History"
+          className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition"
+          title="View History"
         >
-          <Eye className="w-4 h-4" />
+          <Eye className="w-5 h-5" />
         </button>
       </div>
-      <div className="space-y-2 text-sm">
+
+      {/* Customer Info */}
+      <div className="mt-5 space-y-3 text-sm">
+
         <div className="flex items-center gap-2 text-gray-600">
-          <Phone className="w-4 h-4 flex-shrink-0" />
-          <span className="truncate">{customer.phone}</span>
+          <Phone className="w-4 h-4 text-gray-400" />
+          <span>{customer.phone}</span>
         </div>
+
         <div className="flex items-center gap-2 text-gray-600">
-          <Mail className="w-4 h-4 flex-shrink-0" />
+          <Mail className="w-4 h-4 text-gray-400" />
           <span className="truncate">
-            {customer.email || "dummy@gmail.com"}
+            {customer.email || "No Email"}
           </span>
         </div>
+
         <div className="flex items-center gap-2 text-gray-600">
-          <Calendar className="w-4 h-4 flex-shrink-0" />
+          <Calendar className="w-4 h-4 text-gray-400" />
           <span>
-            Last order:{" "}
-            {customer.lastOrder
-              ? new Date(customer.lastOrder).toLocaleDateString()
+            {customer.lastVisit
+              ? new Date(customer.lastVisit).toLocaleDateString()
               : "Never"}
           </span>
         </div>
+
       </div>
-      <div className="mt-4 pt-3 border-t flex justify-between text-sm">
-        <div>
-          <span className="text-gray-500">Orders: </span>
-          <span className="font-semibold text-gray-800">
-            {customer.totalOrders || 0}
-          </span>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3 mt-5 pt-5 border-t">
+
+        <div className="text-center">
+          <p className="text-xl font-bold text-indigo-600">
+            {customer.totalOrders}
+          </p>
+          <p className="text-xs text-gray-500">
+            Orders
+          </p>
         </div>
-        <div>
-          <span className="text-gray-500">Spent: </span>
-          <span className="font-semibold text-gray-800">
-            ₹{customer.totalSpent?.toFixed(2) || "0.00"}
-          </span>
+
+        <div className="text-center">
+          <p className="text-xl font-bold text-green-600">
+            ₹{customer.totalSpent.toLocaleString()}
+          </p>
+          <p className="text-xs text-gray-500">
+            Spent
+          </p>
         </div>
+
+        <div className="text-center">
+          <p className="text-xl font-bold text-orange-600">
+            {customer.orders?.length ?? 0}
+          </p>
+          <p className="text-xs text-gray-500">
+            Visits
+          </p>
+        </div>
+
       </div>
     </div>
   );
@@ -701,9 +979,8 @@ function OrderCard({ order }: { order: Order }) {
           </span>
         </div>
         <span
-          className={`px-2 py-1 text-xs font-medium rounded-full ${
-            statusColors[order.status] || "bg-gray-100 text-gray-700"
-          }`}
+          className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[order.status] || "bg-gray-100 text-gray-700"
+            }`}
         >
           {order.status}
         </span>
