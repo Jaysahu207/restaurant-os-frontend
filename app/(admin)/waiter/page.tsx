@@ -264,7 +264,7 @@ export default function WaiterPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
+    localStorage.removeItem("auth-storage");
     useAuthStore.setState({ user: null, token: null });
     window.location.href = "/";
   };
@@ -330,7 +330,7 @@ export default function WaiterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100/80  border-amber-600 border">
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100/80 ">
 
       <div className="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-2 lg:px-8">
 

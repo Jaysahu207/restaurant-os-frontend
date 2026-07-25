@@ -114,7 +114,7 @@ export default function Sidebar() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
+    localStorage.removeItem("auth-storage");
     useAuthStore.setState({ user: null, token: null });
     window.location.href = "/";
   };

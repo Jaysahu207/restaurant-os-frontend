@@ -36,7 +36,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       <div className="flex-1 overflow-hidden ">
         <main
-          className={`flex-1 overflow-y-auto focus:outline-none ${showTopBar ? "pt-16" : ""
+          className={`flex-1 overflow-y-auto focus:outline-none ${isMobileOrTablet && (role === "owner" || role === "manager")
+            ? "pt-16"
+            : ""
             }`}
         >
           {children}

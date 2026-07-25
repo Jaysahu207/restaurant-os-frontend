@@ -236,22 +236,20 @@ export default function AuthPage() {
                   <div className="flex bg-gray-100/80 rounded-2xl p-1 mb-6 sm:mb-8">
                     <button
                       onClick={() => setActiveTab("login")}
-                      className={`flex-1 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${
-                        activeTab === "login"
-                          ? "bg-linear-to-r from-orange-600 to-amber-600 text-white shadow-md transform scale-[1.02]"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
-                      }`}
+                      className={`flex-1 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${activeTab === "login"
+                        ? "bg-linear-to-r from-orange-600 to-amber-600 text-white shadow-md transform scale-[1.02]"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                        }`}
                     >
                       Login
                     </button>
 
                     <button
                       onClick={() => setActiveTab("register")}
-                      className={`flex-1 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${
-                        activeTab === "register"
-                          ? "bg-linear-to-r from-orange-600 to-amber-600 text-white shadow-md transform scale-[1.02]"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
-                      }`}
+                      className={`flex-1 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${activeTab === "register"
+                        ? "bg-linear-to-r from-orange-600 to-amber-600 text-white shadow-md transform scale-[1.02]"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                        }`}
                     >
                       Register
                     </button>
@@ -678,49 +676,7 @@ export default function AuthPage() {
               </p>
             </div>
 
-            {/* Gmail Integration
-            <div className="bg-blue-50/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-5 sm:p-6 shadow-md hover:shadow-xl transition-all duration-300">
-              <div className="flex items-center gap-3 mb-3 sm:mb-4">
-                <div className="p-2 bg-blue-100 rounded-xl">
-                  <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-                </div>
-                <h2 className="text-lg sm:text-xl font-bold text-gray-900">
-                  Gmail Integration (Optional)
-                </h2>
-              </div>
-              <p className="text-sm sm:text-base text-gray-700 mb-4">
-                Connect your Gmail account to send invoices, loyalty updates,
-                promotions, and customer communications directly from your own
-                email address.
-              </p>
-              <div className="space-y-3 text-sm">
-                <div className="flex gap-3">
-                  <Database className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <span className="text-xs sm:text-sm text-gray-700">
-                    Only requests <strong>gmail.send</strong> permission – no
-                    read, modify, or delete access.
-                  </span>
-                </div>
-                <div className="flex gap-3">
-                  <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <span className="text-xs sm:text-sm text-gray-700">
-                    QRasoi never reads, stores, or shares your Gmail messages.
-                  </span>
-                </div>
-                <div className="flex gap-3">
-                  <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <span className="text-xs sm:text-sm text-gray-700">
-                    User data is never sold, shared with advertisers, or used
-                    for AI training.
-                  </span>
-                </div>
-              </div>
-              <div className="mt-4 text-xs text-gray-600 bg-white/60 backdrop-blur-sm p-3 rounded-xl border border-blue-100">
-                💡 <strong>Why we need this permission:</strong> To let you send
-                professional emails (invoices, promotions) from your own Gmail
-                address. We only send emails you initiate.
-              </div>
-            </div> */}
+
 
             {/* Feature Icons */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

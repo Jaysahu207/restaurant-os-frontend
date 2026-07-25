@@ -569,7 +569,7 @@ export default function OrdersPage() {
               {filteredOrders.length !== 1 ? "s" : ""}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 ">
               {filteredOrders.map((order) => (
                 <OrderCard
                   key={order.id}
