@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Plus,
   Pencil,
@@ -11,107 +11,54 @@ import {
   X,
   Upload,
   CheckCircle,
-  AlertCircle,
 } from "lucide-react";
-import axios from "axios";
 import toast from "react-hot-toast";
 import { useAuthStore } from "@/store/useAuthStore";
 import {
-  updateBanner,
-  getRestaurantBanners,
-  deleteBanner,
-  createBanner,
-  toggleBannerStatus,
-} from "@/services/bannerService";
+  useBanners,
+  useCreateBanner,
+  useUpdateBanner,
+  useDeleteBanner,
+  useToggleBannerStatus,
+  type Banner,
+} from "@/hooks/useBanners";
 
 // ----------------------------------------------------------------------
-// Types
-// ----------------------------------------------------------------------
-interface Banner {
-  _id: string;
-
-  title: string;
-  subtitle?: string;
-  description?: string;
-
-  image: string;
-
-  type:
-    | "offer"
-    | "combo"
-    | "festival"
-    | "announcement"
-    | "special"
-    | "new_item";
-
-  isActive: boolean;
-
-  views: number;
-  clicks: number;
-
-  createdAt: string;
-  updatedAt: string;
-
-  actionType: "none" | "category" | "product" | "offer";
-
-  actionTarget?: string;
-
-  buttonText?: string;
-
-  priority?: number;
-
-  startDate?: string;
-
-  endDate?: string;
-}
-
-// ----------------------------------------------------------------------
-// Banner Modal Component (Create / Edit)
+// Banner Modal Component (Create / Edit) — unchanged local form state,
+// only the submit handler now goes through mutations
 // ----------------------------------------------------------------------
 function BannerModal({
   banner,
   onClose,
-  onSuccess,
   restaurantId,
 }: {
   banner?: Banner | null;
   onClose: () => void;
-  onSuccess: () => void;
   restaurantId: string;
 }) {
   const [formData, setFormData] = useState({
     title: banner?.title || "",
     subtitle: banner?.subtitle || "",
     description: banner?.description || "",
-
     type: banner?.type || "offer",
-
     actionType: banner?.actionType || "none",
-
     actionTarget: banner?.actionTarget || "",
-
     buttonText: banner?.buttonText || "",
-
     priority: banner?.priority ?? 0,
-
     startDate: banner?.startDate ? banner.startDate.slice(0, 10) : "",
-
     endDate: banner?.endDate ? banner.endDate.slice(0, 10) : "",
-
     isActive: banner?.isActive ?? true,
   });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
-
   const [imagePreview, setImagePreview] = useState<string>(banner?.image || "");
-  const [loading, setLoading] = useState(false);
 
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const createBannerMutation = useCreateBanner(restaurantId);
+  const updateBannerMutation = useUpdateBanner(restaurantId);
+  const isSaving = createBannerMutation.isPending || updateBannerMutation.isPending;
 
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >,
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
     const { name, value, type } = e.target;
     if (type === "checkbox") {
@@ -124,19 +71,13 @@ function BannerModal({
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-
     if (!file) return;
-
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image");
       return;
     }
-
     setImageFile(file);
-
-    const previewUrl = URL.createObjectURL(file);
-
-    setImagePreview(previewUrl);
+    setImagePreview(URL.createObjectURL(file));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,53 +91,38 @@ function BannerModal({
       return;
     }
 
-    setLoading(true);
+    const payload = { ...formData, restaurantId, image: imageFile };
+
     try {
-      const payload = {
-        ...formData,
-        restaurantId,
-        image: imageFile,
-      };
       if (banner?._id) {
-        await updateBanner(banner._id, payload);
+        await updateBannerMutation.mutateAsync({ bannerId: banner._id, payload });
         toast.success("Banner updated successfully");
       } else {
-        await createBanner(payload);
+        await createBannerMutation.mutateAsync(payload);
         toast.success("Banner created successfully");
       }
-      onSuccess();
       onClose();
     } catch (error: any) {
       console.error(error);
       toast.error(error.response?.data?.message || "Operation failed");
-    } finally {
-      setLoading(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
           <h3 className="text-xl font-bold text-gray-800">
             {banner ? "Edit Banner" : "Create New Banner"}
           </h3>
-          <button
-            onClick={onClose}
-            className="rounded-xl p-2 text-gray-500 transition hover:bg-gray-100"
-          >
+          <button onClick={onClose} className="rounded-xl p-2 text-gray-500 transition hover:bg-gray-100">
             <X size={20} />
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Title */}
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">
-              Title *
-            </label>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Title *</label>
             <input
               type="text"
               name="title"
@@ -208,11 +134,8 @@ function BannerModal({
             />
           </div>
 
-          {/* Subtitle */}
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">
-              Subtitle (optional)
-            </label>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Subtitle (optional)</label>
             <input
               type="text"
               name="subtitle"
@@ -222,11 +145,9 @@ function BannerModal({
               className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">
-              Description
-            </label>
 
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Description</label>
             <textarea
               rows={3}
               name="description"
@@ -237,45 +158,25 @@ function BannerModal({
             />
           </div>
 
-          {/* Image Upload */}
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">
-              Banner Image *
-            </label>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Banner Image *</label>
             <div className="flex items-center gap-4">
               <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm text-gray-600 transition hover:bg-gray-50">
                 <Upload size={16} />
                 Upload Image
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
               </label>
-              <p className="text-xs text-gray-500 mt-1">
-                Recommended size: 1200 × 600 px (2:1 ratio)
-              </p>
-              {uploadingImage && (
-                <span className="text-sm text-gray-500">Uploading...</span>
-              )}
+              <p className="text-xs text-gray-500 mt-1">Recommended size: 1200 × 600 px (2:1 ratio)</p>
             </div>
             {imagePreview && (
               <div className="mt-3">
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  className="h-32 w-full rounded-xl object-cover border border-gray-200"
-                />
+                <img src={imagePreview} alt="Preview" className="h-32 w-full rounded-xl object-cover border border-gray-200" />
               </div>
             )}
           </div>
 
-          {/* Type */}
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">
-              Banner Type
-            </label>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">Banner Type</label>
             <select
               name="type"
               value={formData.type}
@@ -290,15 +191,12 @@ function BannerModal({
               <option value="new_item">New Item</option>
             </select>
           </div>
+
           <div className="border-t pt-5">
             <h4 className="font-semibold text-gray-800 mb-4">Schedule</h4>
-
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block mb-1 text-sm font-semibold">
-                  Start Date
-                </label>
-
+                <label className="block mb-1 text-sm font-semibold">Start Date</label>
                 <input
                   type="date"
                   name="startDate"
@@ -307,12 +205,8 @@ function BannerModal({
                   className="w-full rounded-xl border border-gray-300 px-4 py-2.5"
                 />
               </div>
-
               <div>
-                <label className="block mb-1 text-sm font-semibold">
-                  End Date
-                </label>
-
+                <label className="block mb-1 text-sm font-semibold">End Date</label>
                 <input
                   type="date"
                   name="endDate"
@@ -323,14 +217,12 @@ function BannerModal({
               </div>
             </div>
           </div>
-          {/* Active Toggle */}
+
           <div className="flex items-center justify-between rounded-xl border p-4">
             <div>
               <h4 className="font-medium">Active Banner</h4>
-
               <p className="text-sm text-gray-500">Visible to customers</p>
             </div>
-
             <label className="relative inline-flex cursor-pointer items-center">
               <input
                 type="checkbox"
@@ -339,14 +231,11 @@ function BannerModal({
                 onChange={handleChange}
                 className="peer sr-only"
               />
-
               <div className="h-6 w-11 rounded-full bg-gray-300 peer-checked:bg-orange-500 transition"></div>
-
               <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-5"></div>
             </label>
           </div>
 
-          {/* Actions */}
           <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
@@ -357,10 +246,10 @@ function BannerModal({
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSaving}
               className="rounded-xl bg-linear-to-r from-orange-600 to-amber-600 px-5 py-2 text-sm font-medium text-white shadow-md transition hover:from-orange-700 hover:to-amber-700 disabled:opacity-50"
             >
-              {loading ? "Saving..." : banner ? "Update" : "Create"}
+              {isSaving ? "Saving..." : banner ? "Update" : "Create"}
             </button>
           </div>
         </form>
@@ -376,66 +265,37 @@ export default function BannerManagement() {
   const { restaurant } = useAuthStore();
   const restaurantId = restaurant?._id;
 
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedBanner, setSelectedBanner] = useState<Banner | null>(null);
 
-  const fetchBanners = async () => {
-    if (!restaurantId) return;
-    setLoading(true);
-    try {
-      // console.log("Fetching banners for restaurant:", restaurantId);
-      const res = await getRestaurantBanners(restaurantId);
-      setBanners(res.banners || []);
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to load banners");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: banners = [], isLoading } = useBanners(restaurantId);
+  const deleteBannerMutation = useDeleteBanner(restaurantId);
+  const toggleStatusMutation = useToggleBannerStatus(restaurantId);
 
-  useEffect(() => {
-    if (restaurantId) fetchBanners();
-  }, [restaurantId]);
-
-  const handleDelete = async (bannerId: string) => {
+  const handleDelete = (bannerId: string) => {
     if (!confirm("Are you sure you want to delete this banner?")) return;
-    try {
-      await deleteBanner(bannerId);
-      toast.success("Banner deleted");
-      fetchBanners();
-    } catch (error) {
-      console.error(error);
-      toast.error("Delete failed");
-    }
+    deleteBannerMutation.mutate(bannerId, {
+      onSuccess: () => toast.success("Banner deleted"),
+      onError: () => toast.error("Delete failed"),
+    });
   };
 
-  const handleToggleStatus = async (bannerId: string) => {
-    try {
-      await toggleBannerStatus(bannerId);
-      toast.success("Status updated");
-      fetchBanners();
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to update status");
-    }
+  const handleToggleStatus = (bannerId: string) => {
+    toggleStatusMutation.mutate(bannerId, {
+      onSuccess: () => toast.success("Status updated"),
+      onError: () => toast.error("Failed to update status"),
+    });
   };
 
-  // Helper: stats calculations
   const totalViews = banners.reduce((acc, b) => acc + (b.views || 0), 0);
   const totalClicks = banners.reduce((acc, b) => acc + (b.clicks || 0), 0);
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Offers & Banners</h1>
-          <p className="text-sm text-gray-500">
-            Manage promotional banners shown to customers
-          </p>
+          <p className="text-sm text-gray-500">Manage promotional banners shown to customers</p>
         </div>
         <button
           onClick={() => {
@@ -449,15 +309,12 @@ export default function BannerManagement() {
         </button>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Total Banners</p>
-              <h3 className="text-2xl font-bold text-gray-800">
-                {banners.length}
-              </h3>
+              <h3 className="text-2xl font-bold text-gray-800">{banners.length}</h3>
             </div>
             <div className="rounded-xl bg-orange-100 p-3">
               <ImageIcon className="h-6 w-6 text-orange-600" />
@@ -479,9 +336,7 @@ export default function BannerManagement() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Total Clicks</p>
-              <h3 className="text-2xl font-bold text-gray-800">
-                {totalClicks}
-              </h3>
+              <h3 className="text-2xl font-bold text-gray-800">{totalClicks}</h3>
             </div>
             <div className="rounded-xl bg-emerald-100 p-3">
               <CheckCircle className="h-6 w-6 text-emerald-600" />
@@ -490,34 +345,21 @@ export default function BannerManagement() {
         </div>
       </div>
 
-      {/* Banners Table */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-175 text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-5 py-4 text-left font-semibold text-gray-600">
-                  Banner
-                </th>
-                <th className="px-5 py-4 text-left font-semibold text-gray-600">
-                  Type
-                </th>
-                <th className="px-5 py-4 text-left font-semibold text-gray-600">
-                  Status
-                </th>
-                <th className="px-5 py-4 text-left font-semibold text-gray-600">
-                  Views
-                </th>
-                <th className="px-5 py-4 text-left font-semibold text-gray-600">
-                  Clicks
-                </th>
-                <th className="px-5 py-4 text-right font-semibold text-gray-600">
-                  Actions
-                </th>
+                <th className="px-5 py-4 text-left font-semibold text-gray-600">Banner</th>
+                <th className="px-5 py-4 text-left font-semibold text-gray-600">Type</th>
+                <th className="px-5 py-4 text-left font-semibold text-gray-600">Status</th>
+                <th className="px-5 py-4 text-left font-semibold text-gray-600">Views</th>
+                <th className="px-5 py-4 text-left font-semibold text-gray-600">Clicks</th>
+                <th className="px-5 py-4 text-right font-semibold text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {loading ? (
+              {isLoading ? (
                 [...Array(3)].map((_, i) => (
                   <tr key={i}>
                     <td colSpan={6} className="px-5 py-4">
@@ -527,10 +369,7 @@ export default function BannerManagement() {
                 ))
               ) : banners.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="px-5 py-12 text-center text-gray-400"
-                  >
+                  <td colSpan={6} className="px-5 py-12 text-center text-gray-400">
                     No banners found. Click "Create Banner" to add one.
                   </td>
                 </tr>
@@ -545,35 +384,22 @@ export default function BannerManagement() {
                           className="h-12 w-20 rounded-lg object-cover border border-gray-200"
                         />
                         <div>
-                          <p className="font-medium text-gray-800">
-                            {banner.title}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate max-w-45">
-                            {banner.subtitle}
-                          </p>
+                          <p className="font-medium text-gray-800">{banner.title}</p>
+                          <p className="text-xs text-gray-500 truncate max-w-45">{banner.subtitle}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4 capitalize text-gray-700">
-                      {banner.type}
-                    </td>
+                    <td className="px-5 py-4 capitalize text-gray-700">{banner.type}</td>
                     <td className="px-5 py-4">
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          banner.isActive
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${banner.isActive ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                          }`}
                       >
                         {banner.isActive ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-gray-700">
-                      {banner.views || 0}
-                    </td>
-                    <td className="px-5 py-4 text-gray-700">
-                      {banner.clicks || 0}
-                    </td>
+                    <td className="px-5 py-4 text-gray-700">{banner.views || 0}</td>
+                    <td className="px-5 py-4 text-gray-700">{banner.clicks || 0}</td>
                     <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -581,11 +407,7 @@ export default function BannerManagement() {
                           className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
                           title="Toggle status"
                         >
-                          {banner.isActive ? (
-                            <EyeOff size={16} />
-                          ) : (
-                            <Eye size={16} />
-                          )}
+                          {banner.isActive ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                         <button
                           onClick={() => {
@@ -614,12 +436,10 @@ export default function BannerManagement() {
         </div>
       </div>
 
-      {/* Modal */}
       {showModal && restaurantId && (
         <BannerModal
           banner={selectedBanner}
           onClose={() => setShowModal(false)}
-          onSuccess={fetchBanners}
           restaurantId={restaurantId}
         />
       )}

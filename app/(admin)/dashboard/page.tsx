@@ -14,91 +14,46 @@ import {
   Package,
   AlertCircle,
   Calendar,
-  Eye,
-  MoreHorizontal,
 } from "lucide-react";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { getDashboardData } from "@/services/dashboardService";
+import { useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { io } from "socket.io-client";
 import { redirect } from "next/navigation";
 import TableManagement from "@/components/super-admin/TableManagement";
-import { getRestaurant } from "@/services/restaurantService";
 import toast from "react-hot-toast";
 import DashboardSkeleton from "@/components/skeleton/DashboardSkeleton";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRestaurant } from "@/hooks/useRestaurant";
+import {
+  useDashboard,
+  dashboardKeys,
+  type DashboardData,
+  type RecentOrder,
+  type TopItem,
+} from "@/hooks/useDashboard";
 
-interface DashboardData {
-  revenue: { total: number; trend: number };
-  ordersToday: { count: number; trend: number };
-  customers: { count: number; trend: number };
-  menuItems: number;
-  orderStatus: {
-    pending: number;
-    preparing: number;
-    ready: number;
-    served: number;
-    completed: number;
-  };
-  recentOrders: RecentOrder[];
-  topItems: TopItem[];
-  revenueByDay: { day: string; amount: number }[];
-}
+// ========== Reusable Components (unchanged) ==========
 
-interface RecentOrder {
-  id: string;
-  orderNumber: string;
-  finalAmount: number;
-  afterTax: number;
-  table: number;
-  items: number;
-  total: number;
-  status: "pending" | "preparing" | "ready" | "served" | "paid" | "completed";
-  time: string;
-}
-
-interface TopItem {
-  name: string;
-  quantity: number;
-  revenue: number;
-}
-
-// ========== Reusable Components ==========
-
-const StatCard = ({
-  title,
-  value,
-  icon: Icon,
-  trend,
-  trendLabel,
-  color,
-}: any) => {
+const StatCard = ({ title, value, icon: Icon, trend, trendLabel, color }: any) => {
   const TrendIcon = trend && trend > 0 ? TrendingUp : TrendingDown;
   const trendColor = trend && trend > 0 ? "text-green-600" : "text-red-600";
 
   return (
     <div className="relative overflow-hidden bg-white p-6 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 group">
-      <div
-        className={`absolute top-0 left-0 w-full h-1.5 bg-linear-to-r ${color}`}
-      />
+      <div className={`absolute top-0 left-0 w-full h-1.5 bg-linear-to-r ${color}`} />
       <div className="flex justify-between items-start">
         <div>
-          <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">
-            {title}
-          </p>
+          <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">{title}</p>
           <h3 className="text-2xl font-bold text-gray-800 mt-1">{value}</h3>
           {trend !== undefined && (
             <div className="flex items-center gap-1 mt-2 text-sm">
               <TrendIcon className={`w-4 h-4 ${trendColor}`} />
               <span className={trendColor}>{Math.abs(trend)}%</span>
-              {trendLabel && (
-                <span className="text-gray-400 text-xs ml-1">{trendLabel}</span>
-              )}
+              {trendLabel && <span className="text-gray-400 text-xs ml-1">{trendLabel}</span>}
             </div>
           )}
         </div>
-        <div
-          className={`p-3 rounded-full bg-gradient-to-br ${color} text-white shadow-lg group-hover:scale-110 transition-transform`}
-        >
+        <div className={`p-3 rounded-full bg-gradient-to-br ${color} text-white shadow-lg group-hover:scale-110 transition-transform`}>
           <Icon className="w-6 h-6" />
         </div>
       </div>
@@ -106,12 +61,7 @@ const StatCard = ({
   );
 };
 
-// Simple horizontal bar chart for revenue by day
-const RevenueChart = ({
-  data,
-}: {
-  data: { day: string; amount: number }[];
-}) => {
+const RevenueChart = ({ data }: { data: { day: string; amount: number }[] }) => {
   const maxAmount = Math.max(...data.map((d) => d.amount));
   return (
     <div className="bg-white p-5 rounded-2xl shadow-md">
@@ -124,9 +74,7 @@ const RevenueChart = ({
           const percentage = (item.amount / maxAmount) * 100;
           return (
             <div key={item.day} className="flex items-center gap-3">
-              <div className="w-10 text-sm font-medium text-gray-600">
-                {item.day}
-              </div>
+              <div className="w-10 text-sm font-medium text-gray-600">{item.day}</div>
               <div className="flex-1 h-8 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-end pr-2 text-xs text-white font-medium"
@@ -146,50 +94,15 @@ const RevenueChart = ({
   );
 };
 
-// Order status distribution as progress bars
-const OrderStatusBreakdown = ({
-  status,
-}: {
-  status: DashboardData["orderStatus"];
-}) => {
+const OrderStatusBreakdown = ({ status }: { status: DashboardData["orderStatus"] }) => {
   const total = Object.values(status).reduce((a, b) => a + b, 0);
   const items = [
-    {
-      label: "Pending",
-      value: status.pending,
-      color: "bg-amber-500",
-      icon: Clock,
-    },
-    {
-      label: "Preparing",
-      value: status.preparing,
-      color: "bg-blue-500",
-      icon: ChefHat,
-    },
-    {
-      label: "Ready",
-      value: status.ready,
-      color: "bg-emerald-500",
-      icon: CheckCircle2,
-    },
-    {
-      label: "Served",
-      value: status.served,
-      color: "bg-purple-500",
-      icon: Package,
-    },
-    {
-      label: "Paid",
-      value: status.served,
-      color: "bg-green-500",
-      icon: CheckCircle2,
-    },
-    {
-      label: "Completed",
-      value: status.completed,
-      color: "bg-gray-500",
-      icon: XCircle,
-    },
+    { label: "Pending", value: status.pending, color: "bg-amber-500", icon: Clock },
+    { label: "Preparing", value: status.preparing, color: "bg-blue-500", icon: ChefHat },
+    { label: "Ready", value: status.ready, color: "bg-emerald-500", icon: CheckCircle2 },
+    { label: "Served", value: status.served, color: "bg-purple-500", icon: Package },
+    { label: "Paid", value: status.served, color: "bg-green-500", icon: CheckCircle2 },
+    { label: "Completed", value: status.completed, color: "bg-gray-500", icon: XCircle },
   ];
 
   return (
@@ -209,22 +122,16 @@ const OrderStatusBreakdown = ({
               <span className="text-gray-600">{item.value}</span>
             </div>
             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full ${item.color}`}
-                style={{ width: `${(item.value / total) * 100}%` }}
-              />
+              <div className={`h-full ${item.color}`} style={{ width: `${(item.value / total) * 100}%` }} />
             </div>
           </div>
         ))}
-        <div className="pt-2 text-xs text-gray-400 text-right">
-          Total orders: {total}
-        </div>
+        <div className="pt-2 text-xs text-gray-400 text-right">Total orders: {total}</div>
       </div>
     </div>
   );
 };
 
-// Recent Orders Table
 const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
   const statusColors = {
     pending: "bg-amber-100 text-amber-700",
@@ -241,12 +148,7 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
           <ShoppingCart className="w-5 h-5 text-blue-500" />
           Recent Orders
         </h3>
-        <button
-          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-          onClick={() => {
-            redirect("/orders");
-          }}
-        >
+        <button className="text-sm text-blue-600 hover:text-blue-800 font-medium" onClick={() => redirect("/orders")}>
           View All →
         </button>
       </div>
@@ -267,32 +169,18 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
             {orders.map((order) => (
               <tr key={order.id} className="hover:bg-gray-50 transition">
                 <td className="px-5 py-3 font-mono text-sm text-gray-800">
-                  {order.orderNumber?.slice(-3).toUpperCase() ||
-                    order.id.slice(-8)}
+                  {order.orderNumber?.slice(-3).toUpperCase() || order.id.slice(-8)}
                 </td>
-                <td className="px-5 py-3 text-sm text-gray-600">
-                  Table {order.table}
-                </td>
-                <td className="px-5 py-3 text-sm text-gray-600">
-                  {order.items}
-                </td>
-                <td className="px-5 py-3 text-sm font-medium text-gray-800">
-                  ₹{order.total}
-                </td>
-                <td className="px-5 py-3 text-sm font-medium text-gray-800">
-                  ₹{order.afterTax}
-                </td>
+                <td className="px-5 py-3 text-sm text-gray-600">Table {order.table}</td>
+                <td className="px-5 py-3 text-sm text-gray-600">{order.items}</td>
+                <td className="px-5 py-3 text-sm font-medium text-gray-800">₹{order.total}</td>
+                <td className="px-5 py-3 text-sm font-medium text-gray-800">₹{order.afterTax}</td>
                 <td className="px-5 py-3">
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusColors[order.status]}`}
-                  >
-                    {order.status.charAt(0).toUpperCase() +
-                      order.status.slice(1)}
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusColors[order.status]}`}>
+                    {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                   </span>
                 </td>
-                <td className="px-5 py-3 text-sm text-gray-500">
-                  {order.time}
-                </td>
+                <td className="px-5 py-3 text-sm text-gray-500">{order.time}</td>
               </tr>
             ))}
           </tbody>
@@ -302,7 +190,6 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
   );
 };
 
-// Top Selling Items
 const TopItemsList = ({ items }: { items: TopItem[] }) => {
   return (
     <div className="bg-white p-5 rounded-2xl shadow-md">
@@ -314,18 +201,14 @@ const TopItemsList = ({ items }: { items: TopItem[] }) => {
         {items.map((item, idx) => (
           <div key={item.name} className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="w-6 text-sm font-bold text-gray-400">
-                #{idx + 1}
-              </span>
+              <span className="w-6 text-sm font-bold text-gray-400">#{idx + 1}</span>
               <div>
                 <p className="font-medium text-gray-800">{item.name}</p>
                 <p className="text-xs text-gray-500">{item.quantity} sold</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="font-semibold text-gray-800">
-                ₹{item.revenue.toLocaleString()}
-              </p>
+              <p className="font-semibold text-gray-800">₹{item.revenue.toLocaleString()}</p>
               <p className="text-xs text-gray-400">revenue</p>
             </div>
           </div>
@@ -338,72 +221,42 @@ const TopItemsList = ({ items }: { items: TopItem[] }) => {
 // ========== Main Dashboard Component ==========
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
   const setAuth = useAuthStore((state) => state.setAuth);
   const user = useAuthStore((state) => state.user);
-  const restaurant = useAuthStore((state) => state.restaurant);
   const token = useAuthStore((state) => state.token);
-  // const { restaurant } = useAuthStore();
-  const socketRef = useRef<any>(null);
+  const restaurant = useAuthStore((state) => state.restaurant);
+  const queryClient = useQueryClient();
+
+  // Bootstrap / refresh restaurant profile into the auth store
+  const { data: restaurantData, isPending: isRestaurantPending } = useRestaurant();
 
   useEffect(() => {
-    if (!restaurant?._id) return;
+    if (!restaurantData) return;
+    setAuth({ user, token, restaurant: restaurantData });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurantData]);
 
-    const load = async () => {
-      try {
-        setLoading(true);
-        const res = await getDashboardData(restaurant._id);
-        // console.log("📦 Dashboard Data:", res.data);
-        setData(res.data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const restaurantId = restaurant?._id;
 
-    load();
-  }, [restaurant?._id]);
-  // console.log("🚀 Dashboard Rendered with restaurant:", data);
+  const {
+    data,
+    isLoading: isDashboardLoading,
+  } = useDashboard(restaurantId);
 
+  // Realtime updates: invalidate the dashboard query, don't hand-roll a refetch callback
   useEffect(() => {
-    loadRestaurant();
-  }, []);
-
-  const loadRestaurant = async () => {
-    try {
-      const data = await getRestaurant();
-
-      setAuth({
-        user,
-        token,
-        restaurant: data,
-      });
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to load restaurant");
-    }
-  };
-
-  const refreshDashboard = useCallback(async () => {
-    if (!restaurant?._id) return;
-    const res = await getDashboardData(restaurant._id);
-    setData(res.data);
-  }, [restaurant?._id]);
-  useEffect(() => {
-    if (!restaurant?._id) return;
+    if (!restaurantId) return;
 
     const socket = io(process.env.NEXT_PUBLIC_API_URL, {
       transports: ["websocket"],
       withCredentials: true,
     });
 
-    socketRef.current = socket;
+    socket.emit("joinRestaurant", restaurantId);
 
-    socket.emit("joinRestaurant", restaurant._id);
-
-    const handleUpdate = () => refreshDashboard();
+    const handleUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.detail(restaurantId) });
+    };
 
     socket.on("ORDER_UPDATED", handleUpdate);
     socket.on("ORDER_READY", handleUpdate);
@@ -415,13 +268,14 @@ export default function DashboardPage() {
       socket.off("ORDER_COMPLETED", handleUpdate);
       socket.disconnect();
     };
-  }, [restaurant?._id, refreshDashboard]);
+    // restaurantId is a primitive — this only reconnects when the restaurant actually changes
+  }, [restaurantId, queryClient]);
 
-  if (loading) {
+  if (isRestaurantPending || isDashboardLoading) {
     return <DashboardSkeleton />;
   }
 
-  if (!data) return null;
+  if (!data || !restaurant) return null;
 
   const stats = [
     {
@@ -460,30 +314,24 @@ export default function DashboardPage() {
     <div className="space-y-8 border border-gray-200 rounded-lg p-4 md:p-6">
       <div>
         <h2 className="text-3xl font-bold text-gray-800">Dashboard Overview</h2>
-        <p className="text-gray-500 mt-1">
-          Real‑time insights for your restaurant
-        </p>
+        <p className="text-gray-500 mt-1">Real‑time insights for your restaurant</p>
       </div>
 
-      {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => (
           <StatCard key={stat.title} {...stat} />
         ))}
       </div>
 
-      {/* Sales & Orders Row */}
-      <div className="  p-4 md:p-6">
+      <div className="p-4 md:p-6">
         <TableManagement restaurantId={restaurant._id} />
       </div>
 
-      {/* Charts & Breakdowns Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RevenueChart data={data.revenueByDay} />
         <OrderStatusBreakdown status={data.orderStatus} />
       </div>
 
-      {/* Recent Orders & Top Items */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <RecentOrdersTable orders={data.recentOrders} />
