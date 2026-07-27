@@ -65,6 +65,7 @@ export default function AuthPage() {
         restaurant: data.restaurant,
         token: data.token,
       });
+      console.log(data);
       const role = data?.user?.role?.toUpperCase();
       toast.success(`Welcome back ${data?.user?.name || ""}`);
       if (role === "SUPER_ADMIN") router.push("/super-admin/dashboard");
@@ -76,7 +77,10 @@ export default function AuthPage() {
     } catch (error: any) {
       let message = "Login failed";
       if (error.response) message = error.response?.data?.message || message;
-      else if (error.request) message = "Unable to connect to server";
+      else if (error.request) {
+        message = "Unable to connect to server";
+        console.error(error);
+      }
       else message = error.message;
       toast.error(message);
     } finally {

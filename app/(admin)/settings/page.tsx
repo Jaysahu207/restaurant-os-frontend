@@ -78,7 +78,7 @@ interface RestaurantForm {
     tableCount: number;
     dineIn: boolean;
     takeaway: boolean;
-
+    serviceType: string;
     delivery: {
       enabled: boolean;
       minimumOrder: number;
@@ -166,7 +166,7 @@ export default function SettingsPage() {
       tableCount: 0,
       dineIn: true,
       takeaway: true,
-
+      serviceType: "table",
       delivery: {
         enabled: false,
         minimumOrder: 0,
@@ -285,6 +285,7 @@ export default function SettingsPage() {
           tableCount: restaurant.operations?.tableCount || 0,
           dineIn: restaurant.operations?.dineIn ?? true,
           takeaway: restaurant.operations?.takeaway ?? true,
+          serviceType: restaurant.operations?.serviceType || "table",
 
           delivery: {
             enabled: restaurant.operations?.delivery?.enabled ?? false,
@@ -307,6 +308,7 @@ export default function SettingsPage() {
     }
   }, [restaurant]);
 
+  // console.log("Restaurant Form ", restaurantForm);
   // Gmail OAuth callback handler
   useEffect(() => {
     const gmailStatus = searchParams.get("gmail");
@@ -940,6 +942,63 @@ export default function SettingsPage() {
                     }
                     className={inputClass}
                   />
+                </div>
+                <div className="md:col-span-3">
+                  <label className={labelClass}>Service Mode</label>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+                    {[
+                      {
+                        value: "table",
+                        title: "🍽️ Table Service",
+                        desc: "Staff serves food to customer's table",
+                      },
+                      {
+                        value: "self",
+                        title: "🛎️ Self Service",
+                        desc: "Customer collects order from counter",
+                      },
+                      {
+                        value: "hybrid",
+                        title: "🔀 Hybrid",
+                        desc: "Supports both table service and self pickup",
+                      },
+                    ].map((service) => (
+                      <label
+                        key={service.value}
+                        className={`cursor-pointer rounded-xl border p-4 transition
+        ${restaurantForm.operations.serviceType === service.value
+                            ? "border-orange-500 bg-orange-50"
+                            : "border-gray-200 hover:border-orange-300"
+                          }`}
+                      >
+                        <input
+                          type="radio"
+                          name="serviceType"
+                          value={service.value}
+                          checked={
+                            restaurantForm.operations.serviceType ===
+                            service.value
+                          }
+                          onChange={(e) =>
+                            setRestaurantForm({
+                              ...restaurantForm,
+                              operations: {
+                                ...restaurantForm.operations,
+                                serviceType: e.target.value,
+                              },
+                            })
+                          }
+                          className="hidden"
+                        />
+
+                        <h4 className="font-semibold">{service.title}</h4>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {service.desc}
+                        </p>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 mt-1">
                   <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">

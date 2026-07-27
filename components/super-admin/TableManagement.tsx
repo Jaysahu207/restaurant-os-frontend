@@ -267,11 +267,10 @@ export default function TableManagement({
               <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
-                className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition ${
-                  filterStatus === status
-                    ? "bg-orange-500 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition ${filterStatus === status
+                  ? "bg-orange-500 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
               >
                 {status}
               </button>

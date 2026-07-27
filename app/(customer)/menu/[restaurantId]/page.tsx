@@ -27,6 +27,7 @@ import {
   BookOpen,
   ShoppingBag,
   Trash2,
+  CheckCircle2,
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import {
@@ -101,7 +102,7 @@ interface Restaurant {
     tableCount: number;
     dineIn: boolean;
     takeaway: boolean;
-
+    serviceType: string;
     delivery: {
       enabled: boolean;
       minimumOrder: number;
@@ -320,7 +321,7 @@ function CustomerMenuContent() {
   const [deliveryStep, setDeliveryStep] = useState<"details" | "payment">(
     "details",
   );
-
+  const [showPickupModal, setShowPickupModal] = useState(false);
   const [shuffledMenu, setShuffledMenu] = useState<MenuItem[]>([]);
   // const orderingEnabled = subscription.features.qrOrdering;
   useEffect(() => {
@@ -368,9 +369,7 @@ function CustomerMenuContent() {
         : (restaurant?.operations?.delivery?.deliveryCharge ?? 0)
       : 0;
   // console.log(" Free Delivery Above", restaurant?.operations?.delivery?.freeDeliveryAbove)
-  const orderFinalTotal = Math.round(
-    (currentOrder?.finalAmount || 0)
-  );
+  const orderFinalTotal = Math.round(currentOrder?.finalAmount || 0);
   // console.log("Order Delivery Charge:", orderDeliveryCharge);
   // console.log("Restaurant Data:", restaurant);
   // ------------------------------------------------------------
@@ -431,7 +430,7 @@ function CustomerMenuContent() {
         const menuItems = data?.items || [];
         const restaurantData = data?.restaurant || null;
         setMenu(menuItems);
-        // console.log("Restaurant Data:", restaurantData);
+        console.log("Restaurant Data:", restaurantData);
         setRestaurant(restaurantData);
         setBanners(data.banners || []);
         const uniqueCategories: string[] = [
@@ -455,6 +454,7 @@ function CustomerMenuContent() {
     };
     loadMenu();
   }, [restaurantSlug]);
+  const isSelfService = restaurant?.operations?.serviceType === "self";
 
   useEffect(() => {
     if (!restaurant?._id) return;
@@ -550,13 +550,17 @@ function CustomerMenuContent() {
       setOrderPlaced(true);
     });
 
-    // Single ORDER_READY handler
     socket.on("ORDER_READY", (order: Order) => {
-      if (currentOrder?._id === order._id) {
-        playSound();
-        setCurrentOrder(order);
-        toast.success("✅ Your order is ready!");
+      if (currentOrder?._id !== order._id) return;
+
+      playSound();
+      setCurrentOrder(order);
+
+      if (restaurant?.operations?.serviceType === "self") {
+        setShowPickupModal(true);
       }
+
+      toast.success("✅ Your order is ready!");
     });
 
     socket.on("ORDER_COMPLETED", async (order: Order) => {
@@ -1171,7 +1175,7 @@ function CustomerMenuContent() {
     };
     const invoiceDeliveryCharge =
       currentOrder.orderType === "delivery"
-        ? currentOrder.deliveryCharge ?? 0
+        ? (currentOrder.deliveryCharge ?? 0)
         : 0;
     // console.log("Current Order:", currentOrder);
     // console.log("Delivery Charge:", currentOrder.deliveryCharge);
@@ -1186,8 +1190,7 @@ function CustomerMenuContent() {
         sgstAmount: currentOrder.sgstAmount ?? 0,
         serviceChargeAmount: currentOrder.serviceChargeAmount ?? 0,
         deliveryCharge: invoiceDeliveryCharge,
-        grandTotal:
-          (currentOrder.finalAmount ?? 0) + invoiceDeliveryCharge,
+        grandTotal: (currentOrder.finalAmount ?? 0) + invoiceDeliveryCharge,
         customer: {
           name: currentOrder.customerId?.name || "Guest",
           phone: currentOrder.customerId?.phone || "",
@@ -1200,7 +1203,6 @@ function CustomerMenuContent() {
         paymentMethod: currentOrder.paymentMethod ?? "Cash",
 
         orderType: currentOrder.orderType,
-
 
         table: currentOrder.tableNumber?.toString() ?? "",
       }
@@ -1589,6 +1591,49 @@ function CustomerMenuContent() {
                 </div>
               )}
             </div>
+            {showPickupModal && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-xs p-4">
+                <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl p-6 animate-in zoom-in-95 duration-300">
+
+                  {/* Icon */}
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                    <CheckCircle2 className="h-9 w-9 text-green-600" />
+                  </div>
+
+                  {/* Title */}
+                  <h2 className="mt-4 text-center text-2xl font-bold text-gray-900">
+                    Order Ready!
+                  </h2>
+
+                  {/* Description */}
+                  <p className="mt-2 text-center text-sm text-gray-600">
+                    Your order is ready for pickup.
+                  </p>
+
+                  {/* Pickup Message */}
+                  <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50 p-3">
+                    <p className="text-center text-sm font-medium text-orange-700">
+                      🍽️ Please collect your order from the counter.
+                    </p>
+                  </div>
+
+                  {/* Order Number */}
+                  <div className="mt-4 flex justify-center">
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-700">
+                      Order #{currentOrder?.orderNumber.slice(-3)}
+                    </span>
+                  </div>
+
+                  {/* Button */}
+                  <button
+                    onClick={() => setShowPickupModal(false)}
+                    className="mt-5 w-full rounded-xl bg-orange-500 py-2.5 font-medium text-white transition hover:bg-orange-600"
+                  >
+                    Got it
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {invoiceOrder && restaurant && (
@@ -2291,7 +2336,6 @@ function CustomerMenuContent() {
                           {orderType === "delivery" &&
                             deliveryStep === "payment" && (
                               <div className="space-y-3">
-
                                 <button
                                   onClick={() => {
                                     setDeliveryPaymentMethod("cash");
@@ -2503,6 +2547,8 @@ function CustomerMenuContent() {
           </div>
         </div>
       )}
+
+
       {showPayment && (
         <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-85 rounded-3xl bg-white border border-orange-100 shadow-2xl p-5">
@@ -2606,6 +2652,10 @@ function CustomerMenuContent() {
           </div>
         </div>
       )}
+
+
+
+
     </div>
   );
 }
