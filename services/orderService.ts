@@ -36,7 +36,7 @@ type OrderPayload = {
 // 🔥 PLACE ORDER
 export const placeOrder = async (orderData: OrderPayload) => {
   try {
-    console.log("ORDER DATA:", orderData);
+    // console.log("ORDER DATA:", orderData);
     const res = await PublicAPI.post("/api/orders", orderData);
     console.log("ORDER RESPONSE:", res.data);
     return res.data;

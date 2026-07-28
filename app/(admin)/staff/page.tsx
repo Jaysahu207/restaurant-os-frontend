@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -14,34 +14,19 @@ import {
   X,
   RefreshCw,
   Shield,
-  Calendar,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import {
-  getStaffList,
-  deleteStaff,
-  createStaff,
-  updateStaff, //
-} from "@/services/staffService";
 import { useAuthStore } from "@/store/useAuthStore";
+import {
+  useStaff,
+  useCreateStaff,
+  useUpdateStaff,
+  useDeleteStaff,
+  type Staff,
+  type StaffPermissions,
+} from "@/hooks/useStaff";
 
 // ==================== Types ====================
-interface Staff {
-  _id: string;
-  name: string;
-  email: string;
-  phone: string;
-  role: string;
-  shift?: string;
-  status?: string;
-  permissions: StaffPermissions;
-  isActive: boolean;
-  password?: string;
-  restaurantId?: string;
-  createdAt?: string;
-  joinDate?: string;
-}
-
 interface StaffFormData {
   name: string;
   email: string;
@@ -56,41 +41,16 @@ interface StaffFormData {
   restaurantId: string;
 }
 
-interface StaffPermissions {
-  canCreateOrder: boolean;
-  canUpdateOrder: boolean;
-  canViewCustomers: boolean;
-  canManageMenu: boolean;
-  canManageStaff: boolean;
-  canViewAnalytics: boolean;
-}
 // ==================== Constants ====================
 const PERMISSIONS = [
-  {
-    label: "Create Orders",
-    value: "canCreateOrder",
-  },
-  {
-    label: "Update Order Status",
-    value: "canUpdateOrder",
-  },
-  {
-    label: "View Customers",
-    value: "canViewCustomers",
-  },
-  {
-    label: "Manage Menu",
-    value: "canManageMenu",
-  },
-  {
-    label: "Manage Staff",
-    value: "canManageStaff",
-  },
-  {
-    label: "View Analytics",
-    value: "canViewAnalytics",
-  },
+  { label: "Create Orders", value: "canCreateOrder" },
+  { label: "Update Order Status", value: "canUpdateOrder" },
+  { label: "View Customers", value: "canViewCustomers" },
+  { label: "Manage Menu", value: "canManageMenu" },
+  { label: "Manage Staff", value: "canManageStaff" },
+  { label: "View Analytics", value: "canViewAnalytics" },
 ];
+
 const defaultPermissions: StaffPermissions = {
   canCreateOrder: true,
   canUpdateOrder: true,
@@ -109,7 +69,6 @@ const ROLE_PERMISSIONS: Record<string, StaffPermissions> = {
     canManageStaff: true,
     canViewAnalytics: true,
   },
-
   Manager: {
     canCreateOrder: true,
     canUpdateOrder: true,
@@ -118,7 +77,6 @@ const ROLE_PERMISSIONS: Record<string, StaffPermissions> = {
     canManageStaff: false,
     canViewAnalytics: true,
   },
-
   Chef: {
     canCreateOrder: false,
     canUpdateOrder: true,
@@ -127,7 +85,6 @@ const ROLE_PERMISSIONS: Record<string, StaffPermissions> = {
     canManageStaff: false,
     canViewAnalytics: false,
   },
-
   Waiter: {
     canCreateOrder: true,
     canUpdateOrder: false,
@@ -158,12 +115,11 @@ const initialFormData: StaffFormData = {
 // ==================== Main Component ====================
 export default function StaffPage() {
   const { restaurant } = useAuthStore();
-  const [staff, setStaff] = useState<Staff[]>([]);
+  const restaurantId = restaurant?._id;
+
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All"); // "All", "active", "inactive"
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("All");
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -172,37 +128,18 @@ export default function StaffPage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<string | null>(null);
-  const [formSubmitting, setFormSubmitting] = useState(false);
 
-  // Form state
   const [formData, setFormData] = useState<StaffFormData>(initialFormData);
 
-  // Load staff
-  const loadStaff = useCallback(async () => {
-    if (!restaurant?._id) return;
-    try {
-      setLoading(true);
-      const data = await getStaffList(restaurant._id);
-
-      setStaff(data);
-    } catch (err) {
-      toast.error("Failed to load staff members");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [restaurant?._id]);
-
-  useEffect(() => {
-    loadStaff();
-  }, [loadStaff]);
+  const { data: staff = [], isLoading, isFetching, refetch } = useStaff(restaurantId);
+  const createStaffMutation = useCreateStaff(restaurantId);
+  const updateStaffMutation = useUpdateStaff(restaurantId);
+  const deleteStaffMutation = useDeleteStaff(restaurantId);
 
   const handleRefresh = () => {
-    setRefreshing(true);
-    loadStaff();
+    refetch();
   };
 
-  // Filter staff
   const filteredStaff = staff.filter((s) => {
     const matchesSearch =
       s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -217,12 +154,11 @@ export default function StaffPage() {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
-  // Modal handlers
   const openAddModal = () => {
     setEditingStaff(null);
     setFormData({
       ...initialFormData,
-      restaurantId: restaurant?._id || "",
+      restaurantId: restaurantId || "",
       permissions: defaultPermissions,
     });
     setIsModalOpen(true);
@@ -241,7 +177,7 @@ export default function StaffPage() {
       permissions: staffMember.permissions,
       password: "",
       confirmPassword: "",
-      restaurantId: staffMember.restaurantId || restaurant?._id || "",
+      restaurantId: staffMember.restaurantId || restaurantId || "",
     });
     setIsModalOpen(true);
   };
@@ -266,18 +202,16 @@ export default function StaffPage() {
     setDeleteConfirmOpen(true);
   };
 
-  const confirmDelete = async () => {
+  const confirmDelete = () => {
     if (!staffToDelete) return;
-    try {
-      await deleteStaff(staffToDelete);
-      toast.success("Staff member deleted");
-      loadStaff();
-    } catch (err) {
-      toast.error("Failed to delete staff member");
-    } finally {
-      setStaffToDelete(null);
-      setDeleteConfirmOpen(false);
-    }
+    deleteStaffMutation.mutate(staffToDelete, {
+      onSuccess: () => toast.success("Staff member deleted"),
+      onError: () => toast.error("Failed to delete staff member"),
+      onSettled: () => {
+        setStaffToDelete(null);
+        setDeleteConfirmOpen(false);
+      },
+    });
   };
 
   const cancelDelete = () => {
@@ -285,11 +219,9 @@ export default function StaffPage() {
     setDeleteConfirmOpen(false);
   };
 
-  // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
     if (!formData.name || !formData.email || !formData.phone) {
       toast.error("Please fill all required fields");
       return;
@@ -303,12 +235,8 @@ export default function StaffPage() {
       return;
     }
 
-    setFormSubmitting(true);
-
     try {
       if (editingStaff) {
-        console.log("editingStaff ->> ", editingStaff);
-        // Editing existing staff
         const payload = {
           name: formData.name,
           email: formData.email,
@@ -319,11 +247,9 @@ export default function StaffPage() {
           status: formData.status,
           permissions: formData.permissions,
           restaurantId: formData.restaurantId,
-          // Only include password if provided (for edit)
           ...(formData.password ? { password: formData.password } : {}),
         };
-        // console.log("Editing Staff id - >> ", editingStaff._id, payload);
-        await updateStaff(editingStaff._id, payload);
+        await updateStaffMutation.mutateAsync({ staffId: editingStaff._id, payload });
         toast.success("Staff member updated successfully");
       } else {
         const payload = {
@@ -338,30 +264,26 @@ export default function StaffPage() {
           restaurantId: formData.restaurantId,
           password: formData.password,
         };
-        await createStaff(payload);
-        console.log("Create new staff ->>", payload);
+        await createStaffMutation.mutateAsync(payload);
         toast.success("Staff member created successfully");
       }
 
       closeModal();
-      loadStaff();
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Operation failed");
-    } finally {
-      setFormSubmitting(false);
     }
   };
 
-  // Clear filters
   const clearFilters = () => {
     setSearch("");
     setRoleFilter("All");
     setStatusFilter("All");
   };
 
-  // Loading skeleton
-  if (loading && !refreshing) {
+  const formSubmitting = createStaffMutation.isPending || updateStaffMutation.isPending;
+
+  if (isLoading) {
     return <StaffSkeleton />;
   }
 
@@ -378,13 +300,11 @@ export default function StaffPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={isFetching}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
             title="Refresh"
           >
-            <RefreshCw
-              className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className={`w-5 h-5 ${isFetching ? "animate-spin" : ""}`} />
           </button>
           <button
             onClick={openAddModal}
@@ -436,10 +356,7 @@ export default function StaffPage() {
         </div>
         {(search || roleFilter !== "All" || statusFilter !== "All") && (
           <div className="flex justify-end">
-            <button
-              onClick={clearFilters}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
+            <button onClick={clearFilters} className="text-sm text-blue-600 hover:text-blue-800">
               Clear filters
             </button>
           </div>
@@ -453,9 +370,7 @@ export default function StaffPage() {
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <User className="w-8 h-8 text-gray-400" />
             </div>
-            <h3 className="text-lg font-medium text-gray-800 mb-2">
-              No staff members found
-            </h3>
+            <h3 className="text-lg font-medium text-gray-800 mb-2">No staff members found</h3>
             <p className="text-gray-500">
               {search || roleFilter !== "All" || statusFilter !== "All"
                 ? "Try adjusting your filters."
@@ -494,16 +409,13 @@ export default function StaffPage() {
       )}
 
       {deleteConfirmOpen && (
-        <DeleteConfirmationModal
-          onConfirm={confirmDelete}
-          onCancel={cancelDelete}
-        />
+        <DeleteConfirmationModal onConfirm={confirmDelete} onCancel={cancelDelete} />
       )}
     </div>
   );
 }
 
-// ==================== Staff Card Component ====================
+// ==================== Staff Card =====================
 function StaffCard({
   member,
   onView,
@@ -527,11 +439,10 @@ function StaffCard({
           </h3>
         </div>
         <span
-          className={`px-2 py-1 text-xs font-medium rounded-full ${
-            member.isActive
-              ? "bg-green-100 text-green-700"
-              : "bg-gray-100 text-gray-700"
-          }`}
+          className={`px-2 py-1 text-xs font-medium rounded-full ${member.isActive
+            ? "bg-green-100 text-green-700"
+            : "bg-gray-100 text-gray-700"
+            }`}
         >
           {member.isActive ? "Active" : "Inactive"}
         </span>
@@ -889,11 +800,10 @@ function StaffViewModal({
             <div>
               <p className="text-gray-500">Status</p>
               <span
-                className={`px-2 py-1 text-xs font-medium rounded-full ${
-                  staff.isActive
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-100 text-gray-700"
-                }`}
+                className={`px-2 py-1 text-xs font-medium rounded-full ${staff.isActive
+                  ? "bg-green-100 text-green-700"
+                  : "bg-gray-100 text-gray-700"
+                  }`}
               >
                 {staff.isActive ? "Active" : "Inactive"}
               </span>

@@ -17,15 +17,18 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
-import {
-  getInventory,
-  createInventory,
-  updateInventory,
-  deleteInventory,
-} from "@/services/inventoryService";
-import { toast } from "react-hot-toast";
+import { toast as hotToast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import InventorySkeleton from "@/components/skeleton/InventorySkeleton";
+import { useAuthStore } from "@/store/useAuthStore";
+import {
+  useInventory,
+  useCreateInventoryItem,
+  useUpdateInventoryItem,
+  useDeleteInventoryItem,
+  normalizeItem,
+  type InventoryItem,
+} from "@/hooks/useInventory";
 
 const CATEGORIES = [
   "All",
@@ -63,38 +66,28 @@ function Toast({
 }
 
 export default function InventoryPage() {
-  const [inventory, setInventory] = useState<any[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All");
+  const { restaurant } = useAuthStore();
+  const restaurantId = restaurant?._id;
   const router = useRouter();
 
-  const [toast, setToast] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  // Sorting & Pagination
-  const [sortField, setSortField] = useState<
-    "name" | "quantity" | "costPerUnit" | "totalValue"
-  >("name");
+  const [sortField, setSortField] = useState<"name" | "quantity" | "costPerUnit" | "totalValue">("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [stockModalOpen, setStockModalOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [stockAction, setStockAction] = useState<"add" | "remove">("add");
   const [stockQuantity, setStockQuantity] = useState(0);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
-  // Form state
   const [formData, setFormData] = useState({
     name: "",
     category: "Vegetables",
@@ -105,70 +98,35 @@ export default function InventoryPage() {
     supplier: "",
   });
 
+  const { data: inventory = [], isLoading, error: queryError } = useInventory(restaurantId);
+  const createMutation = useCreateInventoryItem(restaurantId);
+  const updateMutation = useUpdateInventoryItem(restaurantId);
+  const deleteMutation = useDeleteInventoryItem(restaurantId);
+
+  const showToast = (message: string, type: "success" | "error") => setToast({ message, type });
+
+  // Surface the 403 feature-lock toast once when the query error arrives
   useEffect(() => {
-    fetchInventory();
-  }, []);
-
-  const fetchInventory = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const res = await getInventory();
-
-      // Normalize response
-      let items = Array.isArray(res) ? res : res?.data || [];
-
-      const normalized = items.map((item: any) => ({
-        ...item,
-        _id: item._id || item.id,
-        quantity: Number(item.quantity) || 0,
-        reorderLevel: Number(item.reorderLevel) || 0,
-        costPerUnit: Number(item.costPerUnit) || 0,
-      }));
-
-      setInventory(normalized);
-    } catch (err: any) {
-      // console.error("Inventory fetch error:", err);
-
-      const status = err?.response?.status;
-
-      const backendMessage =
-        err?.response?.data?.message || "Failed to load inventory";
-
-      // 🚨 FEATURE LOCKED
-      if (status === 403) {
-        setError(backendMessage);
-        console.log("🚨 FEATURE LOCKED:", backendMessage);
-        showToast(backendMessage, "error");
-
-        return;
-      }
-
-      // ❌ OTHER ERRORS
-      setError("Something went wrong");
-    } finally {
-      setLoading(false);
+    const status = (queryError as any)?.response?.status;
+    if (status === 403) {
+      const backendMessage = (queryError as any)?.response?.data?.message || "Failed to load inventory";
+      showToast(backendMessage, "error");
     }
-  };
-  const showToast = (message: string, type: "success" | "error") =>
-    setToast({ message, type });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryError]);
 
-  // Filter & sort
   const filteredInventory = useMemo(() => {
-    let result = inventory.filter((item) => {
+    let result = inventory.filter((item: any) => {
       if (!item) return false;
       const name = (item.name || "").toLowerCase();
       const supplier = (item.supplier || "").toLowerCase();
       const searchLower = search.toLowerCase();
-      const matchesSearch =
-        name.includes(searchLower) || supplier.includes(searchLower);
-      const matchesCategory =
-        categoryFilter === "All" || item.category === categoryFilter;
+      const matchesSearch = name.includes(searchLower) || supplier.includes(searchLower);
+      const matchesCategory = categoryFilter === "All" || item.category === categoryFilter;
       return matchesSearch && matchesCategory;
     });
 
-    result.sort((a, b) => {
+    result = [...result].sort((a, b) => {
       let aVal: any, bVal: any;
       if (sortField === "totalValue") {
         aVal = a.quantity * a.costPerUnit;
@@ -192,25 +150,17 @@ export default function InventoryPage() {
     return filteredInventory.slice(start, start + itemsPerPage);
   }, [filteredInventory, currentPage]);
 
-  const lowStockItems = inventory.filter(
-    (item) => item.quantity <= item.reorderLevel,
-  );
-  const totalValue = inventory.reduce(
-    (sum, item) => sum + item.quantity * item.costPerUnit,
-    0,
-  );
+  const lowStockItems = inventory.filter((item: any) => item.quantity <= item.reorderLevel);
+  const totalValue = inventory.reduce((sum: number, item: any) => sum + item.quantity * item.costPerUnit, 0);
 
   const isDuplicateName = (name: string, excludeId?: string) => {
     return inventory.some(
-      (item) =>
-        item.name.toLowerCase() === name.toLowerCase() &&
-        item._id !== excludeId,
+      (item: any) => item.name.toLowerCase() === name.toLowerCase() && item._id !== excludeId,
     );
   };
 
   const handleSort = (field: typeof sortField) => {
-    if (sortField === field)
-      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    if (sortField === field) setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     else {
       setSortField(field);
       setSortDirection("asc");
@@ -224,17 +174,8 @@ export default function InventoryPage() {
   };
 
   const exportToCSV = () => {
-    const headers = [
-      "Name",
-      "Category",
-      "Quantity",
-      "Unit",
-      "Reorder Level",
-      "Cost/Unit",
-      "Total Value",
-      "Supplier",
-    ];
-    const rows = filteredInventory.map((item) => [
+    const headers = ["Name", "Category", "Quantity", "Unit", "Reorder Level", "Cost/Unit", "Total Value", "Supplier"];
+    const rows = filteredInventory.map((item: any) => [
       item.name,
       item.category,
       item.quantity,
@@ -244,9 +185,7 @@ export default function InventoryPage() {
       (item.quantity * item.costPerUnit).toFixed(2),
       item.supplier || "",
     ]);
-    const csvContent = [headers, ...rows]
-      .map((row) => row.join(","))
-      .join("\n");
+    const csvContent = [headers, ...rows].map((row) => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -273,7 +212,7 @@ export default function InventoryPage() {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (item: any) => {
+  const openEditModal = (item: InventoryItem) => {
     setEditingItem(item);
     setFormData({
       name: item.name,
@@ -290,8 +229,6 @@ export default function InventoryPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingItem(null);
-
-    // optional reset form (recommended)
     setFormData({
       name: "",
       category: "Vegetables",
@@ -302,25 +239,10 @@ export default function InventoryPage() {
       supplier: "",
     });
   };
-  const normalizeItem = (item: any) => {
-    if (!item || typeof item !== "object") return null;
-
-    return {
-      _id: item._id || item.id,
-      name: item.name || "",
-      category: item.category || "Other",
-      quantity: Number(item.quantity) || 0,
-      unit: item.unit || "",
-      reorderLevel: Number(item.reorderLevel) || 0,
-      costPerUnit: Number(item.costPerUnit) || 0,
-      supplier: item.supplier || "",
-    };
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (isSaving) return;
+    if (createMutation.isPending || updateMutation.isPending) return;
 
     if (isDuplicateName(formData.name, editingItem?._id)) {
       showToast("Item already exists", "error");
@@ -328,44 +250,28 @@ export default function InventoryPage() {
     }
 
     try {
-      setIsSaving(true);
-
       let res;
-
       if (editingItem) {
-        res = await updateInventory(editingItem._id, formData);
+        res = await updateMutation.mutateAsync({ itemId: editingItem._id, payload: formData });
       } else {
-        res = await createInventory(formData);
+        res = await createMutation.mutateAsync(formData);
       }
 
-      // ✅ FIXED
-      if (!res || !res._id) {
+      const item = normalizeItem(res);
+      if (!item || !item._id) {
         showToast("Invalid server response", "error");
         return;
       }
 
-      const item = normalizeItem(res);
-      if (!item) return;
-
-      if (editingItem) {
-        setInventory((prev) =>
-          prev.map((i) => (i._id === item._id ? item : i)),
-        );
-        showToast("Item updated successfully", "success");
-      } else {
-        setInventory((prev) => [item, ...prev]);
-        showToast("Item added successfully", "success");
-      }
-
-      closeModal(); // ✅ works perfectly now
+      showToast(editingItem ? "Item updated successfully" : "Item added successfully", "success");
+      closeModal();
     } catch (err) {
       console.error(err);
       showToast("Failed to save item", "error");
-    } finally {
-      setIsSaving(false);
     }
   };
-  const openStockModal = (item: any, action: "add" | "remove") => {
+
+  const openStockModal = (item: InventoryItem, action: "add" | "remove") => {
     setSelectedItem(item);
     setStockAction(action);
     setStockQuantity(0);
@@ -386,22 +292,19 @@ export default function InventoryPage() {
     }
 
     try {
-      const res = await updateInventory(selectedItem._id, {
-        ...selectedItem,
-        quantity: newQuantity,
+      const res = await updateMutation.mutateAsync({
+        itemId: selectedItem._id,
+        payload: { ...selectedItem, quantity: newQuantity },
       });
 
-      const updatedItem = normalizeItem(res.data);
-
-      setInventory((prev) =>
-        prev.map((item) =>
-          item._id === selectedItem._id ? updatedItem : item,
-        ),
-      );
+      const updatedItem = normalizeItem(res);
+      if (!updatedItem) {
+        showToast("Invalid server response", "error");
+        return;
+      }
 
       setStockModalOpen(false);
       setSelectedItem(null);
-
       showToast("Stock updated successfully", "success");
     } catch (err) {
       console.error(err);
@@ -414,36 +317,34 @@ export default function InventoryPage() {
     setDeleteConfirmOpen(true);
   };
 
-  const confirmDelete = async () => {
+  const confirmDelete = () => {
     if (!itemToDelete) return;
-    try {
-      await deleteInventory(itemToDelete);
-      setInventory((prev) => prev.filter((item) => item._id !== itemToDelete));
-      setDeleteConfirmOpen(false);
-      setItemToDelete(null);
-      showToast("Item deleted", "success");
-    } catch (err) {
-      console.error("Delete error:", err);
-      showToast("Failed to delete item", "error");
-    }
+    deleteMutation.mutate(itemToDelete, {
+      onSuccess: () => showToast("Item deleted", "success"),
+      onError: (err) => {
+        console.error("Delete error:", err);
+        showToast("Failed to delete item", "error");
+      },
+      onSettled: () => {
+        setDeleteConfirmOpen(false);
+        setItemToDelete(null);
+      },
+    });
   };
 
-  if (loading) {
+  if (isLoading) {
     return <InventorySkeleton />;
   }
 
-  if (error) {
+  const lockedStatus = (queryError as any)?.response?.status;
+  if (lockedStatus === 403) {
+    const backendMessage = (queryError as any)?.response?.data?.message || "Failed to load inventory";
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="bg-white border rounded-2xl shadow-sm p-8 max-w-md text-center">
           <AlertTriangle className="w-14 h-14 text-orange-500 mx-auto mb-4" />
-
-          <h2 className="text-2xl font-bold text-gray-800">
-            Feature Not Available
-          </h2>
-
-          <p className="text-gray-600 mt-3">{error}</p>
-
+          <h2 className="text-2xl font-bold text-gray-800">Feature Not Available</h2>
+          <p className="text-gray-600 mt-3">{backendMessage}</p>
           <button
             onClick={() => router.push("/subscription")}
             className="mt-6 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl"
@@ -457,15 +358,8 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6 p-4 md:p-6  mx-auto">
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Low Stock Banner */}
       {lowStockItems.length > 0 && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
           <div className="flex items-center gap-2">
@@ -473,57 +367,32 @@ export default function InventoryPage() {
             <span className="font-medium text-yellow-800">Low Stock Alert</span>
           </div>
           <p className="text-sm text-yellow-700 mt-1">
-            {lowStockItems.length} item(s) are below reorder level. Please
-            restock soon.
+            {lowStockItems.length} item(s) are below reorder level. Please restock soon.
           </p>
         </div>
       )}
+
       <div className="flex items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-            Inventory Management
-          </h1>
-
-          <p className="mt-1 text-sm text-gray-500">
-            Manage your restaurant's inventory and stock levels
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Inventory Management</h1>
+          <p className="mt-1 text-sm text-gray-500">Manage your restaurant's inventory and stock levels</p>
         </div>
       </div>
 
-
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Items"
-          value={inventory.length}
-          icon={Package}
-          color="bg-blue-500"
-        />
-        <StatCard
-          label="Low Stock Items"
-          value={lowStockItems.length}
-          icon={AlertTriangle}
-          color="bg-yellow-500"
-        />
-        <StatCard
-          label="Total Value"
-          value={`₹${totalValue.toFixed(2)}`}
-          icon={TrendingUp}
-          color="bg-green-500"
-        />
+        <StatCard label="Total Items" value={inventory.length} icon={Package} color="bg-blue-500" />
+        <StatCard label="Low Stock Items" value={lowStockItems.length} icon={AlertTriangle} color="bg-yellow-500" />
+        <StatCard label="Total Value" value={`₹${totalValue.toFixed(2)}`} icon={TrendingUp} color="bg-green-500" />
         <StatCard
           label="Categories"
-          value={new Set(inventory.map((i) => i.category)).size}
+          value={new Set(inventory.map((i: any) => i.category)).size}
           icon={Filter}
           color="bg-purple-500"
         />
       </div>
 
-      {/* Header Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-2xl font-bold text-gray-800">
-          Inventory Management
-        </h2>
+        <h2 className="text-2xl font-bold text-gray-800">Inventory Management</h2>
         <div className="flex gap-2">
           <button
             onClick={exportToCSV}
@@ -540,7 +409,6 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
@@ -573,56 +441,32 @@ export default function InventoryPage() {
             </select>
           </div>
           {(search || categoryFilter !== "All") && (
-            <button
-              onClick={clearFilters}
-              className="text-sm text-red-600 hover:underline"
-            >
+            <button onClick={clearFilters} className="text-sm text-red-600 hover:underline">
               Clear filters
             </button>
           )}
         </div>
       </div>
 
-      {/* Inventory Table */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-600">
               <tr>
-                <th
-                  className="px-4 py-3 text-left cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort("name")}
-                >
-                  Name{" "}
-                  {sortField === "name" &&
-                    (sortDirection === "asc" ? "↑" : "↓")}
+                <th className="px-4 py-3 text-left cursor-pointer hover:bg-gray-100" onClick={() => handleSort("name")}>
+                  Name {sortField === "name" && (sortDirection === "asc" ? "↑" : "↓")}
                 </th>
                 <th className="px-4 py-3 text-left">Category</th>
-                <th
-                  className="px-4 py-3 text-left cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort("quantity")}
-                >
-                  Quantity{" "}
-                  {sortField === "quantity" &&
-                    (sortDirection === "asc" ? "↑" : "↓")}
+                <th className="px-4 py-3 text-left cursor-pointer hover:bg-gray-100" onClick={() => handleSort("quantity")}>
+                  Quantity {sortField === "quantity" && (sortDirection === "asc" ? "↑" : "↓")}
                 </th>
                 <th className="px-4 py-3 text-left">Unit</th>
                 <th className="px-4 py-3 text-left">Reorder Level</th>
-                <th
-                  className="px-4 py-3 text-left cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort("costPerUnit")}
-                >
-                  Cost/Unit{" "}
-                  {sortField === "costPerUnit" &&
-                    (sortDirection === "asc" ? "↑" : "↓")}
+                <th className="px-4 py-3 text-left cursor-pointer hover:bg-gray-100" onClick={() => handleSort("costPerUnit")}>
+                  Cost/Unit {sortField === "costPerUnit" && (sortDirection === "asc" ? "↑" : "↓")}
                 </th>
-                <th
-                  className="px-4 py-3 text-left cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort("totalValue")}
-                >
-                  Total Value{" "}
-                  {sortField === "totalValue" &&
-                    (sortDirection === "asc" ? "↑" : "↓")}
+                <th className="px-4 py-3 text-left cursor-pointer hover:bg-gray-100" onClick={() => handleSort("totalValue")}>
+                  Total Value {sortField === "totalValue" && (sortDirection === "asc" ? "↑" : "↓")}
                 </th>
                 <th className="px-4 py-3 text-left">Supplier</th>
                 <th className="px-4 py-3 text-left">Actions</th>
@@ -631,21 +475,15 @@ export default function InventoryPage() {
             <tbody className="divide-y divide-gray-200">
               {paginatedItems.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={9}
-                    className="px-4 py-8 text-center text-gray-500"
-                  >
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                     No inventory items found.
                   </td>
                 </tr>
               ) : (
-                paginatedItems.map((item) => {
+                paginatedItems.map((item: any) => {
                   const isLowStock = item.quantity <= item.reorderLevel;
                   return (
-                    <tr
-                      key={item._id}
-                      className={`hover:bg-gray-50 ${isLowStock ? "bg-red-50" : ""}`}
-                    >
+                    <tr key={item._id} className={`hover:bg-gray-50 ${isLowStock ? "bg-red-50" : ""}`}>
                       <td className="px-4 py-3 font-medium text-gray-800">
                         {item.name}
                         {isLowStock && (
@@ -654,47 +492,25 @@ export default function InventoryPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {item.category}
-                      </td>
+                      <td className="px-4 py-3 text-gray-600">{item.category}</td>
                       <td className="px-4 py-3 font-medium">{item.quantity}</td>
                       <td className="px-4 py-3 text-gray-600">{item.unit}</td>
                       <td className="px-4 py-3">{item.reorderLevel}</td>
                       <td className="px-4 py-3">₹{item.costPerUnit}</td>
-                      <td className="px-4 py-3 font-medium">
-                        ₹{(item.quantity * item.costPerUnit).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {item.supplier || "-"}
-                      </td>
+                      <td className="px-4 py-3 font-medium">₹{(item.quantity * item.costPerUnit).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-gray-600">{item.supplier || "-"}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openStockModal(item, "add")}
-                            className="p-1 text-green-600 hover:bg-green-50 rounded"
-                            title="Add Stock"
-                          >
+                          <button onClick={() => openStockModal(item, "add")} className="p-1 text-green-600 hover:bg-green-50 rounded" title="Add Stock">
                             <TrendingUp className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => openStockModal(item, "remove")}
-                            className="p-1 text-orange-600 hover:bg-orange-50 rounded"
-                            title="Remove Stock"
-                          >
+                          <button onClick={() => openStockModal(item, "remove")} className="p-1 text-orange-600 hover:bg-orange-50 rounded" title="Remove Stock">
                             <TrendingDown className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => openEditModal(item)}
-                            className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                            title="Edit"
-                          >
+                          <button onClick={() => openEditModal(item)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Edit">
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleDeleteClick(item._id)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded"
-                            title="Delete"
-                          >
+                          <button onClick={() => handleDeleteClick(item._id)} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Delete">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -706,7 +522,6 @@ export default function InventoryPage() {
             </tbody>
           </table>
         </div>
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t">
             <button
@@ -730,7 +545,6 @@ export default function InventoryPage() {
         )}
       </div>
 
-      {/* Modals */}
       {isModalOpen && (
         <InventoryFormModal
           formData={formData}
@@ -739,7 +553,7 @@ export default function InventoryPage() {
           onClose={closeModal}
           onSubmit={handleSubmit}
           categories={CATEGORIES.filter((c) => c !== "All")}
-          isSaving={isSaving}
+          isSaving={createMutation.isPending || updateMutation.isPending}
         />
       )}
       {stockModalOpen && selectedItem && (
@@ -753,16 +567,13 @@ export default function InventoryPage() {
         />
       )}
       {deleteConfirmOpen && (
-        <DeleteConfirmationModal
-          onConfirm={confirmDelete}
-          onCancel={() => setDeleteConfirmOpen(false)}
-        />
+        <DeleteConfirmationModal onConfirm={confirmDelete} onCancel={() => setDeleteConfirmOpen(false)} />
       )}
     </div>
   );
 }
 
-// Subcomponents (unchanged)
+
 function StatCard({ label, value, icon: Icon, color }: any) {
   return (
     <div className="bg-white p-5 rounded-2xl shadow-sm hover:shadow-md transition">
@@ -779,23 +590,12 @@ function StatCard({ label, value, icon: Icon, color }: any) {
   );
 }
 
-function InventoryFormModal({
-  formData,
-  setFormData,
-  editingItem,
-  onClose,
-  onSubmit,
-  categories,
-  isSaving,
-}: any) {
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
+function InventoryFormModal({ formData, setFormData, editingItem, onClose, onSubmit, categories, isSaving }: any) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     setFormData((prev: any) => ({
       ...prev,
-      [name]:
-        type === "number" ? (value === "" ? 0 : parseFloat(value)) : value,
+      [name]: type === "number" ? (value === "" ? 0 : parseFloat(value)) : value,
     }));
   };
 
@@ -803,9 +603,7 @@ function InventoryFormModal({
     <div className="fixed inset-0 bg-black/40 backdrop-blur-md  bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white">
-          <h3 className="text-lg font-semibold">
-            {editingItem ? "Edit Item" : "Add Item"}
-          </h3>
+          <h3 className="text-lg font-semibold">{editingItem ? "Edit Item" : "Add Item"}</h3>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
             <X className="w-5 h-5" />
           </button>
@@ -813,107 +611,43 @@ function InventoryFormModal({
         <form onSubmit={onSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium">Item Name *</label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border rounded-lg"
-            />
+            <input type="text" name="name" value={formData.name} onChange={handleChange} required className="w-full px-3 py-2 border rounded-lg" />
           </div>
           <div>
             <label className="block text-sm font-medium">Category *</label>
-            <select
-              name="category"
-              value={formData.category}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg bg-white"
-            >
+            <select name="category" value={formData.category} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg bg-white">
               {categories.map((cat: string) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
+                <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label>Quantity *</label>
-              <input
-                type="number"
-                name="quantity"
-                value={formData.quantity}
-                onChange={handleChange}
-                required
-                min="0"
-                step="0.01"
-                className="w-full px-3 py-2 border rounded-lg"
-              />
+              <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} required min="0" step="0.01" className="w-full px-3 py-2 border rounded-lg" />
             </div>
             <div>
               <label>Unit *</label>
-              <input
-                type="text"
-                name="unit"
-                value={formData.unit}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border rounded-lg"
-              />
+              <input type="text" name="unit" value={formData.unit} onChange={handleChange} required className="w-full px-3 py-2 border rounded-lg" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label>Reorder Level *</label>
-              <input
-                type="number"
-                name="reorderLevel"
-                value={formData.reorderLevel}
-                onChange={handleChange}
-                required
-                min="0"
-                step="0.01"
-                className="w-full px-3 py-2 border rounded-lg"
-              />
+              <input type="number" name="reorderLevel" value={formData.reorderLevel} onChange={handleChange} required min="0" step="0.01" className="w-full px-3 py-2 border rounded-lg" />
             </div>
             <div>
               <label>Cost per Unit ($) *</label>
-              <input
-                type="number"
-                name="costPerUnit"
-                value={formData.costPerUnit}
-                onChange={handleChange}
-                required
-                min="0"
-                step="0.01"
-                className="w-full px-3 py-2 border rounded-lg"
-              />
+              <input type="number" name="costPerUnit" value={formData.costPerUnit} onChange={handleChange} required min="0" step="0.01" className="w-full px-3 py-2 border rounded-lg" />
             </div>
           </div>
           <div>
             <label>Supplier</label>
-            <input
-              type="text"
-              name="supplier"
-              value={formData.supplier}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg"
-            />
+            <input type="text" name="supplier" value={formData.supplier} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" />
           </div>
           <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border rounded-lg"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
-            >
+            <button type="button" onClick={onClose} className="px-4 py-2 border rounded-lg">Cancel</button>
+            <button type="submit" disabled={isSaving} className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
               {isSaving ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -932,28 +666,15 @@ function InventoryFormModal({
   );
 }
 
-function StockAdjustModal({
-  item,
-  action,
-  quantity,
-  setQuantity,
-  onConfirm,
-  onClose,
-}: any) {
+function StockAdjustModal({ item, action, quantity, setQuantity, onConfirm, onClose }: any) {
   const isAdd = action === "add";
-  const newQuantity = isAdd
-    ? item.quantity + quantity
-    : item.quantity - quantity;
+  const newQuantity = isAdd ? item.quantity + quantity : item.quantity - quantity;
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-md bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl max-w-sm w-full">
         <div className="p-6 space-y-4">
-          <h3 className="text-lg font-semibold">
-            {isAdd ? "Add Stock" : "Remove Stock"}
-          </h3>
-          <p>
-            Current: {item.quantity} {item.unit}
-          </p>
+          <h3 className="text-lg font-semibold">{isAdd ? "Add Stock" : "Remove Stock"}</h3>
+          <p>Current: {item.quantity} {item.unit}</p>
           <input
             type="number"
             value={quantity}
@@ -963,21 +684,14 @@ function StockAdjustModal({
             className="w-full px-3 py-2 border rounded-lg"
           />
           <p>
-            New quantity:{" "}
-            <strong>
-              {newQuantity} {item.unit}
-            </strong>
+            New quantity: <strong>{newQuantity} {item.unit}</strong>
           </p>
           {!isAdd && quantity > item.quantity && (
-            <p className="text-red-600 text-sm">
-              Amount exceeds current stock.
-            </p>
+            <p className="text-red-600 text-sm">Amount exceeds current stock.</p>
           )}
         </div>
         <div className="border-t p-6 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 border rounded-lg">
-            Cancel
-          </button>
+          <button onClick={onClose} className="px-4 py-2 border rounded-lg">Cancel</button>
           <button
             onClick={onConfirm}
             disabled={!isAdd && quantity > item.quantity}
@@ -997,19 +711,11 @@ function DeleteConfirmationModal({ onConfirm, onCancel }: any) {
       <div className="bg-white rounded-xl max-w-sm w-full p-6">
         <h3 className="text-lg font-semibold">Confirm Delete</h3>
         <p className="text-gray-600 my-4">
-          Are you sure you want to delete this item? This action cannot be
-          undone.
+          Are you sure you want to delete this item? This action cannot be undone.
         </p>
         <div className="flex justify-end gap-3">
-          <button onClick={onCancel} className="px-4 py-2 border rounded-lg">
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg"
-          >
-            Delete
-          </button>
+          <button onClick={onCancel} className="px-4 py-2 border rounded-lg">Cancel</button>
+          <button onClick={onConfirm} className="px-4 py-2 bg-red-600 text-white rounded-lg">Delete</button>
         </div>
       </div>
     </div>

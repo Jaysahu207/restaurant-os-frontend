@@ -52,7 +52,7 @@ export default function SocketProvider({
       addNotification({
         type: "new_order",
         title: "New Order",
-        message: `Table ${order.orderNumber}`,
+        message: `Table ${order.orderNumber.slice(3)}`,
         createdAt: new Date(),
       });
       toast.success(`New Order Table ${order.orderNumber.slice(3)}`);
@@ -91,5 +91,5 @@ export default function SocketProvider({
 function playNotification() {
   const audio = new Audio("/sounds/order-placed.mp3");
   audio.load();
-  audio.play().catch(() => {});
+  audio.play().catch(() => { });
 }

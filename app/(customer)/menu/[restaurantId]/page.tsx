@@ -58,6 +58,7 @@ import "aos/dist/aos.css";
 import AOS from "aos";
 
 import { Pacifico, Lobster } from "next/font/google";
+import { useCustomerMenuQuery } from "@/hooks/useCustomerMenu";
 
 const lobster = Lobster({
   subsets: ["latin"],
@@ -260,10 +261,14 @@ function CustomerMenuContent() {
   const table = searchParams.get("table");
   const mode = searchParams.get("mode");
   // --- State ---
-  const [menu, setMenu] = useState<MenuItem[]>([]);
-  const [banners, setBanners] = useState([]);
-  const [categories, setCategories] = useState<string[]>(["All"]);
-  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [error, setError] = useState("");
+  const { data: menuData, isLoading: loading, error: menuError } = useCustomerMenuQuery(restaurantSlug);
+
+  const menu: MenuItem[] = useMemo(() => menuData?.items ?? [], [menuData]);
+  const banners = useMemo(() => menuData?.banners ?? [], [menuData]);
+  const restaurant: Restaurant | null = useMemo(() => menuData?.restaurant ?? null, [menuData]);
+
+
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -274,8 +279,6 @@ function CustomerMenuContent() {
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [customerLocked, setCustomerLocked] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<{
     name: string;
@@ -387,6 +390,21 @@ function CustomerMenuContent() {
     // Inside the verifyTable effect (around line 280)
     verifyTable();
   }, [restaurantSlug, table]);
+  useEffect(() => {
+    if (menuError) {
+      setError("Failed to load menu. Please try again.");
+      toast.error("Menu loading failed");
+    }
+  }, [menuError]);
+
+  const categories = useMemo<string[]>(() => {
+    return [
+      "All",
+      ...(Array.from(
+        new Set(menu.map((item) => item.category?.trim()).filter(Boolean)),
+      ) as string[]),
+    ];
+  }, [menu]);
   const verifyTable = async () => {
     if (!table || !restaurantSlug) return;
 
@@ -421,39 +439,39 @@ function CustomerMenuContent() {
   // }, [showPayment]);
 
   // Load menu & restaurant
-  useEffect(() => {
-    if (!restaurantSlug) return;
-    const loadMenu = async () => {
-      try {
-        setLoading(true);
-        const data = await fetchCustomerMenu(restaurantSlug);
-        const menuItems = data?.items || [];
-        const restaurantData = data?.restaurant || null;
-        setMenu(menuItems);
-        console.log("Restaurant Data:", restaurantData);
-        setRestaurant(restaurantData);
-        setBanners(data.banners || []);
-        const uniqueCategories: string[] = [
-          "All",
-          ...(Array.from(
-            new Set(
-              menuItems
-                .map((item: MenuItem) => item.category?.trim())
-                .filter(Boolean),
-            ),
-          ) as string[]),
-        ];
-        setCategories(uniqueCategories);
-      } catch (err) {
-        // console.error(err);
-        setError("Failed to load menu. Please try again.");
-        toast.error("Menu loading failed");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadMenu();
-  }, [restaurantSlug]);
+  // useEffect(() => {
+  //   if (!restaurantSlug) return;
+  //   const loadMenu = async () => {
+  //     try {
+  //       setLoading(true);
+  //       const data = await fetchCustomerMenu(restaurantSlug);
+  //       const menuItems = data?.items || [];
+  //       const restaurantData = data?.restaurant || null;
+  //       setMenu(menuItems);
+  //       console.log("Restaurant Data:", restaurantData);
+  //       setRestaurant(restaurantData);
+  //       setBanners(data.banners || []);
+  //       const uniqueCategories: string[] = [
+  //         "All",
+  //         ...(Array.from(
+  //           new Set(
+  //             menuItems
+  //               .map((item: MenuItem) => item.category?.trim())
+  //               .filter(Boolean),
+  //           ),
+  //         ) as string[]),
+  //       ];
+  //       setCategories(uniqueCategories);
+  //     } catch (err) {
+  //       // console.error(err);
+  //       setError("Failed to load menu. Please try again.");
+  //       toast.error("Menu loading failed");
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
+  //   loadMenu();
+  // }, [restaurantSlug]);
   const isSelfService = restaurant?.operations?.serviceType === "self";
 
   useEffect(() => {
@@ -529,6 +547,13 @@ function CustomerMenuContent() {
       verifyTable();
     }
   }, [currentOrder?.status]);
+  const currentOrderRef = useRef<Order | null>(null);
+  const completedOrderIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    currentOrderRef.current = currentOrder;
+  }, [currentOrder]);
+
   // Socket connection for real-time updates
   useEffect(() => {
     if (!restaurant?._id) return;
@@ -539,7 +564,6 @@ function CustomerMenuContent() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      // console.log("Socket connected");
       socket.emit("joinRestaurant", restaurant._id);
     });
 
@@ -551,7 +575,7 @@ function CustomerMenuContent() {
     });
 
     socket.on("ORDER_READY", (order: Order) => {
-      if (currentOrder?._id !== order._id) return;
+      if (currentOrderRef.current?._id !== order._id) return;
 
       playSound();
       setCurrentOrder(order);
@@ -564,61 +588,48 @@ function CustomerMenuContent() {
     });
 
     socket.on("ORDER_COMPLETED", async (order: Order) => {
-      if (currentOrder?._id !== order._id) return;
+      if (currentOrderRef.current?._id !== order._id) return;
+
+      // Guard against duplicate emits / duplicate listener registration —
+      // only process a given order's completion once.
+      if (completedOrderIdsRef.current.has(order._id)) return;
+      completedOrderIdsRef.current.add(order._id);
 
       playSound();
       setCurrentOrder(order);
 
       try {
-        // ✅ Release table on backend
         if (table && restaurantSlug) {
           await releaseTable(restaurantSlug, Number(table));
-          // console.log("Table released successfully");
         }
       } catch (err) {
         console.error("Failed to release table", err);
       }
 
-      // ✅ UI updates (always run)
       setTableOccupied(false);
 
-      // ✅ Review popup only when completed
       if (order.status === "completed") {
         setShowReviewPopup(true);
       }
 
       toast.success("✅ Order completed! Thanks for dining with us.");
     });
-    socket.on("ORDER_CANCELLED", (order: Order) => {
-      if (currentOrder?._id === order._id) {
-        playSound();
 
-        // Clear states
+    socket.on("ORDER_CANCELLED", (order: Order) => {
+      if (currentOrderRef.current?._id === order._id) {
+        playSound();
         setCurrentOrder(null);
         setOrderPlaced(false);
-
-        // Clear cart
         clearCart();
-
-        // Reset checkout
         setIsCheckingOut(false);
-
-        // Clear customer details
         setCustomerName("");
         setCustomerPhone("");
         setCustomerEmail("");
-
-        // Unlock customer
         setCustomerLocked(false);
-
-        // Remove localStorage
         localStorage.removeItem("currentOrder");
         localStorage.removeItem("customerInfo");
-
-        // Notification
+        setTableOccupied(false);
         toast.error("❌ Your order was cancelled by restaurant");
-
-        // Optional redirect
         setTimeout(() => {
           router.refresh();
         }, 2000);
@@ -629,7 +640,7 @@ function CustomerMenuContent() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [restaurant?._id, currentOrder?._id]); // added dependency to avoid stale closure
+  }, [restaurant?._id]); // no longer depends on currentOrder?._id — socket stays alive across order changes
   const ETA_MINUTES =
     currentOrder?.orderType === "delivery"
       ? (restaurant?.operations?.delivery?.estimatedDeliveryTime ?? 45)
@@ -914,7 +925,7 @@ function CustomerMenuContent() {
         await completePayment(currentOrder._id, "cash");
 
         const updated = await getOrderById(currentOrder._id);
-        console.log("Updated Order:", updated);
+        // console.log("Updated Order:", updated);
         setCurrentOrder(updated);
 
         toast.success("Cash payment selected!");
@@ -992,6 +1003,7 @@ function CustomerMenuContent() {
     setSpecialInstructions("");
     localStorage.removeItem("cart-storage");
     localStorage.removeItem("currentOrder");
+    localStorage.removeItem("customerInfo");
     toast.success("Session reset. You can start a new order.");
   };
   const isValidPhone = /^[6-9]\d{9}$/.test(customerPhone);
@@ -1592,7 +1604,7 @@ function CustomerMenuContent() {
               )}
             </div>
             {showPickupModal && (
-              <div className="fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-xs p-4">
+              <div className="fixed inset-0 z-100 flex items-center justify-center backdrop-blur-xs p-4">
                 <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl p-6 animate-in zoom-in-95 duration-300">
 
                   {/* Icon */}

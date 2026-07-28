@@ -8,11 +8,8 @@ import {
   X,
   Mail,
   RefreshCw,
-  Filter,
-  ChevronDown,
   User,
   ShoppingBag,
-  DollarSign,
   Clock,
   Printer,
   IndianRupee,
@@ -22,64 +19,27 @@ import {
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
-import {
-  getCustomers,
-  getCustomerById,
-  deleteCustomer,
-  getCustomerHistory,
-} from "@/services/customerDetail";
 import toast from "react-hot-toast";
-import { debounce } from "lodash"; // or implement a simple debounce
+import { debounce } from "lodash";
 import { useAuthStore } from "@/store/useAuthStore";
 import * as XLSX from "xlsx";
-// ==================== Types ====================
-interface Customer {
-  _id: string;
-  name: string;
-  phone: string;
-  email: string;
-  lastVisit?: string;
-  totalOrders: number;
-  totalSpent: number;
-  isRegular: boolean;
-  orders: string[];
-  createdAt: string;
-}
-
-interface OrderItem {
-  name: string;
-  price: number;
-  quantity: number;
-}
-
-interface Order {
-  _id: string;
-  status: string;
-  totalAmount: number;
-  createdAt: string;
-  items: OrderItem[];
-}
+import { useCustomers, useCustomerHistory, type Customer, type Order } from "@/hooks/useCustomers";
 
 // ==================== Main Component ====================
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [search, setSearch] = useState("");
-
-  const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [mainDateFilter, setMainDateFilter] = useState(""); // for main customer list
-  const [modalDateFilter, setModalDateFilter] = useState(""); // for order history inside modal
-  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
-  // Modal state
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [historyModalOpen, setHistoryModalOpen] = useState(false);
-  const [orderDateFilter, setOrderDateFilter] = useState(""); // For filtering orders within modal
-  const [modalLoading, setModalLoading] = useState(false);
-  const [exporting, setExporting] = useState(false); // new state
   const { restaurant } = useAuthStore();
+  const restaurantId = restaurant?._id;
+
+  const [search, setSearch] = useState("");
+  const [inputValue, setInputValue] = useState("");
+  const [mainDateFilter, setMainDateFilter] = useState("");
+  const [modalDateFilter, setModalDateFilter] = useState("");
+
+  // Modal state
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [customerType, setCustomerType] = useState("all");
@@ -87,19 +47,30 @@ export default function CustomersPage() {
   const [spentFilter, setSpentFilter] = useState("all");
   const [emailFilter, setEmailFilter] = useState("all");
 
+  const {
+    data: customers = [],
+    isLoading,
+    isFetching,
+    refetch,
+  } = useCustomers(restaurantId);
+
+  const {
+    data: historyData,
+    isLoading: modalLoading,
+  } = useCustomerHistory(historyModalOpen ? selectedCustomerId : null);
+
+  const selectedCustomer = historyData?.customer ?? null;
+  const orders: Order[] = historyData?.history ?? [];
+  const analytics = historyData?.analytics ?? null;
+
   // Debounced search handler
   const debouncedSearch = useMemo(() => {
     return debounce((value: string) => {
       const trimmed = value.trim();
-
       if (trimmed.length < 2 && trimmed.length !== 0) return;
-
-      setSearch((prev) => {
-        if (prev === trimmed) return prev; // prevent duplicate
-        return trimmed;
-      });
+      setSearch((prev) => (prev === trimmed ? prev : trimmed));
     }, 500);
-  }, []); // ✅ EMPTY dependency
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -109,41 +80,27 @@ export default function CustomersPage() {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setInputValue(value); // instant UI update
-    debouncedSearch(value); // delayed API
+    setInputValue(value);
+    debouncedSearch(value);
   };
-  // Load customers with optional date filter
-  const loadCustomers = useCallback(async () => {
-    if (!restaurant?._id) return;
-    try {
-      setLoading(true);
-      const data = await getCustomers(restaurant._id, "", 1, 1000); // 👈 no search, no date
-      setCustomers(data);
-      setFilteredCustomers(data); // 👈 important
-    } catch (err) {
-      console.error("Failed to load customers:", err);
-      toast.error("Could not load customers");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [restaurant?._id]);
-
-  useEffect(() => {
-    loadCustomers();
-  }, [loadCustomers]);
 
   const handleRefresh = () => {
-    setRefreshing(true);
-    loadCustomers();
+    refetch();
   };
-  useEffect(() => {
+
+  const formatLocalDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  // Client-side filtering over the cached customer list
+  const filteredCustomers = useMemo(() => {
     let filtered = [...customers];
 
-    // Search
     if (search) {
       const q = search.toLowerCase();
-
       filtered = filtered.filter(
         (c) =>
           c.name.toLowerCase().includes(q) ||
@@ -152,174 +109,104 @@ export default function CustomersPage() {
       );
     }
 
-    // From Date
     if (fromDate) {
       filtered = filtered.filter((c) => {
         if (!c.lastVisit) return false;
-
         return new Date(c.lastVisit) >= new Date(fromDate);
       });
     }
 
-    // To Date
     if (toDate) {
       const end = new Date(toDate);
       end.setHours(23, 59, 59, 999);
-
       filtered = filtered.filter((c) => {
         if (!c.lastVisit) return false;
-
         return new Date(c.lastVisit) <= end;
       });
     }
 
-    // Customer Type
     if (customerType === "new") {
       filtered = filtered.filter((c) => c.totalOrders === 1);
     }
-
     if (customerType === "regular") {
       filtered = filtered.filter((c) => c.totalOrders > 1);
     }
 
-    // Orders Filter
     switch (ordersFilter) {
       case "1":
         filtered = filtered.filter((c) => c.totalOrders === 1);
         break;
-
       case "2-5":
-        filtered = filtered.filter(
-          (c) => c.totalOrders >= 2 && c.totalOrders <= 5,
-        );
+        filtered = filtered.filter((c) => c.totalOrders >= 2 && c.totalOrders <= 5);
         break;
-
       case "5-10":
-        filtered = filtered.filter(
-          (c) => c.totalOrders >= 5 && c.totalOrders <= 10,
-        );
+        filtered = filtered.filter((c) => c.totalOrders >= 5 && c.totalOrders <= 10);
         break;
-
       case "10+":
         filtered = filtered.filter((c) => c.totalOrders > 10);
         break;
     }
 
-    // Spent Filter
     switch (spentFilter) {
       case "0-500":
-        filtered = filtered.filter(
-          (c) => c.totalSpent >= 0 && c.totalSpent <= 500,
-        );
+        filtered = filtered.filter((c) => c.totalSpent >= 0 && c.totalSpent <= 500);
         break;
-
       case "500-2000":
-        filtered = filtered.filter(
-          (c) => c.totalSpent >= 500 && c.totalSpent <= 2000,
-        );
+        filtered = filtered.filter((c) => c.totalSpent >= 500 && c.totalSpent <= 2000);
         break;
-
       case "2000+":
         filtered = filtered.filter((c) => c.totalSpent > 2000);
         break;
     }
 
-    // Email Filter
     if (emailFilter === "has") {
       filtered = filtered.filter((c) => c.email && c.email.trim() !== "");
     }
-
     if (emailFilter === "no") {
       filtered = filtered.filter((c) => !c.email || c.email.trim() === "");
     }
 
-    setFilteredCustomers(filtered);
-  }, [
-    customers,
-    search,
-    fromDate,
-    toDate,
-    customerType,
-    ordersFilter,
-    spentFilter,
-    emailFilter,
-  ]);
-  const formatLocalDate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return filtered;
+  }, [customers, search, fromDate, toDate, customerType, ordersFilter, spentFilter, emailFilter]);
+
+  const openHistory = (customer: Customer) => {
+    setSelectedCustomerId(customer._id);
+    setModalDateFilter("");
+    setHistoryModalOpen(true);
   };
-  // Open customer order history
-  const openHistory = async (customer: Customer) => {
-    try {
-      setModalLoading(true);
-      const historyData = await getCustomerHistory(customer._id);
-      // console.log("backend data", historyData);
-      setSelectedCustomer(historyData.customer);
-      setOrders(historyData.history || []);
-      setAnalytics(historyData.analytics || null);
-      setOrderDateFilter(""); // Reset order date filter
-      setHistoryModalOpen(true);
-    } catch (err) {
-      console.error("Failed to load customer details:", err);
-      toast.error("Could not load customer history");
-    } finally {
-      setModalLoading(false);
-    }
-  };
-  // console.log("Customer Data -> ", selectedCustomer, orders);
+
   const closeHistory = () => {
     setHistoryModalOpen(false);
-    setSelectedCustomer(null);
-    setOrders([]);
-    setOrderDateFilter("");
+    setSelectedCustomerId(null);
   };
 
-  // Filter orders within modal by date
   const filteredOrders = useMemo(() => {
     if (!modalDateFilter) return orders;
-    return orders.filter((order) => {
-      return formatLocalDate(new Date(order.createdAt)) === modalDateFilter;
-    });
+    return orders.filter((order) => formatLocalDate(new Date(order.createdAt)) === modalDateFilter);
   }, [orders, modalDateFilter]);
 
-  // Calculate stats for customer card
   const customerStats = useMemo(() => {
     const total = customers.length;
-    const totalSpent = customers.reduce(
-      (sum, c) => sum + (c.totalSpent || 0),
-      0,
-    );
+    const totalSpent = customers.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
     const avgOrders =
-      total > 0
-        ? customers.reduce((sum, c) => sum + (c.totalOrders || 0), 0) / total
-        : 0;
+      total > 0 ? customers.reduce((sum, c) => sum + (c.totalOrders || 0), 0) / total : 0;
     return { total, totalSpent, avgOrders };
   }, [customers]);
 
-  // Clear all filters
   const clearFilters = () => {
     setSearch("");
     setInputValue("");
-
     setFromDate("");
     setToDate("");
-
     setCustomerType("all");
     setOrdersFilter("all");
     setSpentFilter("all");
     setEmailFilter("all");
-
     debouncedSearch("");
   };
 
-  // console.log("Filtered Customers -> ", filteredCustomers);
-  // console.log("Customer Data -> ", selectedCustomer, orders);
-  // ==================== EXPORT HANDLER ====================
   const handleExport = useCallback(() => {
     setExporting(true);
-    // 1. Get the currently displayed customers (filtered by search & date)
     try {
       const baseData = filteredCustomers;
       const sixMonthsAgo = new Date();
@@ -337,40 +224,24 @@ export default function CustomersPage() {
         Name: c.name,
         Phone: c.phone,
         Email: c.email || "",
-
         "Customer Type": c.isRegular ? "Regular" : "New",
-
         "Total Orders": c.totalOrders ?? 0,
-
         "Total Visits": c.orders?.length ?? 0,
-
         "Total Spent (₹)": (c.totalSpent ?? 0).toFixed(2),
-
         "Average Order Value (₹)":
           c.totalOrders && c.totalOrders > 0
             ? ((c.totalSpent ?? 0) / c.totalOrders).toFixed(2)
             : "0.00",
-
-        "Last Visit": c.lastVisit
-          ? new Date(c.lastVisit).toLocaleDateString("en-IN")
-          : "Never",
-
-        "Customer Since": c.createdAt
-          ? new Date(c.createdAt).toLocaleDateString("en-IN")
-          : "-",
-
+        "Last Visit": c.lastVisit ? new Date(c.lastVisit).toLocaleDateString("en-IN") : "Never",
+        "Customer Since": c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-IN") : "-",
         "Email Available": c.email ? "Yes" : "No",
       }));
-      // 4. Create workbook & sheet
+
       const worksheet = XLSX.utils.json_to_sheet(rows);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
 
-      // 5. Generate Excel file and download
-      const excelBuffer = XLSX.write(workbook, {
-        bookType: "xlsx",
-        type: "array",
-      });
+      const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
       const blob = new Blob([excelBuffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
@@ -380,12 +251,11 @@ export default function CustomersPage() {
         .toISOString()
         .slice(0, 10)}.xlsx`;
       link.href = url;
-      link.download = 0 < fileName.length ? fileName : "customers.xlsx";
+      link.download = fileName.length > 0 ? fileName : "customers.xlsx";
 
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
       URL.revokeObjectURL(url);
 
       toast.success(`Exported ${activeCustomers.length} customers.`);
@@ -395,7 +265,7 @@ export default function CustomersPage() {
       setExporting(false);
     }
   }, [filteredCustomers, restaurant?.name]);
-  // Print order history for selected customer
+
   const handlePrintHistory = () => {
     const printContent = document.getElementById("customer-history-print");
     if (printContent && selectedCustomer) {
@@ -428,7 +298,7 @@ export default function CustomersPage() {
     }
   };
 
-  if (loading && !refreshing) {
+  if (isLoading) {
     return <CustomersSkeleton />;
   }
 
@@ -437,15 +307,10 @@ export default function CustomersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-800">
-            Customer Management
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            View and manage your customer base
-          </p>
+          <h2 className="text-3xl font-bold text-gray-800">Customer Management</h2>
+          <p className="text-sm text-gray-500 mt-1">View and manage your customer base</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Export Button */}
           <button
             onClick={handleExport}
             disabled={exporting || filteredCustomers.length === 0}
@@ -454,28 +319,20 @@ export default function CustomersPage() {
             <Download className="w-4 h-4" />
             {exporting ? "Exporting..." : "Export Data"}
           </button>
-          {/* Refresh Button */}
           <button
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={isFetching}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
             title="Refresh"
           >
-            <RefreshCw
-              className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className={`w-5 h-5 ${isFetching ? "animate-spin" : ""}`} />
           </button>
         </div>
       </div>
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard
-          label="Total Customers"
-          value={customerStats.total}
-          icon={User}
-          color="bg-blue-500"
-        />
+        <StatCard label="Total Customers" value={customerStats.total} icon={User} color="bg-blue-500" />
         <StatCard
           label="Total Revenue"
           value={`₹${customerStats.totalSpent.toFixed(2)}`}
@@ -492,11 +349,7 @@ export default function CustomersPage() {
 
       {/* ================= Filters ================= */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
-
-        {/* Top Row */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-
-          {/* Search */}
           <div className="relative md:col-span-5">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -508,41 +361,31 @@ export default function CustomersPage() {
             />
           </div>
 
-          {/* From Date */}
           <DatePicker
             selected={fromDate ? new Date(fromDate) : null}
-            onChange={(date: any) =>
-              setFromDate(date ? formatLocalDate(date) : "")
-            }
+            onChange={(date: any) => setFromDate(date ? formatLocalDate(date) : "")}
             placeholderText="From"
             dateFormat="yyyy-MM-dd"
             className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm text-gray-700"
           />
 
-          {/* To Date */}
           <DatePicker
             selected={toDate ? new Date(toDate) : null}
-            onChange={(date: any) =>
-              setToDate(date ? formatLocalDate(date) : "")
-            }
+            onChange={(date: any) => setToDate(date ? formatLocalDate(date) : "")}
             placeholderText="To"
             dateFormat="yyyy-MM-dd"
             className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm text-gray-700"
           />
 
-          {/* Clear */}
           <button
             onClick={clearFilters}
             className="h-10 px-4 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium transition"
           >
             Clear
           </button>
-
         </div>
 
-        {/* Bottom Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-
           <select
             value={customerType}
             onChange={(e) => setCustomerType(e.target.value)}
@@ -585,10 +428,8 @@ export default function CustomersPage() {
             <option value="has">Has Email</option>
             <option value="no">No Email</option>
           </select>
-
         </div>
 
-        {/* Active Filters */}
         {(search ||
           fromDate ||
           toDate ||
@@ -597,56 +438,34 @@ export default function CustomersPage() {
           spentFilter !== "all" ||
           emailFilter !== "all") && (
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
-
-              <span className="text-xs font-medium text-gray-500">
-                Active:
-              </span>
-
+              <span className="text-xs font-medium text-gray-500">Active:</span>
               {search && (
-                <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs">
-                  🔍 {search}
-                </span>
+                <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs">🔍 {search}</span>
               )}
-
               {fromDate && (
-                <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs">
-                  📅 {fromDate}
-                </span>
+                <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs">📅 {fromDate}</span>
               )}
-
               {toDate && (
-                <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs">
-                  📅 {toDate}
-                </span>
+                <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs">📅 {toDate}</span>
               )}
-
               {customerType !== "all" && (
-                <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-700 text-xs">
-                  {customerType}
-                </span>
+                <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-700 text-xs">{customerType}</span>
               )}
-
               {ordersFilter !== "all" && (
                 <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-700 text-xs">
                   {ordersFilter} Orders
                 </span>
               )}
-
               {spentFilter !== "all" && (
-                <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs">
-                  {spentFilter}
-                </span>
+                <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs">{spentFilter}</span>
               )}
-
               {emailFilter !== "all" && (
                 <span className="px-2 py-1 rounded-full bg-pink-100 text-pink-700 text-xs">
                   {emailFilter === "has" ? "Has Email" : "No Email"}
                 </span>
               )}
-
             </div>
           )}
-
       </div>
 
       {/* Customers Grid */}
@@ -656,9 +475,7 @@ export default function CustomersPage() {
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <User className="w-8 h-8 text-gray-400" />
             </div>
-            <h3 className="text-lg font-medium text-gray-800 mb-2">
-              No customers found
-            </h3>
+            <h3 className="text-lg font-medium text-gray-800 mb-2">No customers found</h3>
             <p className="text-gray-500">
               {search ||
                 fromDate ||
@@ -675,21 +492,14 @@ export default function CustomersPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {filteredCustomers.map((customer) => (
-            <CustomerCard
-              key={customer._id}
-              customer={customer}
-              onViewHistory={() => openHistory(customer)}
-            />
+            <CustomerCard key={customer._id} customer={customer} onViewHistory={() => openHistory(customer)} />
           ))}
         </div>
       )}
 
       {/* Customer History Modal */}
       {historyModalOpen && selectedCustomer && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-          onClick={closeHistory}
-        >
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={closeHistory}>
           <div
             className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
@@ -699,17 +509,10 @@ export default function CustomersPage() {
                 Order History - {selectedCustomer.name}
               </h3>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={handlePrintHistory}
-                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded"
-                  title="Print history"
-                >
+                <button onClick={handlePrintHistory} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded" title="Print history">
                   <Printer className="w-5 h-5" />
                 </button>
-                <button
-                  onClick={closeHistory}
-                  className="p-1.5 hover:bg-gray-100 rounded"
-                >
+                <button onClick={closeHistory} className="p-1.5 hover:bg-gray-100 rounded">
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
@@ -721,84 +524,59 @@ export default function CustomersPage() {
               </div>
             ) : (
               <div id="customer-history-print" className="p-6 space-y-6">
-                {/* Customer Summary */}
                 <div className="bg-gray-200 p-4 rounded-lg grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div>
                     <p className="text-xs text-gray-700 flex items-center gap-1">
                       <Phone className="w-3 h-3" /> Phone
                     </p>
-                    <p className="font-medium text-gray-700">
-                      {selectedCustomer.phone}
-                    </p>
+                    <p className="font-medium text-gray-700">{selectedCustomer.phone}</p>
                   </div>
-
                   <div>
                     <p className="text-xs text-gray-700 flex items-center gap-1">
                       <User className="w-3 h-3" /> Name
                     </p>
-                    <p className="font-medium text-gray-700">
-                      {selectedCustomer.name}
-                    </p>
+                    <p className="font-medium text-gray-700">{selectedCustomer.name}</p>
                   </div>
-
                   <div>
                     <p className="text-xs text-gray-700">Total Orders</p>
-                    <p className="font-medium text-gray-700">
-                      {analytics.totalOrders}
-                    </p>
+                    <p className="font-medium text-gray-700">{analytics?.totalOrders}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-700">Total Spent</p>
-                    <p className="font-medium text-gray-700">
-                      {analytics.totalSpent?.toFixed(2) || "0.00"}
-                    </p>
+                    <p className="font-medium text-gray-700">{analytics?.totalSpent?.toFixed(2) || "0.00"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-700 flex items-center gap-1">
                       <Mail className="w-3 h-3" /> Email
                     </p>
                     <p className="font-medium text-gray-700 truncate">
-                      {selectedCustomer.email?.toLowerCase() ||
-                        "dummy@gmail.com"}
+                      {selectedCustomer.email?.toLowerCase() || "dummy@gmail.com"}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium text-gray-700">Order History</h4>
-
                   <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-xl px-3 py-1 shadow-sm">
                     <Calendar className="w-4 h-4 text-gray-500" />
-
                     <DatePicker
-                      selected={
-                        mainDateFilter ? new Date(mainDateFilter) : null
-                      }
-                      onChange={(date: any) =>
-                        setMainDateFilter(date ? formatLocalDate(date) : "")
-                      }
+                      selected={mainDateFilter ? new Date(mainDateFilter) : null}
+                      onChange={(date: any) => setMainDateFilter(date ? formatLocalDate(date) : "")}
                       placeholderText="Select date"
                       className="text-sm outline-none bg-transparent text-gray-800"
                       dateFormat="yyyy-MM-dd"
                     />
-
                     {mainDateFilter && (
-                      <button
-                        onClick={() => setMainDateFilter("")}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
+                      <button onClick={() => setMainDateFilter("")} className="text-gray-400 hover:text-gray-600">
                         <X className="w-4 h-4" />
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* Orders List */}
                 {filteredOrders.length === 0 ? (
                   <p className="text-gray-500 text-center py-8 bg-gray-50 rounded-lg">
-                    {orders.length === 0
-                      ? "No orders found for this customer."
-                      : "No orders match the selected date."}
+                    {orders.length === 0 ? "No orders found for this customer." : "No orders match the selected date."}
                   </p>
                 ) : (
                   <div className="space-y-4">
@@ -811,10 +589,7 @@ export default function CustomersPage() {
             )}
 
             <div className="border-t p-6 flex justify-end">
-              <button
-                onClick={closeHistory}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-              >
+              <button onClick={closeHistory} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
                 Close
               </button>
             </div>
@@ -826,17 +601,7 @@ export default function CustomersPage() {
 }
 
 // ==================== Stat Card Component ====================
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  color,
-}: {
-  label: string;
-  value: string | number;
-  icon: any;
-  color: string;
-}) {
+function StatCard({ label, value, icon: Icon, color }: { label: string; value: string | number; icon: any; color: string }) {
   return (
     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
       <div className="flex justify-between items-center">
@@ -853,23 +618,12 @@ function StatCard({
 }
 
 // ==================== Customer Card Component ====================
-function CustomerCard({
-  customer,
-  onViewHistory,
-}: {
-  customer: Customer;
-  onViewHistory: () => void;
-}) {
+function CustomerCard({ customer, onViewHistory }: { customer: Customer; onViewHistory: () => void }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 p-5">
-
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="text-lg font-bold text-gray-800">
-            {customer.name}
-          </h3>
-
+          <h3 className="text-lg font-bold text-gray-800">{customer.name}</h3>
           <div className="mt-1">
             {customer.isRegular ? (
               <span className="inline-flex items-center rounded-full bg-green-100 text-green-700 px-2.5 py-1 text-xs font-medium">
@@ -882,72 +636,39 @@ function CustomerCard({
             )}
           </div>
         </div>
-
-        <button
-          onClick={onViewHistory}
-          className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition"
-          title="View History"
-        >
+        <button onClick={onViewHistory} className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition" title="View History">
           <Eye className="w-5 h-5" />
         </button>
       </div>
 
-      {/* Customer Info */}
       <div className="mt-5 space-y-3 text-sm">
-
         <div className="flex items-center gap-2 text-gray-600">
           <Phone className="w-4 h-4 text-gray-400" />
           <span>{customer.phone}</span>
         </div>
-
         <div className="flex items-center gap-2 text-gray-600">
           <Mail className="w-4 h-4 text-gray-400" />
-          <span className="truncate">
-            {customer.email || "No Email"}
-          </span>
+          <span className="truncate">{customer.email || "No Email"}</span>
         </div>
-
         <div className="flex items-center gap-2 text-gray-600">
           <Calendar className="w-4 h-4 text-gray-400" />
-          <span>
-            {customer.lastVisit
-              ? new Date(customer.lastVisit).toLocaleDateString()
-              : "Never"}
-          </span>
+          <span>{customer.lastVisit ? new Date(customer.lastVisit).toLocaleDateString() : "Never"}</span>
         </div>
-
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mt-5 pt-5 border-t">
-
         <div className="text-center">
-          <p className="text-xl font-bold text-indigo-600">
-            {customer.totalOrders}
-          </p>
-          <p className="text-xs text-gray-500">
-            Orders
-          </p>
+          <p className="text-xl font-bold text-indigo-600">{customer.totalOrders}</p>
+          <p className="text-xs text-gray-500">Orders</p>
         </div>
-
         <div className="text-center">
-          <p className="text-xl font-bold text-green-600">
-            ₹{customer.totalSpent.toLocaleString()}
-          </p>
-          <p className="text-xs text-gray-500">
-            Spent
-          </p>
+          <p className="text-xl font-bold text-green-600">₹{customer.totalSpent.toLocaleString()}</p>
+          <p className="text-xs text-gray-500">Spent</p>
         </div>
-
         <div className="text-center">
-          <p className="text-xl font-bold text-orange-600">
-            {customer.orders?.length ?? 0}
-          </p>
-          <p className="text-xs text-gray-500">
-            Visits
-          </p>
+          <p className="text-xl font-bold text-orange-600">{customer.orders?.length ?? 0}</p>
+          <p className="text-xs text-gray-500">Visits</p>
         </div>
-
       </div>
     </div>
   );
@@ -956,11 +677,9 @@ function CustomerCard({
 // ==================== Order Card Component (in modal) ====================
 function OrderCard({ order }: { order: Order }) {
   const statusColors: Record<string, string> = {
-    pending:
-      "bg-yellow-50 text-yellow-800 ring-1 ring-inset ring-yellow-600/20",
+    pending: "bg-yellow-50 text-yellow-800 ring-1 ring-inset ring-yellow-600/20",
     preparing: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10",
-    ready:
-      "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",
+    ready: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",
     served: "bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-700/10",
     completed: "bg-gray-50 text-gray-600 ring-1 ring-inset ring-gray-500/10",
     cancelled: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/10",
@@ -970,18 +689,13 @@ function OrderCard({ order }: { order: Order }) {
     <div className="border rounded-lg p-4 bg-white">
       <div className="flex flex-wrap justify-between items-start gap-2 mb-3">
         <div>
-          <span className="font-mono text-sm font-semibold text-gray-800">
-            #{order._id.slice(-8)}
-          </span>
+          <span className="font-mono text-sm font-semibold text-gray-800">#{order._id.slice(-8)}</span>
           <span className="text-sm text-gray-500 ml-2 flex items-center gap-1">
             <Clock className="w-3 h-3" />
             {new Date(order.createdAt).toLocaleString()}
           </span>
         </div>
-        <span
-          className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[order.status] || "bg-gray-100 text-gray-700"
-            }`}
-        >
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[order.status] || "bg-gray-100 text-gray-700"}`}>
           {order.status}
         </span>
       </div>
@@ -998,23 +712,15 @@ function OrderCard({ order }: { order: Order }) {
           {order.items.map((item, idx) => (
             <tr key={idx} className="border-b last:border-0">
               <td className="px-2 py-1 text-gray-700">{item.name}</td>
-              <td className="px-2 py-1 text-center text-gray-700">
-                {item.quantity}
-              </td>
-              <td className="px-2 py-1 text-right text-gray-700">
-                ₹{item.price.toFixed(2)}
-              </td>
-              <td className="px-2 py-1 text-right text-gray-700">
-                ₹{(item.quantity * item.price).toFixed(2)}
-              </td>
+              <td className="px-2 py-1 text-center text-gray-700">{item.quantity}</td>
+              <td className="px-2 py-1 text-right text-gray-700">₹{item.price.toFixed(2)}</td>
+              <td className="px-2 py-1 text-right text-gray-700">₹{(item.quantity * item.price).toFixed(2)}</td>
             </tr>
           ))}
         </tbody>
       </table>
       <div className="flex justify-end text-sm border-t pt-2">
-        <span className="font-semibold text-gray-700">
-          Total: ₹{order.totalAmount.toFixed(2)}
-        </span>
+        <span className="font-semibold text-gray-700">Total: ₹{order.totalAmount.toFixed(2)}</span>
       </div>
     </div>
   );

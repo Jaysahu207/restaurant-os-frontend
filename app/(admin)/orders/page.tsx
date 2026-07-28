@@ -6,101 +6,35 @@ import {
   Clock,
   CheckCircle,
   ChefHat,
-  XCircle,
   Eye,
   Printer,
   Filter,
   X,
   RefreshCw,
   Calendar,
-  ChevronDown,
   TableIcon,
   User,
   Truck,
   ShoppingBag,
 } from "lucide-react";
-import {
-  getOrders,
-  printKOT,
-  updateOrderStatus as updateStatusAPI,
-  verifyPayment,
-} from "@/services/orderService";
+import { printKOT } from "@/services/orderService";
 import { io, Socket } from "socket.io-client";
 import { useAuthStore } from "@/store/useAuthStore";
 import toast from "react-hot-toast";
 import InvoiceTemplate from "@/components/invoice/InvoiceTemplate";
-import { generateInvoicePDF } from "@/utils/pdf/generateInvoicePDF";
 import { useReactToPrint } from "react-to-print";
 import { useNotificationStore } from "@/store/useNotificationStore";
-
-// ==================== Types ====================
-interface OrderItem {
-  _id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  specialInstructions?: string;
-}
-
-interface Order {
-  id: string;
-  customer: {
-    name: string;
-    phone: string;
-    email?: string;
-  };
-  orderNumber: string;
-  table: string;
-  orderType: "dine_in" | "takeaway" | "delivery";
-  items: OrderItem[];
-  total: number; // Grand total after all taxes (final amount)
-  subtotal: number; // Subtotal before taxes
-  cgstAmount: number; // CGST amount
-  sgstAmount: number; // SGST amount
-  serviceChargeAmount: number;
-  deliveryCharge: number;
-  deliveryDetails?: {
-    address: string;
-    landmark?: string;
-    city?: string;
-    pincode?: string;
-    charge: number;
-  };
-  invoiceNumber: string;
-  status: OrderStatus;
-  createdAt: string;
-  specialInstructions?: string;
-  paymentMethod?: "cash" | "upi";
-  paymentStatus?: "unpaid" | "pending" | "paid";
-}
-interface KOTItem {
-  _id?: string;
-  name: string;
-  quantity: number;
-  price?: number;
-  revision?: number;
-}
-
-interface KOTData {
-  orderId: string;
-  orderNumber: string;
-  batch: number;
-  tableNumber: number | null;
-  orderType: "dine_in" | "takeaway";
-  createdAt: string;
-  specialInstructions?: string;
-  items: KOTItem[];
-}
-type OrderStatus =
-  | "pending"
-  | "preparing"
-  | "ready"
-  | "served"
-  | "paid"
-  | "out_for_delivery"
-  | "delivered"
-  | "completed"
-  | "cancelled";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useOrders,
+  useUpdateOrderStatus,
+  useVerifyPayment,
+  mapOrder,
+  orderKeys,
+  type Order,
+  type OrderStatus,
+  getISTDateString,
+} from "@/hooks/useOrders";
 
 const statusColors: Record<OrderStatus, string> = {
   pending: "bg-yellow-100 text-yellow-700 border-yellow-200",
@@ -130,68 +64,72 @@ const statusLabels: Record<OrderStatus | "all", string> = {
 // ==================== Main Component ====================
 export default function OrdersPage() {
   const { restaurant } = useAuthStore();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const restaurantId = restaurant?._id;
+  const queryClient = useQueryClient();
+  const clearOrders = useNotificationStore((state) => state.clearOrders);
+
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [kotModalOpen, setKotModalOpen] = useState(false);
-
   const [kotData, setKotData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
+  const [soundEnabled] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(getISTDateString());
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const printRef = useRef<HTMLDivElement>(null);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0],
+  const key = orderKeys.list(restaurantId ?? "", selectedDate);
+
+  const { data: orders = [], isLoading, isFetching, refetch } = useOrders(
+    restaurantId,
+    selectedDate,
   );
-  // console.log("🚀 ~ file: page.tsx:101 ~ OrdersPage ~ orders:", orders);
-  // Load orders with optional date filter
-  const loadOrders = useCallback(async () => {
-    if (!restaurant?._id) return;
-    try {
-      setLoading(true);
-      const dateParam = selectedDate || undefined;
-      const data = await getOrders(restaurant._id, dateParam);
-      // console.log("Fetched orders -->>  ", data);
-      const formatted: Order[] = data.map((o: any) => mapOrder(o));
-      // console.log("Fetched orders -->>  ", formatted);
-      setOrders(formatted);
-    } catch (error) {
-      console.error("Failed to load orders:", error);
-      toast.error("Could not load orders");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [restaurant?._id, selectedDate]);
-  // console.log("🚀 ~ file: page.tsx:101 ~ OrdersPage ~ orders:", orders);
+  const updateStatusMutation = useUpdateOrderStatus(restaurantId, selectedDate);
+  const verifyPaymentMutation = useVerifyPayment();
+
   useEffect(() => {
-    loadOrders();
     clearOrders();
-  }, [loadOrders]);
-  const clearOrders = useNotificationStore((state) => state.clearOrders);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleRefresh = () => {
-    setRefreshing(true);
-    loadOrders();
+    refetch();
   };
 
-  // Real-time socket connection
-  useEffect(() => {
-    if (!restaurant?._id) return;
+  const playSound = useCallback(() => {
+    if (!soundEnabled || !audioRef.current) return;
+    audioRef.current.currentTime = 0;
+    audioRef.current.play().catch((err) => console.warn("Audio play failed:", err));
+  }, [soundEnabled]);
 
-    const socket = io(process.env.NEXT_PUBLIC_API_URL, {
+  useEffect(() => {
+    audioRef.current = new Audio("/sounds/new-order.mp3");
+    audioRef.current.load();
+  }, []);
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (audioRef.current) {
+        audioRef.current.play().then(() => audioRef.current?.pause()).catch(() => { });
+      }
+      window.removeEventListener("click", unlockAudio);
+    };
+    window.addEventListener("click", unlockAudio);
+    return () => window.removeEventListener("click", unlockAudio);
+  }, []);
+
+  // Real-time socket connection — updates the React Query cache directly
+  // instead of invalidating (so new/updated orders appear instantly, no refetch flash)
+  useEffect(() => {
+    if (!restaurantId) return;
+
+    const socket: Socket = io(process.env.NEXT_PUBLIC_API_URL, {
       withCredentials: true,
       transports: ["websocket"],
     });
-    socketRef.current = socket;
 
     socket.on("connect", () => {
-      // console.log("🟢 Admin socket connected:", socket.id);
-      socket.emit("joinRestaurant", restaurant._id);
+      socket.emit("joinRestaurant", restaurantId);
     });
 
     socket.on("connect_error", (err) => {
@@ -199,34 +137,32 @@ export default function OrdersPage() {
     });
 
     socket.on("NEW_ORDER", (newOrder: any) => {
-      const orderDate = new Date(newOrder.createdAt)
-        .toISOString()
-        .split("T")[0];
+      const orderDate = getISTDateString(new Date(newOrder.createdAt));
       if (selectedDate && orderDate !== selectedDate) return;
+
       const formattedOrder = mapOrder(newOrder);
-      setOrders((prev) => {
-        if (prev.find((o) => o.id === formattedOrder.id)) return prev;
-        return [formattedOrder, ...prev];
+      queryClient.setQueryData<Order[]>(key, (old) => {
+        if (!old) return old;
+        if (old.find((o) => o.id === formattedOrder.id)) return old;
+        return [formattedOrder, ...old];
       });
       playSound();
       toast.success(`New order #${newOrder.orderNumber.slice(-3)} received!`);
     });
 
     socket.on("ORDER_UPDATED", (updatedOrder: any) => {
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === String(updatedOrder._id)
-            ? mapOrder(updatedOrder)
-            : order,
-        ),
+      queryClient.setQueryData<Order[]>(key, (old) =>
+        old?.map((order) =>
+          order.id === String(updatedOrder._id) ? mapOrder(updatedOrder) : order,
+        ) ?? old,
       );
       playSound();
       toast.success(`Order #${updatedOrder.orderNumber.slice(-3)} updated!`);
     });
 
     socket.on("PAYMENT_UPDATED", (updatedOrder: any) => {
-      setOrders((prev) =>
-        prev.map((order) =>
+      queryClient.setQueryData<Order[]>(key, (old) =>
+        old?.map((order) =>
           order.id === updatedOrder._id
             ? {
               ...order,
@@ -234,75 +170,40 @@ export default function OrdersPage() {
               paymentMethod: updatedOrder.paymentMethod,
             }
             : order,
-        ),
+        ) ?? old,
       );
-      toast.success(
-        `Payment received for order #${updatedOrder._id.slice(-3)}`,
-      );
+      toast.success(`Payment received for order #${updatedOrder._id.slice(-3)}`);
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [restaurant?._id, selectedDate]);
+  }, [restaurantId, selectedDate, queryClient, playSound]);
+  // Note: `key` intentionally omitted from deps — it's derived from
+  // restaurantId/selectedDate which are already listed, and including
+  // the array itself would reconnect the socket every render.
 
-  const mapOrder = (o: any): Order => ({
-    id: o._id,
-    table: o.tableNumber,
-    orderType: o.orderType,
-    items: [...o.items],
-    total: o.finalAmount ?? o.totalAmount, // finalAmount is the grand total after taxes
-    subtotal: o.subtotal ?? o.totalAmount,
-    cgstAmount: o.cgstAmount ?? 0,
-    sgstAmount: o.sgstAmount ?? 0,
-    serviceChargeAmount: o.serviceChargeAmount ?? 0,
-    status: o.status,
-    invoiceNumber: o.invoiceNumber,
-    orderNumber: o.orderNumber,
-    paymentStatus: o.paymentStatus,
-    paymentMethod: o.paymentMethod,
-    createdAt: o.createdAt,
-    specialInstructions: o.specialInstructions,
-    customer: {
-      name: o.customerId?.name || "Guest",
-      phone: o.customerId?.phone || "",
-      email: o.customerId?.email || "",
-    },
-    deliveryCharge: o.deliveryCharge ?? "Free Delivery",
-    deliveryDetails: o.delivery
-      ? {
-        address: o.delivery.address?.house,
-        landmark: o.delivery.address?.landmark,
-        city: o.delivery.address?.city,
-        pincode: o.delivery.address?.pincode,
-        charge: o.delivery.deliveryCharge ?? 0,
-      }
-      : undefined,
-  });
-
-  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
-    try {
-      await updateStatusAPI(orderId, newStatus);
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId ? { ...order, status: newStatus } : order,
-        ),
-      );
-      if (selectedOrder?.id === orderId) {
-        setSelectedOrder({ ...selectedOrder, status: newStatus });
-      }
-      toast.success(`Order status updated to ${statusLabels[newStatus]}`);
-    } catch (error) {
-      console.error("Status update failed:", error);
-      toast.error("Failed to update status");
-      loadOrders();
-    }
+  const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
+    updateStatusMutation.mutate(
+      { orderId, status: newStatus },
+      {
+        onSuccess: () => {
+          if (selectedOrder?.id === orderId) {
+            setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : prev));
+          }
+          toast.success(`Order status updated to ${statusLabels[newStatus]}`);
+        },
+        onError: () => {
+          toast.error("Failed to update status");
+        },
+      },
+    );
   };
 
   const filteredOrders = orders
-    .filter((order) => filter === "all" || order.status === filter)
+    .filter((order = { status: "all" }) => filter === "all" || order.status === filter)
     .filter(
-      (order) =>
+      (order = { id: "", orderNumber: "", customer: { name: "" } }) =>
         order.id.toLowerCase().includes(search.toLowerCase()) ||
         order.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
         order.customer.name.toLowerCase().includes(search.toLowerCase()),
@@ -310,13 +211,13 @@ export default function OrdersPage() {
 
   const stats = {
     total: orders.length,
-    pending: orders.filter((o) => o.status === "pending").length,
-    preparing: orders.filter((o) => o.status === "preparing").length,
-    ready: orders.filter((o) => o.status === "ready").length,
-    served: orders.filter((o) => o.status === "served").length,
-    paid: orders.filter((o) => o.status === "paid").length,
-    completed: orders.filter((o) => o.status === "completed").length,
-    cancelled: orders.filter((o) => o.status === "cancelled").length,
+    pending: orders.filter((o: any) => o.status === "pending").length,
+    preparing: orders.filter((o: any) => o.status === "preparing").length,
+    ready: orders.filter((o: any) => o.status === "ready").length,
+    served: orders.filter((o: any) => o.status === "served").length,
+    paid: orders.filter((o: any) => o.status === "paid").length,
+    completed: orders.filter((o: any) => o.status === "completed").length,
+    cancelled: orders.filter((o: any) => o.status === "cancelled").length,
   };
 
   const openDetail = (order: Order) => {
@@ -327,7 +228,6 @@ export default function OrdersPage() {
   const openKOT = async (order: Order) => {
     try {
       const kot = await printKOT(order.id);
-
       setKotData(kot);
       setKotModalOpen(true);
     } catch (err) {
@@ -338,37 +238,17 @@ export default function OrdersPage() {
   const clearFilters = () => {
     setSearch("");
     setFilter("all");
-    setSelectedDate(new Date().toISOString().split("T")[0]);
+    setSelectedDate(getISTDateString());
   };
 
-  useEffect(() => {
-    const unlockAudio = () => {
-      if (audioRef.current) {
-        audioRef.current
-          .play()
-          .then(() => audioRef.current?.pause())
-          .catch(() => { });
-      }
-      window.removeEventListener("click", unlockAudio);
-    };
-    window.addEventListener("click", unlockAudio);
-    return () => window.removeEventListener("click", unlockAudio);
-  }, []);
+  const handleVerifyPayment = (orderId: string) => {
+    verifyPaymentMutation.mutate(orderId, {
+      onSuccess: () => updateOrderStatus(orderId, "completed"),
+      onError: () => toast.error("Payment verification failed"),
+    });
+  };
 
-  useEffect(() => {
-    audioRef.current = new Audio("/sounds/new-order.mp3");
-    audioRef.current.load();
-  }, []);
-
-  const playSound = useCallback(() => {
-    if (!soundEnabled || !audioRef.current) return;
-    audioRef.current.currentTime = 0;
-    audioRef.current
-      .play()
-      .catch((err) => console.warn("Audio play failed:", err));
-  }, [soundEnabled]);
-
-  if (loading && !refreshing) {
+  if (isLoading) {
     return <OrdersSkeleton />;
   }
 
@@ -376,14 +256,10 @@ export default function OrdersPage() {
     <div className="space-y-6 p-4 md:p-6 max-w-8xl mx-auto shadow-sm  bg-gray-50">
       {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {/* Left: Title + subtitle */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 tracking-tight">
-            Order Management
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Order Management</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {filteredOrders.length} order
-            {filteredOrders.length !== 1 ? "s" : ""} •{" "}
+            {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""} •{" "}
             {new Date().toLocaleDateString("en-IN", {
               weekday: "short",
               year: "numeric",
@@ -393,7 +269,6 @@ export default function OrdersPage() {
           </p>
         </div>
 
-        {/* Right: Refresh button + optional quick filter badge */}
         <div className="flex items-center gap-3">
           {filter !== "all" && (
             <span className="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
@@ -402,14 +277,14 @@ export default function OrdersPage() {
           )}
           <button
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={isFetching}
             className="relative p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition disabled:opacity-50 group"
             title="Refresh orders"
           >
             <RefreshCw
-              className={`w-5 h-5 ${refreshing ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`}
+              className={`w-5 h-5 ${isFetching ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`}
             />
-            {refreshing && (
+            {isFetching && (
               <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full animate-ping" />
             )}
           </button>
@@ -417,45 +292,13 @@ export default function OrdersPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4  ">
-        <StatCard
-          label="Total Orders"
-          value={stats.total}
-          icon={Clock}
-          color="bg-blue-500"
-        />
-        <StatCard
-          label="Pending"
-          value={stats.pending}
-          icon={Clock}
-          color="bg-yellow-500"
-          highlight={stats.pending > 0}
-        />
-        <StatCard
-          label="Preparing"
-          value={stats.preparing}
-          icon={ChefHat}
-          color="bg-indigo-500"
-        />
-        <StatCard
-          label="Ready"
-          value={stats.ready}
-          icon={CheckCircle}
-          color="bg-green-500"
-          highlight={stats.ready > 0}
-        />
-        <StatCard
-          label="Served"
-          value={stats.served}
-          icon={CheckCircle}
-          color="bg-purple-500"
-        />
-        <StatCard
-          label="Completed"
-          value={stats.completed}
-          icon={CheckCircle}
-          color="bg-gray-500"
-        />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <StatCard label="Total Orders" value={stats.total} icon={Clock} color="bg-blue-500" />
+        <StatCard label="Pending" value={stats.pending} icon={Clock} color="bg-yellow-500" highlight={stats.pending > 0} />
+        <StatCard label="Preparing" value={stats.preparing} icon={ChefHat} color="bg-indigo-500" />
+        <StatCard label="Ready" value={stats.ready} icon={CheckCircle} color="bg-green-500" highlight={stats.ready > 0} />
+        <StatCard label="Served" value={stats.served} icon={CheckCircle} color="bg-purple-500" />
+        <StatCard label="Completed" value={stats.completed} icon={CheckCircle} color="bg-gray-500" />
       </div>
 
       {/* Filters */}
@@ -482,9 +325,7 @@ export default function OrdersPage() {
               />
             </div>
             <button
-              onClick={() =>
-                setSelectedDate(new Date().toISOString().split("T")[0])
-              }
+              onClick={() => setSelectedDate(getISTDateString())}
               className="px-3 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600"
             >
               Today
@@ -499,46 +340,37 @@ export default function OrdersPage() {
         </div>
         <div className="flex items-center justify-between">
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {(
-              [
-                "all",
-                "pending",
-                "preparing",
-                "ready",
-                "served",
-                "completed",
-                "cancelled",
-              ] as const
-            ).map((status) => (
-              <button
-                key={status}
-                onClick={() => setFilter(status)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition flex items-center gap-2 ${filter === status
-                  ? "bg-orange-500 text-white shadow-sm"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-              >
-                {statusLabels[status]}
-                {status !== "all" && (
-                  <span
-                    className={`px-1.5 py-0.5 rounded-full text-xs ${filter === status ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"}`}
-                  >
-                    {stats[status]}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-          {(search ||
-            filter !== "all" ||
-            selectedDate !== new Date().toISOString().split("T")[0]) && (
-              <button
-                onClick={clearFilters}
-                className="ml-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
-              >
-                <X className="w-4 h-4" /> Clear
-              </button>
+            {(["all", "pending", "preparing", "ready", "served", "completed", "cancelled"] as const).map(
+              (status) => (
+                <button
+                  key={status}
+                  onClick={() => setFilter(status)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition flex items-center gap-2 ${filter === status
+                    ? "bg-orange-500 text-white shadow-sm"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                >
+                  {statusLabels[status]}
+                  {status !== "all" && (
+                    <span
+                      className={`px-1.5 py-0.5 rounded-full text-xs ${filter === status ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"
+                        }`}
+                    >
+                      {stats[status]}
+                    </span>
+                  )}
+                </button>
+              ),
             )}
+          </div>
+          {(search || filter !== "all" || selectedDate !== getISTDateString()) && (
+            <button
+              onClick={clearFilters}
+              className="ml-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
+            >
+              <X className="w-4 h-4" /> Clear
+            </button>
+          )}
         </div>
       </div>
 
@@ -550,13 +382,9 @@ export default function OrdersPage() {
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Filter className="w-8 h-8 text-gray-400" />
               </div>
-              <h3 className="text-lg font-medium text-gray-800 mb-2">
-                No orders found
-              </h3>
+              <h3 className="text-lg font-medium text-gray-800 mb-2">No orders found</h3>
               <p className="text-gray-500">
-                {search ||
-                  filter !== "all" ||
-                  selectedDate !== new Date().toISOString().split("T")[0]
+                {search || filter !== "all" || selectedDate !== getISTDateString()
                   ? "Try adjusting your filters or search criteria."
                   : "Waiting for new orders to arrive."}
               </p>
@@ -565,20 +393,17 @@ export default function OrdersPage() {
         ) : (
           <>
             <div className="text-sm text-gray-500 mb-2 ">
-              Showing {filteredOrders.length} order
-              {filteredOrders.length !== 1 ? "s" : ""}
+              Showing {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 ">
-              {filteredOrders.map((order) => (
+              {filteredOrders.map((order: Order) => (
                 <OrderCard
                   key={order.id}
                   order={order}
                   onViewDetails={() => openDetail(order)}
                   onKOT={() => openKOT(order)}
-                  onUpdateStatus={(newStatus) =>
-                    updateOrderStatus(order.id, newStatus)
-                  }
+                  onUpdateStatus={(newStatus) => updateOrderStatus(order.id, newStatus)}
+                  onVerifyPayment={() => handleVerifyPayment(order.id)}
                 />
               ))}
             </div>
@@ -591,23 +416,23 @@ export default function OrdersPage() {
         <OrderDetailModal
           order={selectedOrder}
           onClose={() => setDetailModalOpen(false)}
-          onUpdateStatus={(newStatus) =>
-            updateOrderStatus(selectedOrder.id, newStatus)
-          }
+          onUpdateStatus={(newStatus) => updateOrderStatus(selectedOrder.id, newStatus)}
           restaurantName={restaurant?.name}
         />
       )}
       {kotModalOpen && kotData && (
-        <KOTModal
-          kot={kotData}
-          restaurantName={restaurant?.name}
-          onClose={() => setKotModalOpen(false)}
-        />
+        <KOTModal kot={kotData} restaurantName={restaurant?.name} onClose={() => setKotModalOpen(false)} />
       )}
     </div>
   );
 }
 
+// ==================== Loading Skeleton, StatCard, OrderCard, OrderDetailModal, KOTModal ====================
+// unchanged from your original file — none of them touch data fetching directly.
+// Only the OrderCard's payment-verify button changes signature slightly:
+// it now calls the `onVerifyPayment` prop instead of inlining the
+// verifyPayment + updateOrderStatus calls itself, since that logic
+// moved into the mutation hook on the page.
 // ==================== Loading Skeleton ====================
 function OrdersSkeleton() {
   return (
@@ -688,11 +513,13 @@ function OrderCard({
   onViewDetails,
   onKOT,
   onUpdateStatus,
+  onVerifyPayment,
 }: {
   order: Order;
   onViewDetails: () => void;
   onKOT: () => void;
   onUpdateStatus: (status: OrderStatus) => void;
+  onVerifyPayment: () => void;
 }) {
   const allStatuses: OrderStatus[] =
     order.orderType === "delivery"
@@ -872,10 +699,7 @@ function OrderCard({
 
             {order.paymentStatus === "paid" && order.status !== "completed" && (
               <button
-                onClick={async () => {
-                  await verifyPayment(order.id);
-                  onUpdateStatus("completed");
-                }}
+                onClick={onVerifyPayment}
                 className="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-1.5"
               >
                 ✅ Verify Payment
@@ -992,7 +816,7 @@ function KOTModal({
   onClose,
   restaurantName = "Your Restaurant",
 }: {
-  kot: KOTData;
+  kot: any;
   onClose: () => void;
   restaurantName?: string;
 }) {
@@ -1069,11 +893,11 @@ function KOTModal({
           </div>
 
           <div className="border-y border-dashed py-3 space-y-2">
-            {kot.items.map((item) => (
+            {kot.items.map((item: any) => (
               <div key={item._id ?? item.name} className="flex gap-2">
-                <span className="font-bold min-w-[28px]">{item.quantity}x</span>
+                <span className="font-bold min-w-7">{item.quantity}x</span>
 
-                <span className="flex-1 break-words">{item.name}</span>
+                <span className="flex-1 wrap-break">{item.name}</span>
               </div>
             ))}
           </div>
