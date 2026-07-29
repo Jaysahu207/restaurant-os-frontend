@@ -18,6 +18,8 @@ export const createMenuItem = async (formData: FormData) => {
   return res.data;
 };
 
+
+
 // ✅ Update menu item
 export const updateMenuItem = async (id: string, formData: FormData) => {
   // console.log("📡 Sending FormData...");
@@ -35,5 +37,16 @@ export const deleteMenuItem = async (id: string) => {
 
   // console.log("📡 API Response:", res);
 
+  return res.data;
+};
+
+
+// ✅ Generate AI Menu Description
+export const generateMenuDescription = async (data: {
+  name: string;
+  category?: string;
+  type?: string;
+}) => {
+  const res = await API.post("/api/ai/generate-description", data);
   return res.data;
 };

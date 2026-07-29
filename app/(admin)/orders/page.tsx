@@ -80,10 +80,12 @@ export default function OrdersPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const key = orderKeys.list(restaurantId ?? "", selectedDate);
 
-  const { data: orders = [], isLoading, isFetching, refetch } = useOrders(
-    restaurantId,
-    selectedDate,
-  );
+  const {
+    data: orders = [],
+    isLoading,
+    isFetching,
+    refetch,
+  } = useOrders(restaurantId, selectedDate);
   const updateStatusMutation = useUpdateOrderStatus(restaurantId, selectedDate);
   const verifyPaymentMutation = useVerifyPayment();
 
@@ -99,7 +101,9 @@ export default function OrdersPage() {
   const playSound = useCallback(() => {
     if (!soundEnabled || !audioRef.current) return;
     audioRef.current.currentTime = 0;
-    audioRef.current.play().catch((err) => console.warn("Audio play failed:", err));
+    audioRef.current
+      .play()
+      .catch((err) => console.warn("Audio play failed:", err));
   }, [soundEnabled]);
 
   useEffect(() => {
@@ -110,7 +114,10 @@ export default function OrdersPage() {
   useEffect(() => {
     const unlockAudio = () => {
       if (audioRef.current) {
-        audioRef.current.play().then(() => audioRef.current?.pause()).catch(() => { });
+        audioRef.current
+          .play()
+          .then(() => audioRef.current?.pause())
+          .catch(() => {});
       }
       window.removeEventListener("click", unlockAudio);
     };
@@ -151,28 +158,36 @@ export default function OrdersPage() {
     });
 
     socket.on("ORDER_UPDATED", (updatedOrder: any) => {
-      queryClient.setQueryData<Order[]>(key, (old) =>
-        old?.map((order) =>
-          order.id === String(updatedOrder._id) ? mapOrder(updatedOrder) : order,
-        ) ?? old,
+      queryClient.setQueryData<Order[]>(
+        key,
+        (old) =>
+          old?.map((order) =>
+            order.id === String(updatedOrder._id)
+              ? mapOrder(updatedOrder)
+              : order,
+          ) ?? old,
       );
       playSound();
       toast.success(`Order #${updatedOrder.orderNumber.slice(-3)} updated!`);
     });
 
     socket.on("PAYMENT_UPDATED", (updatedOrder: any) => {
-      queryClient.setQueryData<Order[]>(key, (old) =>
-        old?.map((order) =>
-          order.id === updatedOrder._id
-            ? {
-              ...order,
-              paymentStatus: updatedOrder.paymentStatus,
-              paymentMethod: updatedOrder.paymentMethod,
-            }
-            : order,
-        ) ?? old,
+      queryClient.setQueryData<Order[]>(
+        key,
+        (old) =>
+          old?.map((order) =>
+            order.id === updatedOrder._id
+              ? {
+                  ...order,
+                  paymentStatus: updatedOrder.paymentStatus,
+                  paymentMethod: updatedOrder.paymentMethod,
+                }
+              : order,
+          ) ?? old,
       );
-      toast.success(`Payment received for order #${updatedOrder._id.slice(-3)}`);
+      toast.success(
+        `Payment received for order #${updatedOrder._id.slice(-3)}`,
+      );
     });
 
     return () => {
@@ -189,7 +204,9 @@ export default function OrdersPage() {
       {
         onSuccess: () => {
           if (selectedOrder?.id === orderId) {
-            setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : prev));
+            setSelectedOrder((prev) =>
+              prev ? { ...prev, status: newStatus } : prev,
+            );
           }
           toast.success(`Order status updated to ${statusLabels[newStatus]}`);
         },
@@ -201,7 +218,10 @@ export default function OrdersPage() {
   };
 
   const filteredOrders = orders
-    .filter((order = { status: "all" }) => filter === "all" || order.status === filter)
+    .filter(
+      (order = { status: "all" }) =>
+        filter === "all" || order.status === filter,
+    )
     .filter(
       (order = { id: "", orderNumber: "", customer: { name: "" } }) =>
         order.id.toLowerCase().includes(search.toLowerCase()) ||
@@ -255,136 +275,331 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6 p-4 md:p-6 max-w-8xl mx-auto shadow-sm  bg-gray-50">
       {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Order Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""} •{" "}
-            {new Date().toLocaleDateString("en-IN", {
-              weekday: "short",
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            })}
-          </p>
-        </div>
+      {/* Header */}
+      <div className="rounded-xl border border-gray-100 bg-white px-3 py-3 shadow-sm sm:px-5 sm:py-4">
+        {/* Top Row */}
+        <div className="flex items-start justify-between gap-3">
+          {/* Title Section */}
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold tracking-tight text-gray-800 sm:text-xl lg:text-2xl">
+              Order Management
+            </h1>
 
-        <div className="flex items-center gap-3">
-          {filter !== "all" && (
-            <span className="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
-              Filtered: {filter}
-            </span>
-          )}
+            <p className="mt-1 truncate text-xs text-gray-500 sm:text-sm">
+              {filteredOrders.length} order
+              {filteredOrders.length !== 1 ? "s" : ""} •{" "}
+              {new Date().toLocaleDateString("en-IN", {
+                weekday: "short",
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </p>
+          </div>
+
+          {/* Refresh Button */}
           <button
             onClick={handleRefresh}
             disabled={isFetching}
-            className="relative p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition disabled:opacity-50 group"
+            className="
+        relative
+        flex
+        h-9
+        w-9
+        shrink-0
+        items-center
+        justify-center
+        rounded-lg
+        text-gray-600
+        transition
+        hover:bg-gray-100
+        disabled:opacity-50
+
+        sm:h-10
+        sm:w-10
+        sm:rounded-xl
+      "
             title="Refresh orders"
           >
             <RefreshCw
-              className={`w-5 h-5 ${isFetching ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`}
+              className={`
+          h-4
+          w-4
+          sm:h-5
+          sm:w-5
+          ${
+            isFetching
+              ? "animate-spin"
+              : "transition-transform duration-500 hover:rotate-180"
+          }
+        `}
             />
+
             {isFetching && (
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full animate-ping" />
+              <span className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-blue-500 animate-ping" />
             )}
           </button>
         </div>
+
+        {/* Filter Badge */}
+        {filter !== "all" && (
+          <div className="mt-3">
+            <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700 sm:px-3 sm:text-xs">
+              Filtered: {filter}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatCard label="Total Orders" value={stats.total} icon={Clock} color="bg-blue-500" />
-        <StatCard label="Pending" value={stats.pending} icon={Clock} color="bg-yellow-500" highlight={stats.pending > 0} />
-        <StatCard label="Preparing" value={stats.preparing} icon={ChefHat} color="bg-indigo-500" />
-        <StatCard label="Ready" value={stats.ready} icon={CheckCircle} color="bg-green-500" highlight={stats.ready > 0} />
-        <StatCard label="Served" value={stats.served} icon={CheckCircle} color="bg-purple-500" />
-        <StatCard label="Completed" value={stats.completed} icon={CheckCircle} color="bg-gray-500" />
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <StatCard
+          label="Total Orders"
+          value={stats.total}
+          icon={Clock}
+          color="bg-blue-500"
+        />
+
+        <StatCard
+          label="Pending"
+          value={stats.pending}
+          icon={Clock}
+          color="bg-yellow-500"
+          highlight={stats.pending > 0}
+        />
+
+        <StatCard
+          label="Preparing"
+          value={stats.preparing}
+          icon={ChefHat}
+          color="bg-indigo-500"
+        />
+
+        <StatCard
+          label="Ready"
+          value={stats.ready}
+          icon={CheckCircle}
+          color="bg-green-500"
+          highlight={stats.ready > 0}
+        />
+
+        <StatCard
+          label="Served"
+          value={stats.served}
+          icon={CheckCircle}
+          color="bg-purple-500"
+        />
+
+        <StatCard
+          label="Completed"
+          value={stats.completed}
+          icon={CheckCircle}
+          color="bg-gray-500"
+        />
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm space-y-4">
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+      <div className="rounded-xl bg-white p-3 shadow-sm">
+        {/* Search + Date */}
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+
             <input
               type="text"
-              placeholder="Search by Order No. or Customer..."
+              placeholder="Search order..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+              className="
+          h-9
+          w-full
+          rounded-lg
+          border
+          border-gray-300
+          bg-gray-50
+          pl-9
+          pr-3
+          text-xs
+          text-gray-700
+          focus:border-orange-500
+          focus:ring-2
+          focus:ring-orange-100
+        "
             />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+
+          {/* Date Actions */}
+          <div className="flex gap-2">
+            <div className="relative flex-1 sm:flex-none">
+              <Calendar className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="
+            h-9
+            w-full
+            rounded-lg
+            border
+            border-gray-300
+            pl-8
+            pr-2
+            text-xs
+            text-gray-700
+          "
               />
             </div>
+
             <button
               onClick={() => setSelectedDate(getISTDateString())}
-              className="px-3 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600"
+              className="
+          h-9
+          rounded-lg
+          bg-orange-500
+          px-3
+          text-xs
+          font-medium
+          text-white
+          hover:bg-orange-600
+        "
             >
               Today
             </button>
+
             <button
               onClick={() => setSelectedDate("")}
-              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
+              className="
+          h-9
+          rounded-lg
+          bg-gray-100
+          px-3
+          text-xs
+          font-medium
+          text-gray-700
+          hover:bg-gray-200
+        "
             >
-              All Dates
+              All
             </button>
           </div>
         </div>
-        <div className="flex items-center justify-between">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {(["all", "pending", "preparing", "ready", "served", "completed", "cancelled"] as const).map(
-              (status) => (
-                <button
-                  key={status}
-                  onClick={() => setFilter(status)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition flex items-center gap-2 ${filter === status
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
-                >
-                  {statusLabels[status]}
-                  {status !== "all" && (
-                    <span
-                      className={`px-1.5 py-0.5 rounded-full text-xs ${filter === status ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"
-                        }`}
-                    >
-                      {stats[status]}
-                    </span>
-                  )}
-                </button>
-              ),
-            )}
+
+        {/* Status Filters */}
+        <div className="mt-3 flex items-center gap-2 ">
+          <div
+            className="
+    flex
+    flex-1
+    gap-1.5
+    overflow-x-auto
+    pb-1
+    [-ms-overflow-style:none]
+    [scrollbar-width:none]
+    [&::-webkit-scrollbar]:hidden
+  "
+          >
+            {(
+              [
+                "all",
+                "pending",
+                "preparing",
+                "ready",
+                "served",
+                "completed",
+                "cancelled",
+              ] as const
+            ).map((status) => (
+              <button
+                key={status}
+                onClick={() => setFilter(status)}
+                className={`
+            flex
+            shrink-0
+            items-center
+            gap-1
+            rounded-full
+            px-3
+            py-1.5
+            text-[11px]
+            font-medium
+            capitalize
+            transition
+
+            ${
+              filter === status
+                ? "bg-orange-500 text-white shadow-sm"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }
+          `}
+              >
+                {statusLabels[status]}
+
+                {status !== "all" && (
+                  <span
+                    className={`
+                rounded-full
+                px-1.5
+                text-[10px]
+
+                ${
+                  filter === status
+                    ? "bg-white/20 text-white"
+                    : "bg-gray-200 text-gray-600"
+                }
+              `}
+                  >
+                    {stats[status]}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
-          {(search || filter !== "all" || selectedDate !== getISTDateString()) && (
+
+          {/* Clear */}
+          {(search ||
+            filter !== "all" ||
+            selectedDate !== getISTDateString()) && (
             <button
               onClick={clearFilters}
-              className="ml-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
+              className="
+          flex
+          shrink-0
+          items-center
+          gap-1
+          rounded-lg
+          px-2
+          py-1.5
+          text-xs
+          text-gray-600
+          hover:bg-gray-100
+        "
             >
-              <X className="w-4 h-4" /> Clear
+              <X className="h-3.5 w-3.5" />
+              Clear
             </button>
           )}
         </div>
       </div>
 
       {/* Orders List */}
-      <div className="space-y-4  p-4 rounded-xl shadow-sm">
+      <div className="rounded-xl p-2 sm:p-4">
         {filteredOrders.length === 0 ? (
-          <div className="bg-white p-12 rounded-xl text-center shadow-sm border border-gray-100">
-            <div className="max-w-md mx-auto">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Filter className="w-8 h-8 text-gray-400" />
+          <div className="rounded-xl border border-gray-100 bg-white p-8 text-center shadow-sm sm:p-12">
+            <div className="mx-auto max-w-md">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 sm:h-16 sm:w-16">
+                <Filter className="h-6 w-6 text-gray-400 sm:h-8 sm:w-8" />
               </div>
-              <h3 className="text-lg font-medium text-gray-800 mb-2">No orders found</h3>
-              <p className="text-gray-500">
-                {search || filter !== "all" || selectedDate !== getISTDateString()
+
+              <h3 className="mb-1 text-base font-medium text-gray-800 sm:text-lg">
+                No orders found
+              </h3>
+
+              <p className="text-xs text-gray-500 sm:text-sm">
+                {search ||
+                filter !== "all" ||
+                selectedDate !== getISTDateString()
                   ? "Try adjusting your filters or search criteria."
                   : "Waiting for new orders to arrive."}
               </p>
@@ -392,17 +607,31 @@ export default function OrdersPage() {
           </div>
         ) : (
           <>
-            <div className="text-sm text-gray-500 mb-2 ">
-              Showing {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
+            <div className="mb-2 text-xs text-gray-500 sm:text-sm">
+              Showing {filteredOrders.length} order
+              {filteredOrders.length !== 1 ? "s" : ""}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 ">
+
+            <div
+              className="
+          grid
+          grid-cols-2
+          gap-3
+
+          sm:grid-cols-2
+          lg:grid-cols-3
+          2xl:grid-cols-4
+        "
+            >
               {filteredOrders.map((order: Order) => (
                 <OrderCard
                   key={order.id}
                   order={order}
                   onViewDetails={() => openDetail(order)}
                   onKOT={() => openKOT(order)}
-                  onUpdateStatus={(newStatus) => updateOrderStatus(order.id, newStatus)}
+                  onUpdateStatus={(newStatus) =>
+                    updateOrderStatus(order.id, newStatus)
+                  }
                   onVerifyPayment={() => handleVerifyPayment(order.id)}
                 />
               ))}
@@ -410,29 +639,28 @@ export default function OrdersPage() {
           </>
         )}
       </div>
-
       {/* Modals */}
       {detailModalOpen && selectedOrder && (
         <OrderDetailModal
           order={selectedOrder}
           onClose={() => setDetailModalOpen(false)}
-          onUpdateStatus={(newStatus) => updateOrderStatus(selectedOrder.id, newStatus)}
+          onUpdateStatus={(newStatus) =>
+            updateOrderStatus(selectedOrder.id, newStatus)
+          }
           restaurantName={restaurant?.name}
         />
       )}
       {kotModalOpen && kotData && (
-        <KOTModal kot={kotData} restaurantName={restaurant?.name} onClose={() => setKotModalOpen(false)} />
+        <KOTModal
+          kot={kotData}
+          restaurantName={restaurant?.name}
+          onClose={() => setKotModalOpen(false)}
+        />
       )}
     </div>
   );
 }
 
-// ==================== Loading Skeleton, StatCard, OrderCard, OrderDetailModal, KOTModal ====================
-// unchanged from your original file — none of them touch data fetching directly.
-// Only the OrderCard's payment-verify button changes signature slightly:
-// it now calls the `onVerifyPayment` prop instead of inlining the
-// verifyPayment + updateOrderStatus calls itself, since that logic
-// moved into the mutation hook on the page.
 // ==================== Loading Skeleton ====================
 function OrdersSkeleton() {
   return (
@@ -477,6 +705,7 @@ function OrdersSkeleton() {
 }
 
 // ==================== Stat Card ====================
+// ==================== Stat Card ====================
 function StatCard({
   label,
   value,
@@ -492,22 +721,65 @@ function StatCard({
 }) {
   return (
     <div
-      className={`bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition border ${highlight ? "border-orange-200 ring-1 ring-orange-200" : "border-gray-100"}`}
+      className={`
+        rounded-lg 
+        border 
+        bg-white 
+        p-2
+        shadow-sm
+        transition
+        hover:shadow-md
+
+        sm:p-3
+        lg:p-4
+
+        ${
+          highlight
+            ? "border-orange-200 ring-1 ring-orange-200"
+            : "border-gray-100"
+        }
+      `}
     >
-      <div className="flex justify-between items-center">
-        <div>
-          <p className="text-xs text-gray-500">{label}</p>
-          <p className="text-2xl font-bold text-gray-800">{value}</p>
+      <div className="flex items-center justify-between gap-1">
+        {/* Text */}
+        <div className="min-w-0">
+          <p className="truncate text-[9px] font-medium text-gray-500 sm:text-xs">
+            {label}
+          </p>
+
+          <p className="text-base font-bold text-gray-800 sm:text-xl lg:text-2xl">
+            {value}
+          </p>
         </div>
-        <div className={`p-2 rounded-full ${color} text-white`}>
-          <Icon className="w-4 h-4" />
+
+        {/* Icon */}
+        <div
+          className={`
+            flex
+            h-6
+            w-6
+            shrink-0
+            items-center
+            justify-center
+            rounded-full
+            text-white
+
+            sm:h-8
+            sm:w-8
+
+            lg:h-10
+            lg:w-10
+
+            ${color}
+          `}
+        >
+          <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
         </div>
       </div>
     </div>
   );
 }
 
-// ==================== Order Card (Polished) ====================
 function OrderCard({
   order,
   onViewDetails,
@@ -524,90 +796,103 @@ function OrderCard({
   const allStatuses: OrderStatus[] =
     order.orderType === "delivery"
       ? [
-        "pending",
-        "preparing",
-        "out_for_delivery",
-        "delivered",
-        "completed",
-        "cancelled",
-      ]
+          "pending",
+          "preparing",
+          "out_for_delivery",
+          "delivered",
+          "completed",
+          "cancelled",
+        ]
       : [
-        "pending",
-        "preparing",
-        "ready",
-        "served",
-        "paid",
-        "completed",
-        "cancelled",
-      ];
+          "pending",
+          "preparing",
+          "ready",
+          "served",
+          "paid",
+          "completed",
+          "cancelled",
+        ];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition h-full flex flex-col">
-      {/* Top accent border based on status */}
+    <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-sm transition hover:shadow-md">
+      {/* Status line */}
       <div
-        className={`h-1 w-full rounded-t-xl ${statusColors[order.status].split(" ")[0]}`}
+        className={`h-1 w-full ${statusColors[order.status].split(" ")[0]}`}
       />
 
-      <div className="p-5 flex flex-col gap-5 flex-1">
-        {/* ---------- TOP ROW: Order ID, status, time & quick actions ---------- */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono font-bold text-sm text-gray-900">
+      <div className="flex flex-1 flex-col gap-3 p-3 sm:gap-5 sm:p-5">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-mono text-xs font-bold text-gray-900 sm:text-sm">
               #{order.orderNumber?.slice(-3)}
             </span>
+
             <span
-              className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${statusColors[order.status]}`}
+              className={`
+                rounded-full 
+                border
+                px-2
+                py-0.5
+                text-[10px]
+                font-semibold
+                sm:text-xs
+                ${statusColors[order.status]}
+              `}
             >
               {statusLabels[order.status]}
             </span>
-            <span className="text-xs text-gray-500 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5" />
-              {new Date(order.createdAt).toLocaleString()}
+
+            <span className="flex items-center gap-1 text-[10px] text-gray-500 sm:text-xs">
+              <Clock className="h-3 w-3" />
+              {new Date(order.createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </span>
           </div>
 
-          {/* View & KOT buttons */}
-          <div className="flex items-center gap-1">
+          {/* Actions */}
+          <div className="flex gap-1">
             <button
               onClick={onViewDetails}
-              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-              title="View Details"
+              className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"
             >
-              <Eye className="w-4.5 h-4.5" />
+              <Eye className="h-4 w-4" />
             </button>
+
             <button
               onClick={onKOT}
-              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
-              title="Print KOT"
+              className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50"
             >
-              <Printer className="w-4.5 h-4.5" />
+              <Printer className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* ---------- MIDDLE SECTION: Customer + Billing (grid) ---------- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Customer details */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
-              <User className="w-4 h-4 text-gray-400" />
-              {order.customer.name}
+        {/* Customer + Billing */}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {/* Customer */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-gray-800">
+              <User className="h-3.5 w-3.5 text-gray-400" />
+              <span className="truncate">{order.customer.name}</span>
             </div>
 
-            <div className="flex items-center gap-4 text-xs text-gray-500">
+            <div className="flex flex-wrap gap-3 text-[11px] text-gray-500">
               {order.orderType === "delivery" ? (
-                <span className="flex items-center gap-1.5">
-                  <Truck className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1">
+                  <Truck className="h-3 w-3" />
                   Delivery
                 </span>
               ) : order.orderType === "takeaway" ? (
-                <span className="flex items-center gap-1.5">
-                  <ShoppingBag className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1">
+                  <ShoppingBag className="h-3 w-3" />
                   Takeaway
                 </span>
               ) : (
-                <span className="flex items-center gap-1.5">
-                  <TableIcon className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1">
+                  <TableIcon className="h-3 w-3" />
                   Table {order.table}
                 </span>
               )}
@@ -616,79 +901,63 @@ function OrderCard({
             </div>
 
             {order.specialInstructions && (
-              <p className="text-xs italic text-gray-400 wrap-break-words">
+              <p className="line-clamp-1 text-[11px] italic text-gray-400">
                 💬 {order.specialInstructions}
               </p>
             )}
 
-            {/* Delivery address (if applicable) */}
             {order.orderType === "delivery" &&
               order.deliveryDetails?.address && (
-                <div className="mt-1 rounded-md border border-orange-100 bg-orange-50 px-3 py-2 text-xs text-gray-600 space-y-0.5">
-                  <p>📍 {order.deliveryDetails.address}</p>
-                  {order.deliveryDetails.landmark && (
-                    <p>{order.deliveryDetails.landmark}</p>
-                  )}
-                  <p>
-                    {order.deliveryDetails.city} -{" "}
-                    {order.deliveryDetails.pincode}
-                  </p>
+                <div className="rounded-md bg-orange-50 px-2 py-1.5 text-[11px] text-gray-600">
+                  📍 {order.deliveryDetails.address}
                 </div>
               )}
           </div>
 
-          {/* Billing (styled like a receipt) */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm space-y-1">
-            <div className="flex justify-between text-xs text-gray-500">
+          {/* Billing */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-xs space-y-1 sm:p-4">
+            <div className="flex justify-between text-gray-500">
               <span>Subtotal</span>
-              <span>₹{order.subtotal.toFixed(2)}</span>
+              <span>₹{order.subtotal.toFixed(0)}</span>
             </div>
+
             {order.cgstAmount > 0 && (
-              <div className="flex justify-between text-xs text-gray-500">
+              <div className="flex justify-between text-gray-500">
                 <span>CGST</span>
-                <span>₹{order.cgstAmount.toFixed(2)}</span>
-              </div>
-            )}
-            {order.sgstAmount > 0 && (
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>SGST</span>
-                <span>₹{order.sgstAmount.toFixed(2)}</span>
-              </div>
-            )}
-            {order.serviceChargeAmount > 0 && (
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Service</span>
-                <span>₹{order.serviceChargeAmount.toFixed(2)}</span>
+                <span>₹{order.cgstAmount.toFixed(0)}</span>
               </div>
             )}
 
-            {order.orderType === "delivery" && (
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Delivery</span>
-                <span>
-                  {order.deliveryCharge > 0 ? (
-                    `₹${order.deliveryCharge.toFixed(2)}`
-                  ) : (
-                    <span className="font-semibold text-green-600">FREE</span>
-                  )}
-                </span>
+            {order.sgstAmount > 0 && (
+              <div className="flex justify-between text-gray-500">
+                <span>SGST</span>
+                <span>₹{order.sgstAmount.toFixed(0)}</span>
               </div>
             )}
-            <div className="flex justify-between font-bold text-gray-800 border-t border-gray-300 pt-2 mt-2">
+
+            <div className="mt-1 flex justify-between border-t pt-1.5 font-bold text-gray-800">
               <span>Total</span>
-              <span>₹{order.total.toFixed(2)}</span>
+
+              <span>₹{order.total.toFixed(0)}</span>
             </div>
           </div>
         </div>
 
-        {/* ---------- BOTTOM ROW: Status control + badges ---------- */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100 mt-auto">
-          {/* Left: status dropdown & verify payment button */}
-          <div className="flex flex-wrap items-center gap-2">
+        {/* Bottom actions */}
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t pt-2">
+          <div className="flex flex-wrap gap-2">
             <select
               value={order.status}
               onChange={(e) => onUpdateStatus(e.target.value as OrderStatus)}
-              className="text-xs border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="
+                h-8
+                rounded-lg
+                border
+                border-gray-300
+                bg-white
+                px-2
+                text-xs
+              "
             >
               {allStatuses.map((status) => (
                 <option key={status} value={status}>
@@ -700,23 +969,35 @@ function OrderCard({
             {order.paymentStatus === "paid" && order.status !== "completed" && (
               <button
                 onClick={onVerifyPayment}
-                className="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-1.5"
+                className="
+                  h-8
+                  rounded-lg
+                  bg-green-600
+                  px-2.5
+                  text-xs
+                  font-medium
+                  text-white
+                "
               >
-                ✅ Verify Payment
+                Verify
               </button>
             )}
           </div>
 
-          {/* Right: payment method & status badges */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-1.5">
             {order.paymentMethod && (
-              <span className="px-2.5 py-1 text-xs bg-green-100 text-green-700 rounded-full font-medium">
+              <span
+                className="
+                rounded-full
+                bg-green-100
+                px-2
+                py-1
+                text-[10px]
+                font-medium
+                text-green-700
+              "
+              >
                 {order.paymentMethod.toUpperCase()}
-              </span>
-            )}
-            {order.paymentStatus === "paid" && order.status !== "completed" && (
-              <span className="px-2.5 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full font-medium">
-                ⏳ Awaiting Verification
               </span>
             )}
           </div>

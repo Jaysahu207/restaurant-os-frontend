@@ -16,7 +16,10 @@ import {
   ShoppingBag,
   Truck,
 } from "lucide-react";
+
+
 import QRCode from "react-qr-code";
+
 import { toPng } from "html-to-image";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -39,9 +42,9 @@ export default function TablesPage() {
 
   const [copiedType, setCopiedType] = useState("");
 
-  const restaurantId = useAuthStore((state) => state.restaurant?._id); // Get restaurant ID from auth store
-  const slug = useAuthStore((state) => state.restaurant?.slug) || ""; // Get restaurant ID from auth store
-  // Fetch Tables
+  const restaurantId = useAuthStore((state) => state.restaurant?._id);
+  const slug = useAuthStore((state) => state.restaurant?.slug) || "";
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["tables"],
     queryFn: () => getTables(restaurantId),
@@ -49,7 +52,6 @@ export default function TablesPage() {
 
   const tables = data?.data || [];
 
-  // Create Table
   const createMutation = useMutation({
     mutationFn: createTable,
     onSuccess: () => {
@@ -62,7 +64,6 @@ export default function TablesPage() {
     },
   });
 
-  // Update Table
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       updateTable(id, data),
@@ -76,7 +77,6 @@ export default function TablesPage() {
     },
   });
 
-  // Delete Table
   const deleteMutation = useMutation({
     mutationFn: deleteTable,
     onSuccess: () => {
@@ -87,15 +87,14 @@ export default function TablesPage() {
       toast.error(error?.message || "Failed to delete table");
     },
   });
+
   const copyLink = async (url: string, type: "takeaway" | "delivery") => {
     await navigator.clipboard.writeText(url);
-
     setCopiedType(type);
-
     toast.success("Copied!");
-
     setTimeout(() => setCopiedType(""), 2000);
   };
+
   const getQRUrl = (tableNumber: number) => {
     return `${process.env.NEXT_PUBLIC_FRONTEND_URL}/menu/${slug}?table=${tableNumber}`;
   };
@@ -105,75 +104,73 @@ export default function TablesPage() {
   const getDeliveryQRUrl = () => {
     return `${process.env.NEXT_PUBLIC_FRONTEND_URL}/menu/${slug}?mode=delivery`;
   };
-  // Download QR as PNG
-  const downloadQR = useCallback(async (id: string, tableNumber: number) => {
-    const element = document.getElementById(`qr-${id}`);
-    if (!element) return;
 
+  const downloadHighQualityQR = async (
+    elementId: string,
+    fileName: string
+  ) => {
     try {
-      toast.loading("Generating QR code...", { id: "qr-download" });
-      const dataUrl = await toPng(element, {
-        quality: 1,
-        pixelRatio: 2,
+      const element = document.getElementById(elementId);
+
+      if (!element) return;
+
+      toast.loading("Downloading high-quality QR...", {
+        id: "qr-download",
       });
-      const link = document.createElement("a");
-      link.download = `table-${tableNumber}-qr.png`;
-      link.href = dataUrl;
-      link.click();
-      toast.success("QR code downloaded!", { id: "qr-download" });
-    } catch (error) {
-      toast.error("Failed to download QR code", { id: "qr-download" });
-    }
-  }, []);
-  const downloadTakeawayQR = useCallback(async () => {
-    const element = document.getElementById(`takeaway-qr`);
-    if (!element) return;
-
-    try {
-      toast.loading("Generating QR code...", { id: "qr-download" });
-      const dataUrl = await toPng(element, {
-        quality: 1,
-        pixelRatio: 2,
-      });
-      const link = document.createElement("a");
-      link.download = `${slug}-takeaway-qr.png`;
-      link.href = dataUrl;
-      link.click();
-      toast.success("QR code downloaded!", { id: "qr-download" });
-    } catch (error) {
-      toast.error("Failed to download QR code", { id: "qr-download" });
-    }
-  }, []);
-  const downloadDeliveryQR = useCallback(async () => {
-    const element = document.getElementById("delivery-qr");
-    if (!element) return;
-
-    try {
-      toast.loading("Generating QR...", { id: "qr-download" });
 
       const dataUrl = await toPng(element, {
+        cacheBust: true,
+        pixelRatio: 8,
+        backgroundColor: "#ffffff",
+        canvasWidth: 4096,
+        canvasHeight: 4096,
         quality: 1,
-        pixelRatio: 2,
       });
 
       const link = document.createElement("a");
-      link.download = `${slug}-delivery-qr.png`;
       link.href = dataUrl;
+      link.download = `${fileName}.png`;
       link.click();
 
       toast.success("QR downloaded", {
         id: "qr-download",
       });
-    } catch {
+    } catch (err) {
+      console.error(err);
+
       toast.error("Download failed", {
         id: "qr-download",
       });
     }
-  }, []);
-  // Copy QR URL to clipboard
+  };
+
+
+  const downloadTableQR = useCallback(
+    async (tableId: string, tableNumber: number) => {
+      await downloadHighQualityQR(
+        `qr-${tableId}`,
+        `table-${tableNumber}-qr`
+      );
+    },
+    []
+  );
+
+  const downloadTakeawayQR = useCallback(async () => {
+    await downloadHighQualityQR(
+      "takeaway-qr",
+      `${slug}-takeaway-qr`
+    );
+  }, [slug]);
+
+  const downloadDeliveryQR = useCallback(async () => {
+    await downloadHighQualityQR(
+      "delivery-qr",
+      `${slug}-delivery-qr`
+    );
+  }, [slug]);
+
   const copyQRUrl = useCallback(async (tableNumber: number, id: string) => {
     const url = getQRUrl(tableNumber);
-    // console.log(url);
     try {
       await navigator.clipboard.writeText(url);
       setCopiedId(id);
@@ -184,11 +181,9 @@ export default function TablesPage() {
     }
   }, []);
 
-  // Handle form submit (create or update)
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
     if (!formData.number || !formData.capacity) {
       toast.error("Please fill all fields");
       return;
@@ -218,7 +213,6 @@ export default function TablesPage() {
         capacity,
         restaurantId,
       });
-      // console.log(tableNumber, capacity, restaurantId);
     }
   };
 
@@ -269,12 +263,10 @@ export default function TablesPage() {
     setFormData({ number: "", capacity: "" });
   };
 
-  // Loading state
   if (isLoading) {
     return <TableQRSkeleton />;
   }
 
-  // Error state
   if (error) {
     return (
       <div className="text-center py-12">
@@ -284,133 +276,132 @@ export default function TablesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 p-6">
-      <div className=" mx-auto space-y-8">
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 p-3 sm:p-4 md:p-5">
+      <div className="mx-auto space-y-4 md:space-y-5">
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold bg-linear-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+            <h1 className="text-xl sm:text-2xl font-bold bg-linear-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
               QR & Table Management
             </h1>
-            <p className="text-gray-600 mt-1">
-              Generate and manage QR codes for dine-in, takeaway and delivery
-              ordering.
+            <p className="text-xs text-gray-600 mt-0.5">
+              Generate and manage QR codes for dine-in, takeaway and delivery ordering.
             </p>
           </div>
           <button
             onClick={openAddModal}
-            className="bg-linear-to-br from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-500 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200 font-medium"
+            className="bg-linear-to-br from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-500 text-white px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm hover:shadow transition-all duration-200 font-medium text-sm"
           >
-            <Plus size={20} />
+            <Plus size={16} />
             Add New Table
           </button>
         </div>
 
         {/* Tables Grid */}
         {tables.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-200">
-            <TableIcon className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">
+          <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
+            <TableIcon className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+            <h3 className="text-lg font-semibold text-gray-700 mb-1">
               No tables yet
             </h3>
-            <p className="text-gray-500 mb-6">
+            <p className="text-sm text-gray-500 mb-4">
               Get started by adding your first table
             </p>
             <button
               onClick={openAddModal}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg inline-flex items-center gap-2 hover:bg-blue-700 transition-colors"
+              className="bg-blue-600 text-white px-5 py-2 rounded-lg inline-flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm"
             >
-              <Plus size={18} />
+              <Plus size={16} />
               Add Table
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
             {tables.map((table: any) => (
               <div
                 key={table._id}
-                className="group bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-blue-200"
+                className="group bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border border-gray-200 hover:border-orange-200"
               >
                 {/* Card Header */}
-                <div className="bg-linear-to-r from-gray-800 to-gray-900 px-5 py-4 text-white">
+                <div className="bg-linear-to-r from-gray-800 to-gray-900 px-3.5 py-3 text-white">
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <TableIcon size={20} className="text-orange-400" />
-                        <h3 className="font-bold text-xl">
+                      <div className="flex items-center gap-1.5">
+                        <TableIcon size={16} className="text-orange-400" />
+                        <h3 className="font-bold text-base">
                           Table {table.tableNumber}
                         </h3>
                       </div>
-                      <div className="flex items-center gap-1 mt-1 text-gray-300 text-sm">
-                        <Users size={14} />
+                      <div className="flex items-center gap-1 mt-0.5 text-gray-300 text-xs">
+                        <Users size={12} />
                         <span>Capacity: {table.capacity} guests</span>
                       </div>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-0.5">
                       <button
                         onClick={() => openEditModal(table)}
-                        className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                        className="p-1 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
                         title="Edit table"
                       >
-                        <Edit size={16} />
+                        <Edit size={14} />
                       </button>
                       <button
                         onClick={() =>
                           deleteTableHandler(table._id, table.tableNumber)
                         }
-                        className="p-1.5 rounded-lg bg-white/10 hover:bg-red-500/50 transition-colors"
+                        className="p-1 rounded-lg bg-white/10 hover:bg-red-500/50 transition-colors"
                         title="Delete table"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
                 </div>
 
                 {/* QR Code Section */}
-                <div className="p-5 flex flex-col items-center border-b border-gray-100">
+                <div className="p-3 flex flex-col items-center border-b border-gray-100">
                   <div className="relative">
-                    <div className="absolute -inset-1 bg-white rounded-xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                    <div className="absolute -inset-1 bg-white rounded-lg blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
                     <div
                       id={`qr-${table._id}`}
-                      className="relative bg-white p-3 rounded-xl shadow-sm"
+                      className="relative bg-white p-2 rounded-lg shadow-sm"
                     >
                       <QRCode
                         value={getQRUrl(table.tableNumber)}
-                        size={160}
+                        size={120}
                         bgColor="#FFFFFF"
                         fgColor="#111827"
                         level="H"
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-3 flex items-center gap-1">
-                    <QrCode size={12} />
+                  <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
+                    <QrCode size={10} />
                     Scan to view menu
                   </p>
                 </div>
 
                 {/* Actions */}
-                <div className="p-4 flex justify-center gap-3">
+                <div className="p-3 flex justify-center gap-2">
                   <button
-                    onClick={() => downloadQR(table._id, table.tableNumber)}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors font-medium text-sm"
+                    onClick={() => downloadTableQR(table._id, table.tableNumber)}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors font-medium text-xs"
                   >
-                    <Download size={16} />
+                    <Download size={13} />
                     Download
                   </button>
                   <button
                     onClick={() => copyQRUrl(table.tableNumber, table._id)}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors font-medium text-sm"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors font-medium text-xs"
                   >
                     {copiedId === table._id ? (
                       <>
-                        <Check size={16} className="text-green-600" />
+                        <Check size={13} className="text-green-600" />
                         Copied!
                       </>
                     ) : (
                       <>
-                        <Copy size={16} />
+                        <Copy size={13} />
                         Copy URL
                       </>
                     )}
@@ -422,40 +413,37 @@ export default function TablesPage() {
         )}
 
         {/* Online Ordering QR Codes */}
-        <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-900">
               Online Ordering QR Codes
             </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Share these QR codes or links to let customers place takeaway and
-              delivery orders directly from their phones.
+            <p className="text-xs text-gray-500 mt-0.5">
+              Share these QR codes or links to let customers place takeaway and delivery orders directly.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Takeaway QR */}
-            <div className="border border-gray-200 rounded-2xl p-5 hover:shadow-lg transition-all duration-300">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-                  <ShoppingBag className="w-5 h-5 text-orange-600" />
+            <div className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all duration-200">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                  <ShoppingBag className="w-4 h-4 text-orange-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Takeaway QR</h3>
-                  <p className="text-xs text-gray-500">
-                    Customers can order for pickup
-                  </p>
+                  <h3 className="font-semibold text-gray-900 text-sm">Takeaway QR</h3>
+                  <p className="text-[10px] text-gray-500">Customers order for pickup</p>
                 </div>
               </div>
 
               <div className="flex justify-center">
                 <div
                   id="takeaway-qr"
-                  className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm"
+                  className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm"
                 >
                   <QRCode
                     value={getTakeawayQRUrl()}
-                    size={170}
+                    size={130}
                     bgColor="#FFFFFF"
                     fgColor="#111827"
                     level="H"
@@ -463,27 +451,26 @@ export default function TablesPage() {
                 </div>
               </div>
 
-              <div className="mt-5 flex gap-3">
+              <div className="mt-4 flex gap-2">
                 <button
                   onClick={downloadTakeawayQR}
-                  className="flex-1 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-xl transition"
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg transition text-sm font-medium"
                 >
-                  <Download size={18} />
+                  <Download size={15} />
                   Download
                 </button>
-
                 <button
                   onClick={() => copyLink(getTakeawayQRUrl(), "takeaway")}
-                  className="flex-1 flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 py-2.5 rounded-xl transition"
+                  className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 hover:bg-gray-50 py-2 rounded-lg transition text-sm font-medium"
                 >
                   {copiedType === "takeaway" ? (
                     <>
-                      <Check size={18} />
+                      <Check size={15} />
                       Copied
                     </>
                   ) : (
                     <>
-                      <Copy size={18} />
+                      <Copy size={15} />
                       Copy Link
                     </>
                   )}
@@ -492,27 +479,25 @@ export default function TablesPage() {
             </div>
 
             {/* Delivery QR */}
-            <div className="border border-gray-200 rounded-2xl p-5 hover:shadow-lg transition-all duration-300">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-                  <Truck className="w-5 h-5 text-green-600" />
+            <div className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all duration-200">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                  <Truck className="w-4 h-4 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Delivery QR</h3>
-                  <p className="text-xs text-gray-500">
-                    Customers can order home delivery
-                  </p>
+                  <h3 className="font-semibold text-gray-900 text-sm">Delivery QR</h3>
+                  <p className="text-[10px] text-gray-500">Customers order home delivery</p>
                 </div>
               </div>
 
               <div className="flex justify-center">
                 <div
                   id="delivery-qr"
-                  className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm"
+                  className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm"
                 >
                   <QRCode
                     value={getDeliveryQRUrl()}
-                    size={170}
+                    size={130}
                     bgColor="#FFFFFF"
                     fgColor="#111827"
                     level="H"
@@ -520,27 +505,26 @@ export default function TablesPage() {
                 </div>
               </div>
 
-              <div className="mt-5 flex gap-3">
+              <div className="mt-4 flex gap-2">
                 <button
                   onClick={downloadDeliveryQR}
-                  className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl transition"
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg transition text-sm font-medium"
                 >
-                  <Download size={18} />
+                  <Download size={15} />
                   Download
                 </button>
-
                 <button
                   onClick={() => copyLink(getDeliveryQRUrl(), "delivery")}
-                  className="flex-1 flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 py-2.5 rounded-xl transition"
+                  className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 hover:bg-gray-50 py-2 rounded-lg transition text-sm font-medium"
                 >
                   {copiedType === "delivery" ? (
                     <>
-                      <Check size={18} />
+                      <Check size={15} />
                       Copied
                     </>
                   ) : (
                     <>
-                      <Copy size={18} />
+                      <Copy size={15} />
                       Copy Link
                     </>
                   )}
@@ -552,93 +536,93 @@ export default function TablesPage() {
       </div>
 
       {/* Modal for Add/Edit */}
-      {isModalOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
-          onClick={closeModal}
-        >
+      {
+        isModalOpen && (
           <div
-            className="bg-white rounded-2xl shadow-2xl max-w-md w-full transform transition-all animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 animate-in fade-in duration-200"
+            onClick={closeModal}
           >
-            {/* Modal Header */}
-            <div className="flex justify-between items-center p-6 border-b border-gray-100">
-              <h2 className="text-2xl font-bold bg-linear-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                {editingTable
-                  ? `Edit Table ${editingTable.tableNumber}`
-                  : "Add New Table"}
-              </h2>
-              <button
-                onClick={closeModal}
-                className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <X size={24} className="text-gray-500" />
-              </button>
-            </div>
-
-            {/* Modal Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Table Number
-                </label>
-                <input
-                  type="number"
-                  placeholder="e.g., 1, 2, 3..."
-                  value={formData.number}
-                  onChange={(e) =>
-                    setFormData({ ...formData, number: e.target.value })
-                  }
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  required
-                  min="1"
-                  step="1"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Capacity (guests)
-                </label>
-                <input
-                  type="number"
-                  placeholder="e.g., 2, 4, 6..."
-                  value={formData.capacity}
-                  onChange={(e) =>
-                    setFormData({ ...formData, capacity: e.target.value })
-                  }
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  required
-                  min="1"
-                  step="1"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
+            <div
+              className="bg-white rounded-xl shadow-xl max-w-md w-full transform transition-all animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center p-4 border-b border-gray-100">
+                <h2 className="text-lg font-bold bg-linear-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                  {editingTable
+                    ? `Edit Table ${editingTable.tableNumber}`
+                    : "Add New Table"}
+                </h2>
                 <button
-                  type="button"
                   onClick={closeModal}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                  className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={
-                    createMutation.isPending || updateMutation.isPending
-                  }
-                  className="flex-1 px-4 py-2.5 bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {(createMutation.isPending || updateMutation.isPending) && (
-                    <Loader2 size={18} className="animate-spin" />
-                  )}
-                  {editingTable ? "Update Table" : "Create Table"}
+                  <X size={20} className="text-gray-500" />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleSubmit} className="p-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Table Number
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 1, 2, 3..."
+                    value={formData.number}
+                    onChange={(e) =>
+                      setFormData({ ...formData, number: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all text-sm"
+                    required
+                    min="1"
+                    step="1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Capacity (guests)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 2, 4, 6..."
+                    value={formData.capacity}
+                    onChange={(e) =>
+                      setFormData({ ...formData, capacity: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all text-sm"
+                    required
+                    min="1"
+                    step="1"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={
+                      createMutation.isPending || updateMutation.isPending
+                    }
+                    className="flex-1 px-4 py-2 bg-linear-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-lg font-medium shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                  >
+                    {(createMutation.isPending || updateMutation.isPending) && (
+                      <Loader2 size={16} className="animate-spin" />
+                    )}
+                    {editingTable ? "Update Table" : "Create Table"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }

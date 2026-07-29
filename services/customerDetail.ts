@@ -64,6 +64,7 @@ export const getCustomerById = async (customerId: string) => {
 export const getCustomerHistory = async (customerId: string) => {
     try {
         const res = await PublicAPI.get(`api/customers/history/${customerId}`);
+        // console.log(res.data);
         return res.data;
     } catch (error) {
         console.error("❌ getCustomerHistory error:", error);

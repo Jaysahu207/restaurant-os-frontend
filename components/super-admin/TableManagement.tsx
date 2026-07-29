@@ -15,6 +15,7 @@ import {
   Loader2,
   LayoutGrid,
   List,
+  Search,
 } from "lucide-react";
 
 type TableStatus = "available" | "occupied" | "reserved";
@@ -195,158 +196,206 @@ export default function TableManagement({
 
   return (
     <div className="">
+
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-            <UtensilsCrossed className="w-7 h-7 text-orange-500" />
-            Table Management
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Real‑time overview of all tables
-          </p>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        {/* Left Side */}
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-100">
+            <UtensilsCrossed className="h-5 w-5 text-orange-600" />
+          </div>
+
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-bold text-gray-900 sm:text-xl lg:text-2xl">
+              Table Management
+            </h1>
+
+            <p className="text-[11px] text-gray-500 sm:text-xs">
+              Real-time overview of all restaurant tables
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Right Side */}
+        <div className="flex shrink-0 items-center gap-2">
           <button
-            onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-            className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition"
+            onClick={() =>
+              setViewMode(viewMode === "grid" ? "list" : "grid")
+            }
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white shadow-sm transition hover:bg-gray-50"
+            title={viewMode === "grid" ? "List View" : "Grid View"}
           >
             {viewMode === "grid" ? (
-              <List className="w-5 h-5" />
+              <List className="h-4 w-4 text-gray-600" />
             ) : (
-              <LayoutGrid className="w-5 h-5" />
+              <LayoutGrid className="h-4 w-4 text-gray-600" />
             )}
           </button>
+
           <button
             onClick={() => fetchTables(true)}
             disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-white border rounded-xl shadow-sm hover:bg-gray-50 disabled:opacity-50"
+            className="flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-xs sm:text-sm font-medium shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <RefreshCw
-              className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
+              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""
+                }`}
             />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div className="bg-blue-200 rounded-2xl p-4 text-center">
-          <p className="text-2xl font-bold">{stats.total}</p>
-          <p className="text-xs text-gray-500">Total Tables</p>
+      <div className="mb-3 grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2 shadow-sm">
+          <p className="text-center text-base sm:text-lg lg:text-xl font-bold text-blue-700 leading-none">
+            {stats.total}
+          </p>
+          <p className="mt-1 truncate text-center text-[9px] sm:text-[10px] lg:text-xs font-medium text-blue-600">
+            Total Tables
+          </p>
         </div>
-        <div className="bg-emerald-200 rounded-2xl p-4 text-center">
-          <p className="text-2xl font-bold text-emerald-700">
+
+        <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-2 shadow-sm">
+          <p className="text-center text-base sm:text-lg lg:text-xl font-bold text-emerald-700 leading-none">
             {stats.available}
           </p>
-          <p className="text-xs text-emerald-600">Available</p>
+          <p className="mt-1 truncate text-center text-[9px] sm:text-[10px] lg:text-xs font-medium text-emerald-600">
+            Available
+          </p>
         </div>
-        <div className="bg-rose-200 rounded-2xl p-4 text-center">
-          <p className="text-2xl font-bold text-rose-700">{stats.occupied}</p>
-          <p className="text-xs text-rose-600">Occupied</p>
+
+        <div className="rounded-lg border border-rose-100 bg-rose-50 px-2.5 py-2 shadow-sm">
+          <p className="text-center text-base sm:text-lg lg:text-xl font-bold text-rose-700 leading-none">
+            {stats.occupied}
+          </p>
+          <p className="mt-1 truncate text-center text-[9px] sm:text-[10px] lg:text-xs font-medium text-rose-600">
+            Occupied
+          </p>
         </div>
-        <div className="bg-amber-200 rounded-2xl p-4 text-center">
-          <p className="text-2xl font-bold text-amber-700">{stats.reserved}</p>
-          <p className="text-xs text-amber-600">Reserved</p>
+
+        <div className="rounded-lg border border-amber-100 bg-amber-50 px-2.5 py-2 shadow-sm">
+          <p className="text-center text-base sm:text-lg lg:text-xl font-bold text-amber-700 leading-none">
+            {stats.reserved}
+          </p>
+          <p className="mt-1 truncate text-center text-[9px] sm:text-[10px] lg:text-xs font-medium text-amber-600">
+            Reserved
+          </p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <input
-          type="text"
-          placeholder="Search table number..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="px-4 py-2 border rounded-xl w-full sm:w-64 text-sm"
-        />
-        <div className="flex gap-2">
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        {/* Search */}
+        <div className="relative w-full md:w-64 lg:w-72">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+
+          <input
+            type="text"
+            placeholder="Search table..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-sm shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+          />
+        </div>
+
+        {/* Status Filters */}
+        <div className="flex flex-wrap items-center gap-2">
           {(["all", "available", "occupied", "reserved"] as const).map(
             (status) => (
               <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
-                className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition ${filterStatus === status
-                  ? "bg-orange-500 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                className={`h-8 rounded-full px-3 text-xs font-medium capitalize transition-all duration-200 ${filterStatus === status
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                   }`}
               >
                 {status}
               </button>
-            ),
+            )
           )}
         </div>
       </div>
 
-      {/* Tables Grid / List */}
+      {/* ----- TABLES ----- */}
       {filteredTables.length === 0 ? (
-        <div className="text-center py-16 text-gray-400 bg-gray-50 rounded-2xl">
-          <UtensilsCrossed className="w-12 h-12 mx-auto mb-2 opacity-40" />
-          <p>No tables match the criteria</p>
+        <div className="flex flex-col items-center justify-center py-12 text-gray-400 bg-gray-50 rounded-2xl border border-gray-200">
+          <UtensilsCrossed className="h-12 w-12 mb-2 opacity-40" />
+          <p className="text-sm font-medium">No tables match the criteria</p>
+          <p className="text-xs">Try adjusting your filters</p>
         </div>
-      ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {filteredTables.map((table) => {
             const statusStyle = getStatusUI(table.status);
             const totalItems = getTotalItems(table.currentOrder);
+            const isAvailable = table.status === 'available';
+
             return (
               <div
                 key={table.tableNumber}
                 onClick={() => {
-                  if (table.status === "available" && onTableClick) {
+                  if (isAvailable && onTableClick) {
                     onTableClick(table);
                   }
                 }}
-                className={`rounded-2xl border shadow-sm hover:shadow-md transition-all duration-200 ${statusStyle.bg} ${statusStyle.border}`}
+                className={`rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${statusStyle.bg} ${statusStyle.border}`}
               >
-                <div className="p-5">
-                  <div className="flex justify-between items-start">
+                <div className="p-3 space-y-2">
+                  <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="text-xl font-bold">
+                      <h3 className="text-sm font-bold text-gray-800">
                         Table {table.tableNumber}
                       </h3>
                       <div
-                        className={`flex items-center gap-1 mt-1 text-sm ${statusStyle.text}`}
+                        className={`flex items-center gap-1 text-xs font-medium ${statusStyle.text}`}
                       >
                         {statusStyle.icon}
                         <span>{statusStyle.label}</span>
                       </div>
                     </div>
-                    {table.status !== "available" && (
+                    {!isAvailable && (
                       <button
-                        onClick={() => freeTable(table.tableNumber)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          freeTable(table.tableNumber);
+                        }}
                         disabled={actionLoading}
-                        className="text-red-500 hover:bg-red-50 p-1 rounded-full transition"
+                        className="text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50 transition"
                         title="Free table"
                       >
-                        <XCircle className="w-5 h-5" />
+                        <XCircle className="h-4 w-4" />
                       </button>
                     )}
                   </div>
 
                   {table.currentOrder && (
-                    <div className="mt-4 bg-white/70 backdrop-blur-sm rounded-xl p-3 text-sm space-y-1">
-                      <p className="font-semibold">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-lg p-2.5 text-xs space-y-1 border border-gray-200/60">
+                      <p className="font-semibold text-gray-700">
                         Order #{table.currentOrder.orderNumber}
                       </p>
-                      <p className="capitalize">
-                        Status: {table.currentOrder.status}
+                      <p className="text-gray-500 capitalize">
+                        {table.currentOrder.status}
                       </p>
-                      <p>Items: {totalItems}</p>
-                      {table.currentOrder.totalAmount && (
-                        <p className="font-medium">
-                          ₹{table.currentOrder.finalAmount}
-                        </p>
-                      )}
+                      <p className="text-gray-500">
+                        Items: {totalItems}
+                        {table.currentOrder.finalAmount && (
+                          <span className="ml-2 font-medium text-orange-600">
+                            ₹{table.currentOrder.finalAmount}
+                          </span>
+                        )}
+                      </p>
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setSelectedTable(table);
                           setShowModal(true);
                         }}
-                        className="mt-2 w-full flex items-center justify-center gap-1 text-orange-600 text-xs font-medium bg-orange-50 py-1.5 rounded-lg"
+                        className="mt-1 w-full flex items-center justify-center gap-1 text-orange-600 text-xs font-medium bg-orange-50/80 py-1 rounded-lg hover:bg-orange-100 transition"
                       >
-                        <Eye className="w-3 h-3" /> View Details
+                        <Eye className="h-3 w-3" /> View Details
                       </button>
                     </div>
                   )}
@@ -356,57 +405,66 @@ export default function TableManagement({
           })}
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border overflow-hidden">
-          <div className="divide-y">
+        // ----- LIST VIEW -----
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100">
             {filteredTables.map((table) => {
               const statusStyle = getStatusUI(table.status);
               const totalItems = getTotalItems(table.currentOrder);
+              const isAvailable = table.status === 'available';
+
               return (
                 <div
                   key={table.tableNumber}
-                  className="flex items-center justify-between p-4 hover:bg-gray-50"
+                  className="flex flex-wrap items-center gap-2 px-3 py-2 hover:bg-gray-50 transition"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center font-bold text-gray-700">
+                  <div className="flex items-center gap-3 flex-1 min-w-[120px]">
+                    <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center font-bold text-sm text-gray-700">
                       {table.tableNumber}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold">
+                        <span className="font-semibold text-sm">
                           Table {table.tableNumber}
                         </span>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.text}`}
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusStyle.bg} ${statusStyle.text}`}
                         >
                           {statusStyle.label}
                         </span>
                       </div>
                       {table.currentOrder && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Order #{table.currentOrder.orderNumber} • {totalItems}{" "}
+                        <p className="text-xs text-gray-500">
+                          Order #{table.currentOrder.orderNumber} · {totalItems}{' '}
                           items
+                          {table.currentOrder.finalAmount && (
+                            <span className="ml-2 font-medium text-orange-600">
+                              ₹{table.currentOrder.finalAmount}
+                            </span>
+                          )}
                         </p>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 ml-auto">
                     {table.currentOrder && (
                       <button
                         onClick={() => {
                           setSelectedTable(table);
                           setShowModal(true);
                         }}
-                        className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200"
+                        className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="h-4 w-4" />
                       </button>
                     )}
-                    {table.status !== "available" && (
+                    {!isAvailable && (
                       <button
                         onClick={() => freeTable(table.tableNumber)}
-                        className="p-2 rounded-xl text-red-600 hover:bg-red-50"
+                        disabled={actionLoading}
+                        className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition"
                       >
-                        <XCircle className="w-4 h-4" />
+                        <XCircle className="h-4 w-4" />
                       </button>
                     )}
                   </div>
@@ -416,6 +474,7 @@ export default function TableManagement({
           </div>
         </div>
       )}
+
 
       {/* Order Details Modal */}
       {showModal && selectedTable && selectedTable.currentOrder && (

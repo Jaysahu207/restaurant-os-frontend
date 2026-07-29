@@ -2,31 +2,75 @@ import { useQuery } from "@tanstack/react-query";
 import { getDashboardData } from "@/services/dashboardService";
 
 export interface DashboardData {
-    revenue: { total: number; trend: number };
-    ordersToday: { count: number; trend: number };
-    customers: { count: number; trend: number };
-    menuItems: number;
+    revenue: {
+        today: number;
+        yesterday: number;
+        trend: number;
+    };
+
+    orders: {
+        today: number;
+        trend: number;
+    };
+
+    customers: {
+        today: number;
+        returning: number;
+    };
+
+    averageOrderValue: number;
+
+    paymentAnalytics: {
+        cash: {
+            count: number;
+            amount: number;
+        };
+        upi: {
+            count: number;
+            amount: number;
+        };
+        pending: {
+            count: number;
+            amount: number;
+        };
+    };
+
+    orderTypes: {
+        dine_in: number;
+        takeaway: number;
+        delivery: number;
+    };
+
     orderStatus: {
         pending: number;
         preparing: number;
         ready: number;
         served: number;
         completed: number;
+        cancelled: number;
     };
-    recentOrders: RecentOrder[];
+
+    menuItems: number;
+
     topItems: TopItem[];
-    revenueByDay: { day: string; amount: number }[];
+
+    recentOrders: RecentOrder[];
+
+    hourlySales: HourlySales[];
 }
 
+// Matches the actual payload: customer name, order type, flat amount,
+// and payment method (nullable — an order can still be pending payment).
 export interface RecentOrder {
     id: string;
     orderNumber: string;
-    finalAmount: number;
-    afterTax: number;
+    customer: string;
     table: number;
+    type: "dine_in" | "takeaway" | "delivery";
     items: number;
-    total: number;
-    status: "pending" | "preparing" | "ready" | "served" | "paid" | "completed";
+    amount: number;
+    payment: "cash" | "upi" | null;
+    status: "pending" | "preparing" | "ready" | "served" | "completed" | "cancelled";
     time: string;
 }
 
@@ -34,6 +78,12 @@ export interface TopItem {
     name: string;
     quantity: number;
     revenue: number;
+}
+
+export interface HourlySales {
+    hour: number;
+    amount: number;
+    orders: number;
 }
 
 export const dashboardKeys = {

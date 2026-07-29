@@ -108,80 +108,111 @@ function BannerModal({
     }
   };
 
+  // --- RENDER with compact design ---
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
-          <h3 className="text-xl font-bold text-gray-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-3 sm:p-4">
+      <div className="w-full max-w-lg max-h-[95vh] overflow-y-auto rounded-xl bg-white shadow-xl border border-gray-200">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+          <h3 className="text-base font-bold text-gray-800">
             {banner ? "Edit Banner" : "Create New Banner"}
           </h3>
-          <button onClick={onClose} className="rounded-xl p-2 text-gray-500 transition hover:bg-gray-100">
-            <X size={20} />
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition"
+          >
+            <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+          {/* Title */}
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Title *</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Title <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               name="title"
               value={formData.title}
               onChange={handleChange}
               placeholder="Summer Sale"
-              className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
               required
             />
           </div>
 
+          {/* Subtitle */}
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Subtitle (optional)</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Subtitle
+            </label>
             <input
               type="text"
               name="subtitle"
               value={formData.subtitle}
               onChange={handleChange}
               placeholder="Get 20% off on all orders"
-              className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
             />
           </div>
 
+          {/* Description */}
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Description</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Description
+            </label>
             <textarea
-              rows={3}
+              rows={2}
               name="description"
               value={formData.description}
               onChange={handleChange}
               placeholder="Describe your offer..."
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 resize-none"
+              className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 resize-none"
             />
           </div>
 
+          {/* Image Upload */}
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Banner Image *</label>
-            <div className="flex items-center gap-4">
-              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm text-gray-600 transition hover:bg-gray-50">
-                <Upload size={16} />
-                Upload Image
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Banner Image <span className="text-red-500">*</span>
+            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition">
+                <Upload size={14} />
+                Upload
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
               </label>
-              <p className="text-xs text-gray-500 mt-1">Recommended size: 1200 × 600 px (2:1 ratio)</p>
+              <span className="text-xs text-gray-400">
+                Recommended: 1200×600px (2:1)
+              </span>
             </div>
             {imagePreview && (
-              <div className="mt-3">
-                <img src={imagePreview} alt="Preview" className="h-32 w-full rounded-xl object-cover border border-gray-200" />
+              <div className="mt-2">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="h-24 w-full rounded-lg object-cover border border-gray-200"
+                />
               </div>
             )}
           </div>
 
+          {/* Type */}
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Banner Type</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Banner Type
+            </label>
             <select
               name="type"
               value={formData.type}
               onChange={handleChange}
-              className="w-full rounded-xl border border-gray-300 px-4 py-2.5"
+              className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-orange-400"
             >
               <option value="offer">Offer</option>
               <option value="combo">Combo</option>
@@ -192,36 +223,38 @@ function BannerModal({
             </select>
           </div>
 
-          <div className="border-t pt-5">
-            <h4 className="font-semibold text-gray-800 mb-4">Schedule</h4>
-            <div className="grid grid-cols-2 gap-4">
+          {/* Schedule (optional) */}
+          <div className="border-t border-gray-100 pt-3">
+            <h4 className="text-xs font-semibold text-gray-700 mb-2">Schedule (optional)</h4>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block mb-1 text-sm font-semibold">Start Date</label>
+                <label className="block text-xs text-gray-500 mb-0.5">Start Date</label>
                 <input
                   type="date"
                   name="startDate"
                   value={formData.startDate}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-orange-400"
                 />
               </div>
               <div>
-                <label className="block mb-1 text-sm font-semibold">End Date</label>
+                <label className="block text-xs text-gray-500 mb-0.5">End Date</label>
                 <input
                   type="date"
                   name="endDate"
                   value={formData.endDate}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-orange-400"
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl border p-4">
+          {/* Active toggle */}
+          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-3">
             <div>
-              <h4 className="font-medium">Active Banner</h4>
-              <p className="text-sm text-gray-500">Visible to customers</p>
+              <h4 className="text-sm font-medium text-gray-800">Active</h4>
+              <p className="text-xs text-gray-500">Visible to customers</p>
             </div>
             <label className="relative inline-flex cursor-pointer items-center">
               <input
@@ -231,23 +264,24 @@ function BannerModal({
                 onChange={handleChange}
                 className="peer sr-only"
               />
-              <div className="h-6 w-11 rounded-full bg-gray-300 peer-checked:bg-orange-500 transition"></div>
-              <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-5"></div>
+              <div className="h-5 w-10 rounded-full bg-gray-300 peer-checked:bg-orange-500 transition"></div>
+              <div className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-5"></div>
             </label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          {/* Buttons */}
+          <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="rounded-xl bg-linear-to-r from-orange-600 to-amber-600 px-5 py-2 text-sm font-medium text-white shadow-md transition hover:from-orange-700 hover:to-amber-700 disabled:opacity-50"
+              className="rounded-lg bg-linear-to-r from-orange-600 to-amber-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:from-orange-700 hover:to-amber-700 disabled:opacity-50 transition"
             >
               {isSaving ? "Saving..." : banner ? "Update" : "Create"}
             </button>
@@ -291,140 +325,171 @@ export default function BannerManagement() {
   const totalClicks = banners.reduce((acc, b) => acc + (b.clicks || 0), 0);
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4 p-3 sm:p-4">
+      {/* Header - compact */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Offers & Banners</h1>
-          <p className="text-sm text-gray-500">Manage promotional banners shown to customers</p>
+          <h1 className="text-lg sm:text-xl font-bold text-gray-800">
+            Offers & Banners
+          </h1>
+          <p className="text-xs text-gray-500">
+            Manage promotional banners shown to customers
+          </p>
         </div>
         <button
           onClick={() => {
             setSelectedBanner(null);
             setShowModal(true);
           }}
-          className="inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-orange-600 to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:from-orange-700 hover:to-amber-700"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-orange-600 to-amber-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:from-orange-700 hover:to-amber-700 transition"
         >
-          <Plus size={18} />
+          <Plus size={16} />
           Create Banner
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Banners</p>
-              <h3 className="text-2xl font-bold text-gray-800">{banners.length}</h3>
-            </div>
-            <div className="rounded-xl bg-orange-100 p-3">
-              <ImageIcon className="h-6 w-6 text-orange-600" />
-            </div>
+      {/* Stats - compact cards */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500">Total Banners</p>
+            <h3 className="text-lg font-bold text-gray-800">{banners.length}</h3>
+          </div>
+          <div className="rounded-lg bg-orange-100 p-2">
+            <ImageIcon className="h-4 w-4 text-orange-600" />
           </div>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Views</p>
-              <h3 className="text-2xl font-bold text-gray-800">{totalViews}</h3>
-            </div>
-            <div className="rounded-xl bg-blue-100 p-3">
-              <Eye className="h-6 w-6 text-blue-600" />
-            </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500">Total Views</p>
+            <h3 className="text-lg font-bold text-gray-800">{totalViews}</h3>
+          </div>
+          <div className="rounded-lg bg-blue-100 p-2">
+            <Eye className="h-4 w-4 text-blue-600" />
           </div>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Clicks</p>
-              <h3 className="text-2xl font-bold text-gray-800">{totalClicks}</h3>
-            </div>
-            <div className="rounded-xl bg-emerald-100 p-3">
-              <CheckCircle className="h-6 w-6 text-emerald-600" />
-            </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm flex items-center justify-between col-span-2 md:col-span-1">
+          <div>
+            <p className="text-xs text-gray-500">Total Clicks</p>
+            <h3 className="text-lg font-bold text-gray-800">{totalClicks}</h3>
+          </div>
+          <div className="rounded-lg bg-emerald-100 p-2">
+            <CheckCircle className="h-4 w-4 text-emerald-600" />
           </div>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-175 text-sm">
+      {/* Table - compact */}
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ">
+        <div className="overflow-x-auto [-ms-overflow-style:none]
+    [scrollbar-width:none]
+    [&::-webkit-scrollbar]:hidden">
+          <table className="w-full min-w-[640px] text-xs">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-5 py-4 text-left font-semibold text-gray-600">Banner</th>
-                <th className="px-5 py-4 text-left font-semibold text-gray-600">Type</th>
-                <th className="px-5 py-4 text-left font-semibold text-gray-600">Status</th>
-                <th className="px-5 py-4 text-left font-semibold text-gray-600">Views</th>
-                <th className="px-5 py-4 text-left font-semibold text-gray-600">Clicks</th>
-                <th className="px-5 py-4 text-right font-semibold text-gray-600">Actions</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600">
+                  Banner
+                </th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600">
+                  Type
+                </th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600">
+                  Status
+                </th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600">
+                  Views
+                </th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600">
+                  Clicks
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-gray-600">
+                  Actions
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 ">
               {isLoading ? (
                 [...Array(3)].map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={6} className="px-5 py-4">
-                      <div className="h-12 animate-pulse rounded bg-gray-100" />
+                    <td colSpan={6} className="px-3 py-3">
+                      <div className="h-10 animate-pulse rounded bg-gray-100" />
                     </td>
                   </tr>
                 ))
               ) : banners.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-gray-400">
+                  <td colSpan={6} className="px-3 py-10 text-center text-gray-400">
                     No banners found. Click "Create Banner" to add one.
                   </td>
                 </tr>
               ) : (
                 banners.map((banner) => (
-                  <tr key={banner._id} className="hover:bg-gray-50 transition">
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
+                  <tr key={banner._id} className="hover:bg-gray-50 transition ">
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2 ">
                         <img
                           src={banner.image}
                           alt={banner.title}
-                          className="h-12 w-20 rounded-lg object-cover border border-gray-200"
+                          className="h-10 w-16 rounded-lg object-cover border border-gray-200"
                         />
                         <div>
-                          <p className="font-medium text-gray-800">{banner.title}</p>
-                          <p className="text-xs text-gray-500 truncate max-w-45">{banner.subtitle}</p>
+                          <p className="font-medium text-gray-800 text-xs sm:text-sm">
+                            {banner.title}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate max-w-[120px] sm:max-w-[200px]">
+                            {banner.subtitle}
+                          </p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4 capitalize text-gray-700">{banner.type}</td>
-                    <td className="px-5 py-4">
+                    <td className="px-3 py-2 capitalize text-gray-700 text-xs">
+                      {banner.type}
+                    </td>
+                    <td className="px-3 py-2">
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${banner.isActive ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${banner.isActive
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-red-100 text-red-700"
                           }`}
                       >
                         {banner.isActive ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-gray-700">{banner.views || 0}</td>
-                    <td className="px-5 py-4 text-gray-700">{banner.clicks || 0}</td>
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-3 py-2 text-gray-700 text-xs">
+                      {banner.views || 0}
+                    </td>
+                    <td className="px-3 py-2 text-gray-700 text-xs">
+                      {banner.clicks || 0}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => handleToggleStatus(banner._id)}
-                          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                          className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 transition"
                           title="Toggle status"
                         >
-                          {banner.isActive ? <EyeOff size={16} /> : <Eye size={16} />}
+                          {banner.isActive ? (
+                            <EyeOff size={14} />
+                          ) : (
+                            <Eye size={14} />
+                          )}
                         </button>
                         <button
                           onClick={() => {
                             setSelectedBanner(banner);
                             setShowModal(true);
                           }}
-                          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                          className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 transition"
                           title="Edit"
                         >
-                          <Pencil size={16} />
+                          <Pencil size={14} />
                         </button>
                         <button
                           onClick={() => handleDelete(banner._id)}
-                          className="rounded-lg p-2 text-red-500 hover:bg-red-50"
+                          className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 transition"
                           title="Delete"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
@@ -436,6 +501,7 @@ export default function BannerManagement() {
         </div>
       </div>
 
+      {/* Modal */}
       {showModal && restaurantId && (
         <BannerModal
           banner={selectedBanner}
@@ -444,5 +510,6 @@ export default function BannerManagement() {
         />
       )}
     </div>
+
   );
 }

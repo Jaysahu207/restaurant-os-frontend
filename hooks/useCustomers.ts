@@ -15,19 +15,48 @@ export interface Customer {
 }
 
 export interface OrderItem {
+    _id: string;
+    itemId: string;
+    menuItemId: string;
     name: string;
-    price: number;
     quantity: number;
+    price: number;
+    total: number;
+    addons: any[];
+    kotBatch: number;
+    kotPrinted: boolean;
+    addedAt: string;
 }
 
 export interface Order {
     _id: string;
-    status: string;
-    totalAmount: number;
-    createdAt: string;
-    items: OrderItem[];
-}
 
+    orderNumber: string;
+
+    tableNumber: number | null;
+
+    status:
+    | "pending"
+    | "preparing"
+    | "ready"
+    | "served"
+    | "completed"
+    | "cancelled";
+
+    items: OrderItem[];
+
+    totalAmount: number;
+    cgstAmount: number;
+    sgstAmount: number;
+    finalAmount: number;
+
+    createdAt: string;
+
+    orderType?: "dine_in" | "takeaway" | "delivery";
+    paymentMethod?: "cash" | "upi" | "card" | "online";
+    paymentStatus?: string;
+    specialInstructions?: string;
+}
 export const customerKeys = {
     list: (restaurantId: string) => ["customers", restaurantId] as const,
     history: (customerId: string) => ["customerHistory", customerId] as const,
