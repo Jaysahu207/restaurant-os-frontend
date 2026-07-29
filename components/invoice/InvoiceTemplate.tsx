@@ -1,6 +1,7 @@
 import { useAuthStore } from "@/store/useAuthStore";
 import "@/styles/print.css";
 import React, { forwardRef } from "react";
+import type { PrinterSize } from "@/utils/printConfig";
 
 interface Addon {
   name: string;
@@ -11,11 +12,8 @@ interface OrderItem {
   name: string;
   quantity: number;
   price: number;
-
   variant?: string;
-
   addons?: Addon[];
-
   specialInstructions?: string;
 }
 
@@ -27,19 +25,12 @@ interface Customer {
 
 interface Order {
   orderNumber: string;
-
   invoiceNumber: string;
-
   createdAt: string;
-
   table?: string;
-
   status?: string;
-
   orderType?: string;
-
   paymentStatus?: string;
-
   paymentMethod?: string;
   deliveryDetails?: {
     address: string;
@@ -49,31 +40,25 @@ interface Order {
     charge: number;
   };
   specialInstructions?: string;
-
   customer?: Customer;
-
   items: OrderItem[];
-
   subtotal: number;
-
   cgstAmount: number;
-
   sgstAmount: number;
-
   serviceChargeAmount: number;
-
   total: number;
 }
 
 interface Props {
   order: Order;
-
+  printerSize?: PrinterSize; // NEW
   restaurantName: string;
 }
 
 const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
-  ({ order, restaurantName }, ref) => {
+  ({ order, restaurantName, printerSize = "80mm" }, ref) => {
     const { restaurant } = useAuthStore();
+    const width = printerSize === "58mm" ? "58mm" : "80mm";
 
     const formatCurrency = (amount: number) => {
       return `₹${(amount || 0).toFixed(2)}`;
@@ -90,17 +75,16 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
         id="invoice-print"
         className="bg-white text-black"
         style={{
-          width: "80mm",
-          maxWidth: "80mm",
-          minWidth: "80mm",
-          padding: "3mm",
+          width,
+          maxWidth: width,
+          minWidth: width,
+          padding: printerSize === "58mm" ? "2mm" : "3mm",
           boxSizing: "border-box",
           margin: "0 auto",
         }}
       >
         {/* ================= RESTAURANT HEADER ================= */}
         <div className="border-b border-dashed pb-2 text-center">
-          {/* Logo */}
           {restaurant?.logo && (
             <img
               src={restaurant.logo}
@@ -109,30 +93,25 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
             />
           )}
 
-          {/* Restaurant Name */}
           <h1 className="text-base font-bold uppercase leading-none">
             {restaurantName}
           </h1>
 
-          {/* Address */}
           <p className="mt-1 text-[11px] leading-4 text-gray-700">
             {restaurant?.address?.street}, {restaurant?.address?.city},{" "}
             {restaurant?.address?.state} - {restaurant?.address?.pincode}
           </p>
 
-          {/* Contact */}
           <p className="text-[11px] leading-4 text-gray-700">
             {restaurant?.contactPhone || "-"} |{" "}
             {restaurant?.contactEmail || "-"}
           </p>
 
-          {/* GST & FSSAI */}
           <p className="text-[11px] leading-4 text-gray-700">
             GST: {restaurant?.legal?.gstNumber || "N/A"} &nbsp;|&nbsp; FSSAI:{" "}
             {restaurant?.legal?.fssaiNumber || "N/A"}
           </p>
 
-          {/* Invoice Title */}
           <div className="mt-2 border-t border-dashed pt-1">
             <h2 className="text-sm font-bold tracking-wide">TAX INVOICE</h2>
             <p className="text-[10px] text-gray-500">
@@ -144,7 +123,6 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
         {/* ================= ORDER INFORMATION ================= */}
         <div className="border-b border-dashed py-2 text-sm">
           <div className="grid grid-cols-2 gap-x-6 ">
-            {/* Left */}
             <div className="space-y-1">
               <p>
                 <span className="font-semibold">Invoice:</span>{" "}
@@ -163,7 +141,6 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
               )}
             </div>
 
-            {/* Right */}
             <div className="space-y-1 text-right">
               <p>
                 <span className="font-semibold">Date:</span>{" "}
@@ -185,7 +162,6 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
             </div>
           </div>
 
-          {/* Delivery Address */}
           {order.orderType === "delivery" && (
             <div className="mt-2 border-t border-dashed pt-2">
               <span className="font-semibold">Address:</span>{" "}
@@ -200,6 +176,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
             </div>
           )}
         </div>
+
         {/* ================= CUSTOMER DETAILS ================= */}
         <div className="py-4 border-b border-dashed">
           <h3 className="font-bold text-sm mb-2 uppercase">Customer Details</h3>
@@ -230,11 +207,8 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
             <thead>
               <tr className="border-b border-t border-dashed">
                 <th className="py-2 text-left font-bold">Item</th>
-
                 <th className="py-2 text-center font-bold w-10">Qty</th>
-
                 <th className="py-2 text-right font-bold w-14">Rate</th>
-
                 <th className="py-2 text-right font-bold w-14">Amount</th>
               </tr>
             </thead>
@@ -300,14 +274,12 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
           <div className="ml-auto max-w-sm space-y-2">
             <div className="flex justify-between">
               <span>Items ({totalItems})</span>
-
               <span>{formatCurrency(order.subtotal)}</span>
             </div>
 
             {(order.cgstAmount || 0) > 0 && (
               <div className="flex justify-between">
                 <span>CGST</span>
-
                 <span>{formatCurrency(order.cgstAmount)}</span>
               </div>
             )}
@@ -315,7 +287,6 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
             {(order.sgstAmount || 0) > 0 && (
               <div className="flex justify-between">
                 <span>SGST</span>
-
                 <span>{formatCurrency(order.sgstAmount)}</span>
               </div>
             )}
@@ -323,14 +294,12 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
             {(order.serviceChargeAmount || 0) > 0 && (
               <div className="flex justify-between">
                 <span>Service Charge</span>
-
                 <span>{formatCurrency(order.serviceChargeAmount)}</span>
               </div>
             )}
 
             <div className="border-t border-dashed pt-3 flex justify-between text-lg font-bold">
               <span>GRAND TOTAL</span>
-
               <span>{formatCurrency(order.total)}</span>
             </div>
           </div>
@@ -341,13 +310,11 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <p className="font-semibold mb-1">Payment Method</p>
-
               <p className="uppercase">{order.paymentMethod || "Cash"}</p>
             </div>
 
             <div className="text-right">
               <p className="font-semibold mb-1">Payment Status</p>
-
               <p className="uppercase">{order.paymentStatus || "Pending"}</p>
             </div>
           </div>
@@ -357,7 +324,6 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
         {order.specialInstructions && (
           <div className="border-t border-dashed mt-5 pt-4">
             <h3 className="font-semibold mb-2">Special Instructions</h3>
-
             <p className="italic text-gray-600 text-sm">
               {order.specialInstructions}
             </p>
@@ -367,15 +333,12 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, Props>(
         {/* ================= FOOTER ================= */}
         <div className="border-t-2 border-dashed mt-6 pt-5 text-center">
           <p className="font-semibold text-base">Thank You, Visit Again 🙏</p>
-
           <p className="text-xs text-gray-500 mt-2">
             This is a computer-generated invoice.
           </p>
-
           <p className="text-xs text-gray-500 mt-1">
             Goods once sold will not be taken back.
           </p>
-
           <p className="text-xs text-gray-500 mt-1">
             Please retain invoice for future reference.
           </p>

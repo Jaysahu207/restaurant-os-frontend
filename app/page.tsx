@@ -131,6 +131,7 @@ export default function AuthPage() {
       else if (error.request) message = "Unable to connect to server";
       else message = error.message;
       toast.error(message);
+      setLoading(false);
     } finally {
       setLoading(false);
     }

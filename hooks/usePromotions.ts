@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
 import {
     createPromotion,
     deletePromotion,
@@ -6,6 +7,8 @@ import {
     updatePromotion,
     sendMarketingEmail,
 } from "@/services/promotionService";
+import { getOrders } from "@/services/orderService";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export interface Promotion {
     _id: string;
@@ -99,5 +102,18 @@ export function useSendMarketingEmail() {
             message: string;
             restaurantId?: string;
         }) => sendMarketingEmail(payload),
+    });
+}
+
+
+
+export function useOrders(filters?: { status?: string; search?: string }) {
+    const { restaurant } = useAuthStore();
+
+    return useQuery({
+        queryKey: ["orders", restaurant?._id, filters ?? {}],
+        queryFn: () => getOrders(restaurant!._id, filters?.search),
+        enabled: !!restaurant?._id,
+        staleTime: 30_000, // socket keeps it fresh in real time; this just avoids refetch storms on remount
     });
 }

@@ -1,41 +1,42 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  Search,
-  Clock,
-  CheckCircle,
-  ChefHat,
-  Eye,
-  Printer,
-  Filter,
-  X,
-  RefreshCw,
-  Calendar,
-  TableIcon,
-  User,
-  Truck,
-  ShoppingBag,
-} from "lucide-react";
-import { printKOT } from "@/services/orderService";
-import { io, Socket } from "socket.io-client";
-import { useAuthStore } from "@/store/useAuthStore";
-import toast from "react-hot-toast";
+
 import InvoiceTemplate from "@/components/invoice/InvoiceTemplate";
-import { useReactToPrint } from "react-to-print";
-import { useNotificationStore } from "@/store/useNotificationStore";
-import { useQueryClient } from "@tanstack/react-query";
 import {
+  getISTDateString,
+  mapOrder,
+  orderKeys,
   useOrders,
   useUpdateOrderStatus,
   useVerifyPayment,
-  mapOrder,
-  orderKeys,
   type Order,
   type OrderStatus,
-  getISTDateString,
 } from "@/hooks/useOrders";
-
+import { printKOT } from "@/services/orderService";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useNotificationStore } from "@/store/useNotificationStore";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Calendar,
+  CheckCircle,
+  ChefHat,
+  Clock,
+  Eye,
+  Filter,
+  Printer,
+  RefreshCw,
+  Search,
+  ShoppingBag,
+  TableIcon,
+  Truck,
+  User,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
+import { useReactToPrint } from "react-to-print";
+import { io, Socket } from "socket.io-client";
+import { getPageStyle, applyPrintBodyClass, clearPrintBodyClass, PrinterSize } from "@/utils/printConfig";
 const statusColors: Record<OrderStatus, string> = {
   pending: "bg-yellow-100 text-yellow-700 border-yellow-200",
   preparing: "bg-blue-100 text-blue-700 border-blue-200",
@@ -74,11 +75,7 @@ export default function OrdersPage() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [kotModalOpen, setKotModalOpen] = useState(false);
   const [kotData, setKotData] = useState<any>(null);
-  const [soundEnabled] = useState(true);
   const [selectedDate, setSelectedDate] = useState(getISTDateString());
-
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const key = orderKeys.list(restaurantId ?? "", selectedDate);
 
   const {
     data: orders = [],
@@ -89,6 +86,7 @@ export default function OrdersPage() {
   const updateStatusMutation = useUpdateOrderStatus(restaurantId, selectedDate);
   const verifyPaymentMutation = useVerifyPayment();
 
+  // Mark unread order badge as seen once the owner actually opens this page.
   useEffect(() => {
     clearOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,105 +96,6 @@ export default function OrdersPage() {
     refetch();
   };
 
-  const playSound = useCallback(() => {
-    if (!soundEnabled || !audioRef.current) return;
-    audioRef.current.currentTime = 0;
-    audioRef.current
-      .play()
-      .catch((err) => console.warn("Audio play failed:", err));
-  }, [soundEnabled]);
-
-  useEffect(() => {
-    audioRef.current = new Audio("/sounds/new-order.mp3");
-    audioRef.current.load();
-  }, []);
-
-  useEffect(() => {
-    const unlockAudio = () => {
-      if (audioRef.current) {
-        audioRef.current
-          .play()
-          .then(() => audioRef.current?.pause())
-          .catch(() => {});
-      }
-      window.removeEventListener("click", unlockAudio);
-    };
-    window.addEventListener("click", unlockAudio);
-    return () => window.removeEventListener("click", unlockAudio);
-  }, []);
-
-  // Real-time socket connection — updates the React Query cache directly
-  // instead of invalidating (so new/updated orders appear instantly, no refetch flash)
-  useEffect(() => {
-    if (!restaurantId) return;
-
-    const socket: Socket = io(process.env.NEXT_PUBLIC_API_URL, {
-      withCredentials: true,
-      transports: ["websocket"],
-    });
-
-    socket.on("connect", () => {
-      socket.emit("joinRestaurant", restaurantId);
-    });
-
-    socket.on("connect_error", (err) => {
-      console.error("❌ Socket connection error:", err.message);
-    });
-
-    socket.on("NEW_ORDER", (newOrder: any) => {
-      const orderDate = getISTDateString(new Date(newOrder.createdAt));
-      if (selectedDate && orderDate !== selectedDate) return;
-
-      const formattedOrder = mapOrder(newOrder);
-      queryClient.setQueryData<Order[]>(key, (old) => {
-        if (!old) return old;
-        if (old.find((o) => o.id === formattedOrder.id)) return old;
-        return [formattedOrder, ...old];
-      });
-      playSound();
-      toast.success(`New order #${newOrder.orderNumber.slice(-3)} received!`);
-    });
-
-    socket.on("ORDER_UPDATED", (updatedOrder: any) => {
-      queryClient.setQueryData<Order[]>(
-        key,
-        (old) =>
-          old?.map((order) =>
-            order.id === String(updatedOrder._id)
-              ? mapOrder(updatedOrder)
-              : order,
-          ) ?? old,
-      );
-      playSound();
-      toast.success(`Order #${updatedOrder.orderNumber.slice(-3)} updated!`);
-    });
-
-    socket.on("PAYMENT_UPDATED", (updatedOrder: any) => {
-      queryClient.setQueryData<Order[]>(
-        key,
-        (old) =>
-          old?.map((order) =>
-            order.id === updatedOrder._id
-              ? {
-                  ...order,
-                  paymentStatus: updatedOrder.paymentStatus,
-                  paymentMethod: updatedOrder.paymentMethod,
-                }
-              : order,
-          ) ?? old,
-      );
-      toast.success(
-        `Payment received for order #${updatedOrder._id.slice(-3)}`,
-      );
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [restaurantId, selectedDate, queryClient, playSound]);
-  // Note: `key` intentionally omitted from deps — it's derived from
-  // restaurantId/selectedDate which are already listed, and including
-  // the array itself would reconnect the socket every render.
 
   const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
     updateStatusMutation.mutate(
@@ -327,11 +226,10 @@ export default function OrdersPage() {
           w-4
           sm:h-5
           sm:w-5
-          ${
-            isFetching
-              ? "animate-spin"
-              : "transition-transform duration-500 hover:rotate-180"
-          }
+          ${isFetching
+                  ? "animate-spin"
+                  : "transition-transform duration-500 hover:rotate-180"
+                }
         `}
             />
 
@@ -489,9 +387,7 @@ export default function OrdersPage() {
         {/* Status Filters */}
         <div className="mt-3 flex items-center gap-2 ">
           <div
-            className="
-    flex
-    flex-1
+            className="flex flex-1
     gap-1.5
     overflow-x-auto
     pb-1
@@ -527,11 +423,10 @@ export default function OrdersPage() {
             capitalize
             transition
 
-            ${
-              filter === status
-                ? "bg-orange-500 text-white shadow-sm"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }
+            ${filter === status
+                    ? "bg-orange-500 text-white shadow-sm"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }
           `}
               >
                 {statusLabels[status]}
@@ -543,11 +438,10 @@ export default function OrdersPage() {
                 px-1.5
                 text-[10px]
 
-                ${
-                  filter === status
-                    ? "bg-white/20 text-white"
-                    : "bg-gray-200 text-gray-600"
-                }
+                ${filter === status
+                        ? "bg-white/20 text-white"
+                        : "bg-gray-200 text-gray-600"
+                      }
               `}
                   >
                     {stats[status]}
@@ -561,9 +455,9 @@ export default function OrdersPage() {
           {(search ||
             filter !== "all" ||
             selectedDate !== getISTDateString()) && (
-            <button
-              onClick={clearFilters}
-              className="
+              <button
+                onClick={clearFilters}
+                className="
           flex
           shrink-0
           items-center
@@ -575,11 +469,11 @@ export default function OrdersPage() {
           text-gray-600
           hover:bg-gray-100
         "
-            >
-              <X className="h-3.5 w-3.5" />
-              Clear
-            </button>
-          )}
+              >
+                <X className="h-3.5 w-3.5" />SsSS
+                Clear
+              </button>
+            )}
         </div>
       </div>
 
@@ -598,8 +492,8 @@ export default function OrdersPage() {
 
               <p className="text-xs text-gray-500 sm:text-sm">
                 {search ||
-                filter !== "all" ||
-                selectedDate !== getISTDateString()
+                  filter !== "all" ||
+                  selectedDate !== getISTDateString()
                   ? "Try adjusting your filters or search criteria."
                   : "Waiting for new orders to arrive."}
               </p>
@@ -733,10 +627,9 @@ function StatCard({
         sm:p-3
         lg:p-4
 
-        ${
-          highlight
-            ? "border-orange-200 ring-1 ring-orange-200"
-            : "border-gray-100"
+        ${highlight
+          ? "border-orange-200 ring-1 ring-orange-200"
+          : "border-gray-100"
         }
       `}
     >
@@ -796,22 +689,22 @@ function OrderCard({
   const allStatuses: OrderStatus[] =
     order.orderType === "delivery"
       ? [
-          "pending",
-          "preparing",
-          "out_for_delivery",
-          "delivered",
-          "completed",
-          "cancelled",
-        ]
+        "pending",
+        "preparing",
+        "out_for_delivery",
+        "delivered",
+        "completed",
+        "cancelled",
+      ]
       : [
-          "pending",
-          "preparing",
-          "ready",
-          "served",
-          "paid",
-          "completed",
-          "cancelled",
-        ];
+        "pending",
+        "preparing",
+        "ready",
+        "served",
+        "paid",
+        "completed",
+        "cancelled",
+      ];
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-sm transition hover:shadow-md">
@@ -1007,7 +900,13 @@ function OrderCard({
   );
 }
 
+
+
 // ==================== Order Detail Modal (with full tax breakdown & print) ====================
+
+
+
+
 function OrderDetailModal({
   order,
   onClose,
@@ -1020,24 +919,19 @@ function OrderDetailModal({
   restaurantName?: string;
 }) {
   const printRef = useRef<HTMLDivElement>(null);
+  const [printerSize, setPrinterSize] = useState<PrinterSize>("80mm");
+
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `Invoice-${order.invoiceNumber}`,
-    pageStyle: `
-    @page {
-      size: 80mm auto;
-      margin: 0;
-    }
-
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 80mm;
-      background: white;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-  `,
+    pageStyle: getPageStyle(printerSize),
+    onBeforePrint: () => {
+      applyPrintBodyClass(printerSize);
+      return Promise.resolve();
+    },
+    onAfterPrint: () => {
+      clearPrintBodyClass();
+    },
   });
 
   return (
@@ -1058,11 +952,36 @@ function OrderDetailModal({
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
+
+        {/* Printer size toggle */}
+        <div className="px-6 pt-4 flex items-center gap-2 text-sm">
+          <span className="text-gray-500">Printer size:</span>
+          <button
+            onClick={() => setPrinterSize("58mm")}
+            className={`px-3 py-1 rounded-full border transition ${printerSize === "58mm"
+              ? "bg-indigo-600 text-white border-indigo-600"
+              : "border-gray-300 text-gray-600 hover:bg-gray-50"
+              }`}
+          >
+            58mm
+          </button>
+          <button
+            onClick={() => setPrinterSize("80mm")}
+            className={`px-3 py-1 rounded-full border transition ${printerSize === "80mm"
+              ? "bg-indigo-600 text-white border-indigo-600"
+              : "border-gray-300 text-gray-600 hover:bg-gray-50"
+              }`}
+          >
+            80mm
+          </button>
+        </div>
+
         <div id="order-detail-print" className="p-6 space-y-6">
           <InvoiceTemplate
             ref={printRef}
             order={order}
             restaurantName={restaurantName}
+            printerSize={printerSize}
           />
         </div>
 
@@ -1073,12 +992,6 @@ function OrderDetailModal({
           >
             Close
           </button>
-          {/* <button
-            onClick={handleDownloadPDF}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg"
-          >
-            Download PDF
-          </button> */}
           <button
             onClick={handlePrint}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center gap-2"
@@ -1091,7 +1004,6 @@ function OrderDetailModal({
   );
 }
 
-// ==================== KOT Modal (Kitchen Order Ticket) ====================
 function KOTModal({
   kot,
   onClose,
@@ -1102,26 +1014,18 @@ function KOTModal({
   restaurantName?: string;
 }) {
   const printRef = useRef<HTMLDivElement>(null);
+  const [printerSize, setPrinterSize] = useState<PrinterSize>("80mm");
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `KOT-${kot.orderNumber}-Batch-${kot.batch}`,
-    pageStyle: `
-    @page {
-      size: 80mm auto;
-      margin: 0;
-    }
-
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 80mm;
-      background: white;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-  `,
+    pageStyle: getPageStyle(printerSize),
+    onBeforePrint: () => {
+      applyPrintBodyClass(printerSize);
+      return Promise.resolve();
+    },
     onAfterPrint: () => {
+      clearPrintBodyClass();
       onClose();
     },
   });
@@ -1149,8 +1053,31 @@ function KOTModal({
           </button>
         </div>
 
+        {/* Printer size toggle */}
+        <div className="px-6 pt-4 flex items-center gap-2 text-sm">
+          <span className="text-gray-500">Printer size:</span>
+          <button
+            onClick={() => setPrinterSize("58mm")}
+            className={`px-3 py-1 rounded-full border transition ${printerSize === "58mm"
+              ? "bg-blue-600 text-white border-blue-600"
+              : "border-gray-300 text-gray-600 hover:bg-gray-50"
+              }`}
+          >
+            58mm
+          </button>
+          <button
+            onClick={() => setPrinterSize("80mm")}
+            className={`px-3 py-1 rounded-full border transition ${printerSize === "80mm"
+              ? "bg-blue-600 text-white border-blue-600"
+              : "border-gray-300 text-gray-600 hover:bg-gray-50"
+              }`}
+          >
+            80mm
+          </button>
+        </div>
+
         {/* Printable Area */}
-        <div ref={printRef} id="kot-print" className="px-3 py-3 space-y-3">
+        <div ref={printRef} id="kot-print" className="px-3 py-3 space-y-3 mt-2">
           <div className="text-center">
             <h2 className="text-xl font-bold">{restaurantName}</h2>
 

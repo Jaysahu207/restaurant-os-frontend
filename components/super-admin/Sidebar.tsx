@@ -49,16 +49,15 @@ export default function Sidebar({ collapsed, setCollapsed }: any) {
 
   return (
     <aside
-      className={`bg-white border-r border-slate-200 shadow-sm transition-all duration-300 flex flex-col ${
-        collapsed ? "w-20" : "w-64"
-      }`}
+      className={`bg-white border-r border-slate-200 shadow-sm transition-all duration-300 flex flex-col ${collapsed ? "w-20" : "w-64"
+        }`}
     >
       {/* Logo Area */}
       <div className="flex items-center justify-between p-4 border-b border-slate-100 h-16">
         {!collapsed && (
           <div className="flex items-center gap-2">
             <Crown className="h-6 w-6 text-indigo-600" />
-            <span className="font-bold text-xl bg-gradient-to-r from-indigo-600 to-indigo-800 bg-clip-text text-transparent">
+            <span className="font-bold text-xl bg-linear-to-r from-indigo-600 to-indigo-800 bg-clip-text text-transparent">
               SuperAdmin
             </span>
           </div>
@@ -81,11 +80,10 @@ export default function Sidebar({ collapsed, setCollapsed }: any) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
-                isActive
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${isActive
                   ? "bg-indigo-50 text-indigo-700 shadow-sm"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              } ${collapsed ? "justify-center" : ""}`}
+                } ${collapsed ? "justify-center" : ""}`}
             >
               <item.icon size={20} className="shrink-0" />
               {!collapsed && (

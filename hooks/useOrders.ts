@@ -4,6 +4,7 @@ import {
     updateOrderStatus as updateStatusAPI,
     verifyPayment as verifyPaymentAPI,
 } from "@/services/orderService";
+import { useAuthStore } from "@/store/useAuthStore";
 
 // ==================== Types ====================
 export interface OrderItem {
@@ -59,8 +60,8 @@ export const mapOrder = (o: any): Order => ({
     table: o.tableNumber,
     orderType: o.orderType,
     items: [...o.items],
-    total: o.finalAmount ?? o.totalAmount,
-    subtotal: o.subtotal ?? o.totalAmount,
+    total: o.finalAmount ?? o.totalAmount ?? 0,
+    subtotal: o.subtotal ?? o.totalAmount ?? 0,
     cgstAmount: o.cgstAmount ?? 0,
     sgstAmount: o.sgstAmount ?? 0,
     serviceChargeAmount: o.serviceChargeAmount ?? 0,
@@ -151,3 +152,6 @@ export function getISTDateString(date = new Date()) {
         day: "2-digit",
     }).format(date);
 }
+
+
+
