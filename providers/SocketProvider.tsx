@@ -146,12 +146,12 @@ export default function SocketProvider({
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("🟢 Socket Connected");
+      // console.log("🟢 Socket Connected");
       socket.emit("joinRestaurant", restaurantId);
     });
 
     socket.on("disconnect", () => {
-      console.log("🔴 Socket Disconnected");
+      // console.log("🔴 Socket Disconnected");
     });
 
     socket.on("connect_error", (err) => {

@@ -64,7 +64,7 @@ export const getOrders = async (restaurantId: string, date?: string) => {
 // 🔥 UPDATE STATUS
 export const updateOrderStatus = async (id: string, status: string) => {
   try {
-    const res = await PublicAPI.put(`/api/orders/${id}`, { status });
+    const res = await API.put(`/api/orders/${id}`, { status });
     return res.data;
   } catch (error: any) {
     console.error(
@@ -131,7 +131,7 @@ export const completePayment = async (id: string, method: string) => {
   }
 };
 export const verifyPayment = async (orderId: string) => {
-  const res = await PublicAPI.put(`/api/orders/${orderId}/verify-payment`);
+  const res = await API.put(`/api/orders/${orderId}/verify-payment`);
 
   return res.data;
 };

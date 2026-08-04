@@ -4,6 +4,7 @@ import {
     createMenuItem,
     deleteMenuItem,
     updateMenuItem,
+    getMenuDropdown,
 } from "@/services/menuService";
 
 export interface MenuVariant {
@@ -60,7 +61,12 @@ export function useCreateMenuItem(restaurantId?: string) {
         },
     });
 }
-
+export function useMenuDropdown() {
+    return useQuery({
+        queryKey: ["menu-dropdown"],
+        queryFn: getMenuDropdown,
+    });
+}
 export function useUpdateMenuItem(restaurantId?: string) {
     const queryClient = useQueryClient();
     return useMutation({

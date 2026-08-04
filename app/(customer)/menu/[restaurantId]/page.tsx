@@ -28,6 +28,7 @@ import {
   ShoppingBag,
   Trash2,
   CheckCircle2,
+  Search,
 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import {
@@ -77,7 +78,7 @@ interface MenuItem {
   image?: string;
   isAvailable?: boolean;
   isPopular?: boolean;
-  variants?: { name: string; price: number }[];
+  variants?: Variant[];
   addons?: { name: string; price: number }[];
 }
 
@@ -143,12 +144,21 @@ interface SubscriptionFeatures {
   promotions: boolean;
   reports: boolean;
 }
-interface OrderItem {
+export interface Variant {
+  _id: string;
+  name: string;
+  price: number;
+}
+
+export interface OrderItem {
   _id?: string;
   menuItemId?: string;
   name: string;
-  price: number;
   quantity: number;
+  price: number;
+
+  variantId?: string;
+  variantName?: string;
 }
 
 interface Order {
@@ -270,6 +280,8 @@ function CustomerMenuContent() {
 
 
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -280,10 +292,7 @@ function CustomerMenuContent() {
   const [customerLocked, setCustomerLocked] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<{
-    name: string;
-    price: number;
-  } | null>(null);
+
   const [selectedAddons, setSelectedAddons] = useState<
     { name: string; price: number }[]
   >([]);
@@ -302,6 +311,7 @@ function CustomerMenuContent() {
   const [selectedPayment, setSelectedPayment] = useState<"cash" | "upi" | null>(
     null,
   );
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
   const [tableOccupied, setTableOccupied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const router = useRouter();
@@ -434,44 +444,7 @@ function CustomerMenuContent() {
       console.error(err);
     }
   };
-  // useEffect(() => {
-  //   console.log("showPayment:", showPayment);
-  // }, [showPayment]);
 
-  // Load menu & restaurant
-  // useEffect(() => {
-  //   if (!restaurantSlug) return;
-  //   const loadMenu = async () => {
-  //     try {
-  //       setLoading(true);
-  //       const data = await fetchCustomerMenu(restaurantSlug);
-  //       const menuItems = data?.items || [];
-  //       const restaurantData = data?.restaurant || null;
-  //       setMenu(menuItems);
-  //       console.log("Restaurant Data:", restaurantData);
-  //       setRestaurant(restaurantData);
-  //       setBanners(data.banners || []);
-  //       const uniqueCategories: string[] = [
-  //         "All",
-  //         ...(Array.from(
-  //           new Set(
-  //             menuItems
-  //               .map((item: MenuItem) => item.category?.trim())
-  //               .filter(Boolean),
-  //           ),
-  //         ) as string[]),
-  //       ];
-  //       setCategories(uniqueCategories);
-  //     } catch (err) {
-  //       // console.error(err);
-  //       setError("Failed to load menu. Please try again.");
-  //       toast.error("Menu loading failed");
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-  //   loadMenu();
-  // }, [restaurantSlug]);
   const isSelfService = restaurant?.operations?.serviceType === "self";
 
   useEffect(() => {
@@ -689,22 +662,7 @@ function CustomerMenuContent() {
     ,
   ]);
 
-  // // Payment timeout
-  // useEffect(() => {
-  //   if (!paymentStarted) return;
-  //   const timer = setInterval(() => {
-  //     setPaymentTimeLeft((prev) => {
-  //       if (prev <= 1) {
-  //         clearInterval(timer);
-  //         toast.error("Payment timeout!");
-  //         setPaymentStarted(false);
-  //         return 0;
-  //       }
-  //       return prev - 1;
-  //     });
-  //   }, 1000);
-  //   return () => clearInterval(timer);
-  // }, [paymentStarted]);
+
 
   // Audio setup
   useEffect(() => {
@@ -734,14 +692,13 @@ function CustomerMenuContent() {
 
   const openItemModal = (item: MenuItem) => {
     setSelectedItem(item);
+
     if (item.variants?.length) {
-      setSelectedVariant({
-        name: item.variants[0].name,
-        price: item.variants[0].price,
-      });
+      setSelectedVariant(item.variants[0]); // ✅ Store full Variant object
     } else {
       setSelectedVariant(null);
     }
+
     setSelectedAddons([]);
     setModalQuantity(1);
   };
@@ -760,28 +717,53 @@ function CustomerMenuContent() {
     const addonsTotal = selectedAddons.reduce((sum, a) => sum + a.price, 0);
     return (basePrice + addonsTotal) * modalQuantity;
   };
-
-  const addToCartSimple = (item: MenuItem) => {
+  const addToCartSimple = (
+    item: MenuItem,
+    selectedVariant?: Variant
+  ) => {
     addItem(
-      { _id: item._id, name: item.name, price: item.price, quantity: 1 },
-      restaurantSlug,
-      table || "",
-    );
-    toast.success(`${item.name} added to cart`);
-  };
+      {
+        _id: item._id,
+        name: selectedVariant
+          ? `${item.name} (${selectedVariant.name})`
+          : item.name,
 
+        price: selectedVariant?.price ?? item.price,
+        quantity: 1,
+
+        variant: selectedVariant
+          ? {
+            _id: selectedVariant._id,
+            name: selectedVariant.name,
+            price: selectedVariant.price,
+          }
+          : undefined,
+      },
+      restaurantSlug,
+      table || ""
+    );
+
+    toast.success(
+      `${item.name}${selectedVariant ? ` (${selectedVariant.name})` : ""} added to cart`
+    );
+  };
+  console.log(cartItems);
   const addCustomizedToCart = () => {
     if (!selectedItem) return;
+
     let finalName = selectedItem.name;
     let unitPrice = selectedItem.price;
+
     if (selectedVariant) {
       finalName += ` (${selectedVariant.name})`;
       unitPrice = selectedVariant.price;
     }
+
     if (selectedAddons.length) {
       finalName += ` + ${selectedAddons.map((a) => a.name).join(", ")}`;
       unitPrice += selectedAddons.reduce((sum, a) => sum + a.price, 0);
     }
+
     for (let i = 0; i < modalQuantity; i++) {
       addItem(
         {
@@ -789,11 +771,22 @@ function CustomerMenuContent() {
           name: finalName,
           price: unitPrice,
           quantity: 1,
+
+          variant: selectedVariant
+            ? {
+              _id: selectedVariant._id,
+              name: selectedVariant.name,
+              price: selectedVariant.price,
+            }
+            : undefined,
+
+          addons: selectedAddons,
         },
         restaurantSlug,
         table || "",
       );
     }
+
     setSelectedItem(null);
     toast.success(`${finalName} added to cart`);
   };
@@ -844,6 +837,9 @@ function CustomerMenuContent() {
           name: item.name,
           price: item.price,
           quantity: item.quantity,
+
+          variantId: item.variant?._id,
+          variantName: item.variant?.name,
         })),
         specialInstructions,
         delivery:
@@ -875,6 +871,7 @@ function CustomerMenuContent() {
         );
         res = data.order;
       } else {
+        console.log(JSON.stringify(payload, null, 2));
         res = await placeOrder(payload);
       }
       // console.log("Response:", res);
@@ -1035,12 +1032,25 @@ function CustomerMenuContent() {
   }, [menu]);
 
   const filteredItems = useMemo(() => {
-    if (selectedCategory === "All") {
-      return shuffledMenu;
+    let items =
+      selectedCategory === "All"
+        ? shuffledMenu
+        : menu.filter((item) => item.category === selectedCategory);
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+
+      items = items.filter((item) => {
+        return (
+          item.name.toLowerCase().includes(query) ||
+          item.category.toLowerCase().includes(query) ||
+          item.description?.toLowerCase().includes(query)
+        );
+      });
     }
 
-    return menu.filter((item) => item.category === selectedCategory);
-  }, [menu, shuffledMenu, selectedCategory]);
+    return items;
+  }, [menu, shuffledMenu, selectedCategory, searchQuery]);
   useEffect(() => {
     AOS.refresh();
   }, [filteredItems]);
@@ -1728,6 +1738,13 @@ function CustomerMenuContent() {
           {/* Actions */}
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowSearch((prev) => !prev)}
+              className="w-11 h-11 flex items-center justify-center rounded-xl border border-gray-200 bg-white"
+            >
+              <Search className="w-5 h-5 text-gray-600" />
+            </button>
+
+            <button
               onClick={() => setIsCartOpen(true)}
               className="relative w-11 h-11 flex items-center justify-center rounded-xl bg-orange-500 text-white shadow-lg shadow-orange-200"
             >
@@ -1753,7 +1770,7 @@ function CustomerMenuContent() {
             <div className="max-w-4xl mx-auto px-4 py-5">
               <div className="flex items-center gap-3">
                 <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2">
-                  🍽️
+                  <UtensilsCrossed className="w-10 h-10" />
                 </div>
 
                 <div>
@@ -1769,8 +1786,34 @@ function CustomerMenuContent() {
             </div>
           </div>
         )}
+        {showSearch && (
+          <div className="border-t border-gray-100 bg-white px-4 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+
+              <input
+                autoFocus
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search dishes..."
+                className="w-full rounded-xl border border-gray-200 py-3 pl-10 pr-10 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none"
+              />
+
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setShowSearch(false);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+          </div>
+        )}
       </header>
-      {hasBanners && (
+      {hasBanners && !showSearch && (
         <section className="max-w-2xl mx-auto px-4 pt-4 pb-2">
           <BannerCarousel banners={banners} />
         </section>
@@ -2440,22 +2483,19 @@ function CustomerMenuContent() {
                 {selectedItem.description}
               </p>
 
-              {selectedItem.variants && selectedItem.variants.length > 0 && (
+              {selectedItem.variants?.length ? (
                 <div className="mt-4">
                   <label className="font-medium text-gray-700">
-                    Choose variant
+                    Choose Variant
                   </label>
+
                   <div className="flex flex-wrap gap-2 mt-1">
                     {selectedItem.variants.map((variant) => (
                       <button
-                        key={variant.name}
-                        onClick={() =>
-                          setSelectedVariant({
-                            name: variant.name,
-                            price: variant.price,
-                          })
-                        }
-                        className={`px-4 py-2 rounded-full text-sm border ${selectedVariant?.name === variant.name
+                        key={variant._id}
+                        type="button"
+                        onClick={() => setSelectedVariant(variant)}
+                        className={`px-4 py-2 rounded-full text-sm border ${selectedVariant?._id === variant._id
                           ? "bg-orange-500 text-white border-orange-500"
                           : "bg-white text-gray-700 border-gray-300"
                           }`}
@@ -2465,7 +2505,7 @@ function CustomerMenuContent() {
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {selectedItem.addons && selectedItem.addons.length > 0 && (
                 <div className="mt-4">

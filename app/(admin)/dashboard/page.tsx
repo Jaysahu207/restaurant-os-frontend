@@ -50,7 +50,7 @@ const StatCard = ({ title, value, icon: Icon, trend, color }: any) => {
     <div className="group relative overflow-hidden rounded-lg border border-gray-100 bg-white p-2 sm:p-3 shadow-sm hover:shadow-md transition-all">
       {/* Top Accent */}
       <div
-        className={`absolute left-0 top-0 h-1 w-full bg-gradient-to-r ${color}`}
+        className={`absolute left-0 top-0 h-1 w-full bg-linear-to-r ${color}`}
       />
 
       <div className="flex items-start justify-between gap-1">
@@ -74,7 +74,7 @@ const StatCard = ({ title, value, icon: Icon, trend, color }: any) => {
         </div>
 
         <div
-          className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-gradient-to-br ${color} text-white shrink-0`}
+          className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-linear-to-br ${color} text-white shrink-0`}
         >
           <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </div>
@@ -90,7 +90,7 @@ const HourlySalesChart = ({ data }: { data: HourlySales[] }) => {
 
   const peakHour = activeHours.reduce(
     (best, cur) => (cur.amount > (best?.amount ?? -1) ? cur : best),
-    activeHours[0]
+    activeHours[0],
   );
 
   const formatHour = (h: number) => {
@@ -123,13 +123,11 @@ const HourlySalesChart = ({ data }: { data: HourlySales[] }) => {
           {data.map((hour) => {
             const height = Math.max(
               (hour.amount / maxAmount) * 100,
-              hour.amount > 0 ? 6 : 2
+              hour.amount > 0 ? 6 : 2,
             );
 
             const isPeak =
-              peakHour &&
-              hour.hour === peakHour.hour &&
-              hour.amount > 0;
+              peakHour && hour.hour === peakHour.hour && hour.amount > 0;
 
             return (
               <div
@@ -142,11 +140,12 @@ ${hour.orders} orders`}
                 <div
                   className={`
                     w-full rounded-t-sm transition-all duration-300
-                    ${isPeak
-                      ? "bg-blue-600"
-                      : hour.amount > 0
-                        ? "bg-blue-300 group-hover:bg-blue-400"
-                        : "bg-gray-100"
+                    ${
+                      isPeak
+                        ? "bg-blue-600"
+                        : hour.amount > 0
+                          ? "bg-blue-300 group-hover:bg-blue-400"
+                          : "bg-gray-100"
                     }
                   `}
                   style={{ height: `${height}%` }}
@@ -419,10 +418,11 @@ const PaymentAnalytics = ({
               </div>
 
               <span
-                className={`text-xs sm:text-sm font-semibold whitespace-nowrap ${row.label === "Pending" && row.amount > 0
-                  ? "text-red-600"
-                  : "text-gray-800"
-                  }`}
+                className={`text-xs sm:text-sm font-semibold whitespace-nowrap ${
+                  row.label === "Pending" && row.amount > 0
+                    ? "text-red-600"
+                    : "text-gray-800"
+                }`}
               >
                 ₹{row.amount.toLocaleString("en-IN")}
               </span>
@@ -488,9 +488,11 @@ const RecentOrdersTable = ({ orders }: { orders: RecentOrder[] }) => {
           View All →
         </button>
       </div>
-      <div className="overflow-x-auto  [-ms-overflow-style:none]
+      <div
+        className="overflow-x-auto  [-ms-overflow-style:none]
     [scrollbar-width:none]
-    [&::-webkit-scrollbar]:hidden">
+    [&::-webkit-scrollbar]:hidden"
+      >
         <table className="w-full text-left">
           <thead className="bg-gray-50 text-[11px] sm:text-xs uppercase tracking-wide text-gray-500">
             <tr>
@@ -767,8 +769,6 @@ export default function DashboardPage() {
       <div className="p-4 md:p-6">
         <TableManagement restaurantId={restaurant._id} />
       </div>
-
-
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <OrderTypeBreakdown types={data.orderTypes} />

@@ -450,22 +450,22 @@ export default function SettingsPage() {
   // Render Helpers
   // ----------------------------------------------------------------------
   const inputClass =
-    "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition";
+    "w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition";
   const labelClass = "block text-sm font-medium text-gray-700 mb-1";
-  const sectionTitleClass = "text-lg font-semibold text-gray-800 mb-4";
+  const sectionTitleClass = "text-base font-semibold text-gray-800 mb-3 sm:text-lg sm:mb-4";
   const subsectionTitleClass =
     "text-md font-semibold text-gray-700 mb-3 border-t pt-4";
 
   return (
-    <div className="space-y-6 p-6 md:p-8 ">
-      <div className="mb-6">
+    <div className="space-y-4 p-3 sm:space-y-6 sm:p-6 md:p-8">
+      <div className="mb-3 sm:mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold text-gray-900 sm:text-2xl md:text-3xl">
                 Restaurant Settings
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="hidden text-sm text-gray-500 mt-1 sm:block">
                 Manage your restaurant information, taxes, billing, delivery,
                 branding and operational preferences.
               </p>
@@ -474,16 +474,16 @@ export default function SettingsPage() {
         </div>
 
         {saveSuccess && (
-          <div className="mt-5 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-green-200 bg-green-50 p-3 sm:mt-5 sm:gap-3 sm:p-4">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-100 sm:h-10 sm:w-10">
+              <CheckCircle2 className="w-4 h-4 text-green-600 sm:w-5 sm:h-5" />
             </div>
 
-            <div className="flex-1">
-              <h4 className="font-semibold text-green-800">
+            <div className="flex-1 min-w-0">
+              <h4 className="text-sm font-semibold text-green-800 sm:text-base">
                 Settings Updated Successfully
               </h4>
-              <p className="text-sm text-green-700 mt-1">
+              <p className="hidden text-sm text-green-700 mt-1 sm:block">
                 Your restaurant settings have been saved successfully and are
                 now active across your QR Menu, Ordering System, Billing and
                 Dashboard.
@@ -494,15 +494,15 @@ export default function SettingsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="flex flex-wrap gap-2">
+      <div className="border-b border-gray-200 -mx-3 px-3 overflow-x-auto sm:mx-0 sm:px-0">
+        <nav className="flex gap-1 whitespace-nowrap sm:flex-wrap sm:gap-2">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition ${activeTab === tab.id
+                className={`flex shrink-0 items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition sm:gap-2 sm:px-4 sm:text-sm ${activeTab === tab.id
                   ? "border-blue-600 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   }`}
@@ -516,30 +516,30 @@ export default function SettingsPage() {
       </div>
 
       {/* Tab Panels */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
+      <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6">
         {/* -------------------- RESTAURANT TAB -------------------- */}
         {activeTab === "restaurant" && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* ===== Header ===== */}
-            <div className="flex items-center justify-between">
-              <h3 className="text-2xl font-semibold text-gray-800">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-lg font-semibold text-gray-800 sm:text-xl md:text-2xl">
                 Restaurant Information
               </h3>
               <button
                 onClick={handleUpdateRestaurant}
                 disabled={isSaving}
-                className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                className="w-full px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm sm:w-auto"
               >
                 {isSaving ? "Saving..." : "Save Changes"}
               </button>
             </div>
 
             {/* ===== Basic Info Card ===== */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-5">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:text-sm sm:mb-4">
                 Basic Information
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                 <div>
                   <label className={labelClass}>Restaurant Name</label>
                   <input
@@ -602,11 +602,11 @@ export default function SettingsPage() {
             </div>
 
             {/* ===== Address Card ===== */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-5">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:text-sm sm:mb-4">
                 Address
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                 <div>
                   <label className={labelClass}>Street</label>
                   <input
@@ -675,11 +675,11 @@ export default function SettingsPage() {
             </div>
 
             {/* ===== Business Details Card ===== */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-5">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:text-sm sm:mb-4">
                 Business Details
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                 <div>
                   <label className={labelClass}>Business Type</label>
                   <select
@@ -702,7 +702,7 @@ export default function SettingsPage() {
                     <option value="cloud_kitchen">Cloud Kitchen</option>
                   </select>
                 </div>
-                <div className="md:col-span-2">
+                <div className="sm:col-span-2 md:col-span-2">
                   <label className={labelClass}>
                     Cuisines (comma separated)
                   </label>
@@ -727,11 +727,11 @@ export default function SettingsPage() {
             </div>
 
             {/* ===== Legal & Tax Card ===== */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-5">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:text-sm sm:mb-4">
                 Legal & Tax Details
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                 <div>
                   <label className={labelClass}>FSSAI License Number</label>
                   <input
@@ -790,11 +790,11 @@ export default function SettingsPage() {
             </div>
 
             {/* ===== Tax Configuration + Billing Settings (combined) ===== */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-5">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:text-sm sm:mb-4">
                 Tax & Billing
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                 <div>
                   <label className={labelClass}>CGST (%)</label>
                   <input
@@ -867,7 +867,7 @@ export default function SettingsPage() {
                     placeholder="e.g. INV-"
                   />
                 </div>
-                <div className="md:col-span-2 flex flex-wrap items-center gap-4 mt-1">
+                <div className="sm:col-span-2 md:col-span-2 flex flex-wrap items-center gap-3 mt-1 sm:gap-4">
                   {(
                     ["enableTaxes", "enableServiceCharge", "roundOff"] as const
                   ).map((field) => (
@@ -902,11 +902,11 @@ export default function SettingsPage() {
             </div>
 
             {/* ===== Operations Card ===== */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-5">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:text-sm sm:mb-4">
                 Operations
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                 <div>
                   <label className={labelClass}>Table Count</label>
                   <input
@@ -943,10 +943,10 @@ export default function SettingsPage() {
                     className={inputClass}
                   />
                 </div>
-                <div className="md:col-span-3">
+                <div className="sm:col-span-2 md:col-span-3">
                   <label className={labelClass}>Service Mode</label>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+                  <div className="grid grid-cols-1 gap-2.5 mt-2 sm:grid-cols-3 sm:gap-3">
                     {[
                       {
                         value: "table",
@@ -966,7 +966,7 @@ export default function SettingsPage() {
                     ].map((service) => (
                       <label
                         key={service.value}
-                        className={`cursor-pointer rounded-xl border p-4 transition
+                        className={`cursor-pointer rounded-xl border p-3 transition sm:p-4
         ${restaurantForm.operations.serviceType === service.value
                             ? "border-orange-500 bg-orange-50"
                             : "border-gray-200 hover:border-orange-300"
@@ -992,15 +992,15 @@ export default function SettingsPage() {
                           className="hidden"
                         />
 
-                        <h4 className="font-semibold">{service.title}</h4>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <h4 className="text-sm font-semibold sm:text-base">{service.title}</h4>
+                        <p className="text-xs text-gray-500 mt-1 sm:text-sm">
                           {service.desc}
                         </p>
                       </label>
                     ))}
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-4 mt-1">
+                <div className="flex flex-wrap items-center gap-3 mt-1 sm:gap-4">
                   <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
                     <input
                       type="checkbox"
@@ -1060,11 +1060,11 @@ export default function SettingsPage() {
 
               {/* Delivery Settings (conditional) */}
               {restaurantForm.operations.delivery.enabled && (
-                <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 sm:p-4">
                   <h4 className="font-semibold text-orange-700 text-sm mb-3">
                     🚚 Delivery Settings
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                     <div>
                       <label className={labelClass}>Minimum Order (₹)</label>
                       <input
@@ -1170,11 +1170,11 @@ export default function SettingsPage() {
             </div>
 
             {/* ===== Timings Card ===== */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-5">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:text-sm sm:mb-4">
                 Timings
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                 <div>
                   <label className={labelClass}>Open Time</label>
                   <input
@@ -1213,43 +1213,43 @@ export default function SettingsPage() {
             </div>
 
             {/* ===== Branding (Logo) Card ===== */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-5">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:text-sm sm:mb-4">
                 Restaurant Branding
               </h4>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-5">
                 {/* Logo Preview */}
-                <div className="relative group">
+                <div className="relative group shrink-0">
                   {restaurantForm.logo ? (
                     <img
                       src={restaurantForm.logo}
                       alt="Restaurant Logo"
-                      className="w-24 h-24 rounded-2xl object-cover border-2 border-orange-100 shadow-md"
+                      className="w-16 h-16 rounded-2xl object-cover border-2 border-orange-100 shadow-md sm:w-24 sm:h-24"
                     />
                   ) : (
-                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
-                      <Store className="w-10 h-10 text-white" />
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md sm:w-24 sm:h-24">
+                      <Store className="w-8 h-8 text-white sm:w-10 sm:h-10" />
                     </div>
                   )}
-                  <div className="absolute -bottom-2 -right-2 bg-green-500 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center">
-                    <span className="text-white text-[10px]">✓</span>
+                  <div className="absolute -bottom-1.5 -right-1.5 bg-green-500 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center sm:-bottom-2 sm:-right-2 sm:w-6 sm:h-6">
+                    <span className="text-white text-[9px] sm:text-[10px]">✓</span>
                   </div>
                 </div>
 
                 {/* Upload Controls */}
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500 mt-1">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-500 mt-1 sm:text-sm">
                     Upload your restaurant logo to personalise your menu, QR
                     ordering page and invoices.
                   </p>
-                  <div className="flex flex-wrap gap-3 mt-4">
+                  <div className="flex flex-wrap gap-2.5 mt-3 sm:gap-3 sm:mt-4">
                     <button
                       disabled={uploadingLogo}
                       type="button"
                       onClick={() =>
                         document.getElementById("logoUpload")?.click()
                       }
-                      className="px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-xl hover:bg-orange-600 transition disabled:opacity-50 flex items-center gap-2"
+                      className="px-3 py-2 bg-orange-500 text-white text-xs font-medium rounded-xl hover:bg-orange-600 transition disabled:opacity-50 flex items-center gap-2 sm:px-4 sm:text-sm"
                     >
                       {uploadingLogo ? (
                         <>
@@ -1267,7 +1267,7 @@ export default function SettingsPage() {
                       <button
                         type="button"
                         onClick={handleRemoveLogo}
-                        className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium rounded-xl transition"
+                        className="px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 text-xs font-medium rounded-xl transition sm:px-4 sm:text-sm"
                       >
                         Remove Logo
                       </button>
@@ -1288,39 +1288,39 @@ export default function SettingsPage() {
             </div>
 
             {/* ===== Marketing Email Card ===== */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-5">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:text-sm sm:mb-4">
                 Marketing Email
               </h4>
               {restaurant?.marketingEmail?.isConnected ? (
-                <div className="flex items-center justify-between bg-green-50 border border-green-200 p-3 rounded-lg">
-                  <div>
-                    <p className="text-green-700 font-medium">✅ Connected</p>
-                    <p className="text-sm text-gray-600">
+                <div className="flex flex-col gap-2.5 bg-green-50 border border-green-200 p-3 rounded-lg sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-green-700 font-medium text-sm">✅ Connected</p>
+                    <p className="text-xs text-gray-600 truncate sm:text-sm">
                       {restaurant.marketingEmail.email || "Gmail Connected"}
                     </p>
                   </div>
                   <button
                     onClick={handleDisconnectGmail}
-                    className="px-4 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition"
+                    className="shrink-0 px-4 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition"
                   >
                     Disconnect
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center justify-between bg-gray-50 border p-3 rounded-lg">
-                  <div>
-                    <p className="text-gray-800 font-medium">
+                <div className="flex flex-col gap-2.5 bg-gray-50 border p-3 rounded-lg sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-gray-800 font-medium text-sm">
                       Connect your Gmail
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-xs text-gray-500 sm:text-sm">
                       Send offers & updates to customers
                     </p>
                   </div>
                   <button
                     onClick={handleConnectGmail}
                     disabled={connecting}
-                    className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                    className="shrink-0 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
                   >
                     {connecting ? "Connecting..." : "Connect Gmail"}
                   </button>
@@ -1331,7 +1331,7 @@ export default function SettingsPage() {
         )}
         {/* -------------------- PAYMENT TAB -------------------- */}
         {activeTab === "payment" && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <h3 className={sectionTitleClass}>Payment Configuration</h3>
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -1390,7 +1390,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleSaveUPI}
                 disabled={isSaving}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 sm:w-auto"
               >
                 Save UPI Settings
               </button>
@@ -1400,7 +1400,7 @@ export default function SettingsPage() {
 
         {/* -------------------- NOTIFICATIONS TAB -------------------- */}
         {activeTab === "notifications" && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <h3 className={sectionTitleClass}>Notification Settings</h3>
             <div className="space-y-3">
               {[
@@ -1430,9 +1430,9 @@ export default function SettingsPage() {
                     {notificationSettings[
                       item.key as keyof typeof notificationSettings
                     ] ? (
-                      <ToggleRight className="w-8 h-8 text-blue-600" />
+                      <ToggleRight className="w-7 h-7 text-blue-600 sm:w-8 sm:h-8" />
                     ) : (
-                      <ToggleLeft className="w-8 h-8 text-gray-400" />
+                      <ToggleLeft className="w-7 h-7 text-gray-400 sm:w-8 sm:h-8" />
                     )}
                   </button>
                 </div>

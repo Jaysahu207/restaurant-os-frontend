@@ -341,7 +341,7 @@ export default function BannerManagement() {
             setSelectedBanner(null);
             setShowModal(true);
           }}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-orange-600 to-amber-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:from-orange-700 hover:to-amber-700 transition"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-linear-to-r from-orange-600 to-amber-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:from-orange-700 hover:to-amber-700 transition"
         >
           <Plus size={16} />
           Create Banner

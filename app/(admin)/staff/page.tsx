@@ -288,75 +288,78 @@ export default function StaffPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-7xl mx-auto">
+    <div className="space-y-4 p-3 sm:space-y-6 sm:p-4 md:p-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Staff Management</h2>
-          <p className="text-sm text-gray-500 mt-1">
+      <div className="flex items-center justify-between gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold text-gray-800 sm:text-xl md:text-2xl">Staff Management</h2>
+          <p className="hidden text-sm text-gray-500 mt-1 sm:block">
             Manage your restaurant staff and their permissions
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <button
             onClick={handleRefresh}
             disabled={isFetching}
-            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
+            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition disabled:opacity-50 sm:p-2"
             title="Refresh"
           >
-            <RefreshCw className={`w-5 h-5 ${isFetching ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${isFetching ? "animate-spin" : ""}`} />
           </button>
           <button
             onClick={openAddModal}
-            className="inline-flex items-center gap-2 bg-gradient-to-br from-orange-400 to-amber-500 text-white px-4 py-2 rounded-lg hover:shadow-md transition"
+            className="inline-flex items-center gap-1.5 bg-gradient-to-br from-orange-400 to-amber-500 text-white px-2.5 py-1.5 text-sm rounded-lg hover:shadow-md transition sm:gap-2 sm:px-4 sm:py-2"
           >
-            <Plus className="w-5 h-5" />
-            Add Staff
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">Add Staff</span>
           </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
+      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 space-y-3 sm:p-4 sm:space-y-4">
+        <div className="flex flex-col gap-2.5 md:flex-row md:gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-800 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-800 w-4 h-4 sm:w-5 sm:h-5" />
             <input
               type="text"
               placeholder="Search by name, email, or phone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="w-full pl-9 pr-4 py-2 text-sm text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent sm:pl-10 sm:py-2.5"
             />
           </div>
-          <div className="sm:w-44">
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white"
-            >
-              {ROLES.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="sm:w-40">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-4 py-2.5 border text-gray-800 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white"
-            >
-              <option value="All">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+          <div className="flex gap-2.5 md:contents">
+            <div className="flex-1 md:w-44 md:flex-none">
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white sm:px-4 sm:py-2.5"
+              >
+                {ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1 md:w-40 md:flex-none">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-3 py-2 text-sm border text-gray-800 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white sm:px-4 sm:py-2.5"
+              >
+                <option value="All">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
           </div>
         </div>
         {(search || roleFilter !== "All" || statusFilter !== "All") && (
           <div className="flex justify-end">
-            <button onClick={clearFilters} className="text-sm text-blue-600 hover:text-blue-800">
+            <button onClick={clearFilters} className="text-xs text-blue-600 hover:text-blue-800 sm:text-sm">
               Clear filters
             </button>
           </div>
@@ -365,13 +368,13 @@ export default function StaffPage() {
 
       {/* Staff Grid */}
       {filteredStaff.length === 0 ? (
-        <div className="bg-white p-12 rounded-xl text-center shadow-sm border border-gray-100">
+        <div className="bg-white p-6 rounded-xl text-center shadow-sm border border-gray-100 sm:p-12">
           <div className="max-w-md mx-auto">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <User className="w-8 h-8 text-gray-400" />
+            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:w-16 sm:h-16 sm:mb-4">
+              <User className="w-6 h-6 text-gray-400 sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-lg font-medium text-gray-800 mb-2">No staff members found</h3>
-            <p className="text-gray-500">
+            <h3 className="text-base font-medium text-gray-800 mb-1.5 sm:text-lg sm:mb-2">No staff members found</h3>
+            <p className="text-sm text-gray-500">
               {search || roleFilter !== "All" || statusFilter !== "All"
                 ? "Try adjusting your filters."
                 : "Get started by adding your first staff member."}
@@ -379,7 +382,7 @@ export default function StaffPage() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-6">
           {filteredStaff.map((member) => (
             <StaffCard
               key={member._id}
@@ -428,18 +431,18 @@ function StaffCard({
   onDelete: () => void;
 }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition p-5 border border-gray-100 group">
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center text-white font-semibold text-lg">
+    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition p-3 border border-gray-100 group sm:p-5">
+      <div className="flex justify-between items-start mb-2.5 sm:mb-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center text-white font-semibold text-sm sm:w-10 sm:h-10 sm:text-lg">
             {member.name.charAt(0).toUpperCase()}
           </div>
-          <h3 className="text-lg font-semibold text-gray-800 truncate">
+          <h3 className="text-sm font-semibold text-gray-800 truncate sm:text-lg">
             {member.name}
           </h3>
         </div>
         <span
-          className={`px-2 py-1 text-xs font-medium rounded-full ${member.isActive
+          className={`shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded-full sm:px-2 sm:py-1 sm:text-xs ${member.isActive
             ? "bg-green-100 text-green-700"
             : "bg-gray-100 text-gray-700"
             }`}
@@ -448,46 +451,46 @@ function StaffCard({
         </span>
       </div>
 
-      <div className="space-y-2 text-sm">
+      <div className="space-y-1.5 text-xs sm:space-y-2 sm:text-sm">
         <div className="flex items-center gap-2 text-gray-600">
-          <Shield className="w-4 h-4 flex-shrink-0" />
+          <Shield className="w-3.5 h-3.5 flex-shrink-0 sm:w-4 sm:h-4" />
           <span className="capitalize">{member.role}</span>
         </div>
         <div className="flex items-center gap-2 text-gray-600">
-          <Mail className="w-4 h-4 flex-shrink-0" />
+          <Mail className="w-3.5 h-3.5 flex-shrink-0 sm:w-4 sm:h-4" />
           <span className="truncate">{member.email}</span>
         </div>
         <div className="flex items-center gap-2 text-gray-600">
-          <Phone className="w-4 h-4 flex-shrink-0" />
+          <Phone className="w-3.5 h-3.5 flex-shrink-0 sm:w-4 sm:h-4" />
           <span>{member.phone}</span>
         </div>
         <div className="flex items-center gap-2 text-gray-600">
-          <Clock className="w-4 h-4 flex-shrink-0" />
+          <Clock className="w-3.5 h-3.5 flex-shrink-0 sm:w-4 sm:h-4" />
           <span className="truncate">{member.shift}</span>
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t flex justify-end gap-2">
+      <div className="mt-3 pt-2.5 border-t flex justify-end gap-1 sm:mt-4 sm:pt-3 sm:gap-2">
         <button
           onClick={onView}
-          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition sm:p-2"
           title="View Details"
         >
-          <Eye className="w-4 h-4" />
+          <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
         <button
           onClick={onEdit}
-          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition sm:p-2"
           title="Edit"
         >
-          <Edit className="w-4 h-4" />
+          <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
         <button
           onClick={onDelete}
-          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition sm:p-2"
           title="Delete"
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
       </div>
     </div>
@@ -538,11 +541,11 @@ function StaffFormModal({
   }, [formData.role, editingStaff, setFormData]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="bg-white relative rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-800">
+      <div className="bg-white relative rounded-t-2xl sm:rounded-xl max-w-md w-full max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between sm:px-6 sm:py-4">
+          <h3 className="text-base font-semibold text-gray-800 sm:text-lg">
             {editingStaff ? "Edit Staff Member" : "Add New Staff"}
           </h3>
           <button
@@ -553,7 +556,7 @@ function StaffFormModal({
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="p-6 space-y-4">
+        <form onSubmit={onSubmit} className="p-4 space-y-3 sm:p-6 sm:space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Full Name <span className="text-red-500">*</span>
@@ -644,7 +647,7 @@ function StaffFormModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Permissions
             </label>
-            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
+            <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto p-1 sm:grid-cols-2">
               {PERMISSIONS.map((perm) => (
                 <label
                   key={perm.value}
@@ -715,7 +718,7 @@ function StaffFormModal({
             </select>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end sm:gap-3 sm:pt-4">
             <button
               type="button"
               onClick={onClose}
@@ -727,7 +730,7 @@ function StaffFormModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-md transition disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isSubmitting && <RefreshCw className="w-4 h-4 animate-spin" />}
               {editingStaff ? "Update" : "Add"} Staff
@@ -748,11 +751,11 @@ function StaffViewModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="bg-white relative rounded-xl max-w-md w-full">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h3 className="text-lg font-semibold text-gray-800">Staff Details</h3>
+      <div className="bg-white relative rounded-t-2xl sm:rounded-xl max-w-md w-full max-h-[92vh] sm:max-h-none overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b sm:p-6">
+          <h3 className="text-base font-semibold text-gray-800 sm:text-lg">Staff Details</h3>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded-full transition"
@@ -761,14 +764,14 @@ function StaffViewModal({
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          <div className="flex justify-center mb-4">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white text-2xl font-bold">
+        <div className="p-4 space-y-3 sm:p-6 sm:space-y-4">
+          <div className="flex justify-center mb-2 sm:mb-4">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white text-xl font-bold sm:w-20 sm:h-20 sm:text-2xl">
               {staff.name.charAt(0).toUpperCase()}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-2 gap-3 text-xs sm:gap-4 sm:text-sm">
             <div>
               <p className="text-gray-500">Full Name</p>
               <p className="font-medium">{staff.name}</p>
@@ -811,7 +814,7 @@ function StaffViewModal({
           </div>
 
           {staff.permissions && Object.keys(staff.permissions).length > 0 && (
-            <div className="border-t pt-4">
+            <div className="border-t pt-3 sm:pt-4">
               <p className="text-sm font-medium text-gray-700 mb-2">
                 Permissions
               </p>
@@ -831,7 +834,7 @@ function StaffViewModal({
           )}
         </div>
 
-        <div className="border-t p-6 flex justify-end">
+        <div className="border-t p-4 flex justify-end sm:p-6">
           <button
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
@@ -853,17 +856,17 @@ function DeleteConfirmationModal({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="bg-white relative rounded-xl max-w-sm w-full p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">
+      <div className="bg-white relative rounded-t-2xl sm:rounded-xl max-w-sm w-full p-5 sm:p-6">
+        <h3 className="text-base font-semibold text-gray-800 mb-2 sm:text-lg">
           Confirm Delete
         </h3>
-        <p className="text-gray-600 mb-6">
+        <p className="text-sm text-gray-600 mb-5 sm:mb-6">
           Are you sure you want to delete this staff member? This action cannot
           be undone.
         </p>
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
           <button
             onClick={onCancel}
             className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
@@ -885,24 +888,24 @@ function DeleteConfirmationModal({
 // ==================== Loading Skeleton ====================
 function StaffSkeleton() {
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-7xl mx-auto animate-pulse">
+    <div className="space-y-4 p-3 sm:space-y-6 sm:p-4 md:p-6 max-w-7xl mx-auto animate-pulse">
       <div className="flex justify-between">
-        <div className="h-8 w-48 bg-gray-200 rounded" />
-        <div className="h-10 w-32 bg-gray-200 rounded-lg" />
+        <div className="h-7 w-40 bg-gray-200 rounded sm:h-8 sm:w-48" />
+        <div className="h-9 w-28 bg-gray-200 rounded-lg sm:h-10 sm:w-32" />
       </div>
-      <div className="bg-white p-4 rounded-xl shadow-sm">
-        <div className="flex gap-4">
+      <div className="bg-white p-3 rounded-xl shadow-sm sm:p-4">
+        <div className="flex flex-col gap-2.5 md:flex-row md:gap-4">
           <div className="flex-1 h-10 bg-gray-200 rounded-lg" />
-          <div className="w-44 h-10 bg-gray-200 rounded-lg" />
-          <div className="w-40 h-10 bg-gray-200 rounded-lg" />
+          <div className="md:w-44 h-10 bg-gray-200 rounded-lg" />
+          <div className="md:w-40 h-10 bg-gray-200 rounded-lg" />
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-6">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="bg-white p-5 rounded-xl shadow-sm">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-gray-200" />
-              <div className="h-5 w-32 bg-gray-200 rounded" />
+          <div key={i} className="bg-white p-3 rounded-xl shadow-sm sm:p-5">
+            <div className="flex items-center gap-2.5 mb-2.5 sm:gap-3 sm:mb-3">
+              <div className="w-8 h-8 rounded-full bg-gray-200 sm:w-10 sm:h-10" />
+              <div className="h-4 w-28 bg-gray-200 rounded sm:h-5 sm:w-32" />
             </div>
             <div className="space-y-2">
               <div className="h-4 w-full bg-gray-200 rounded" />

@@ -50,3 +50,9 @@ export const generateMenuDescription = async (data: {
   const res = await API.post("/api/ai/generate-description", data);
   return res.data;
 };
+
+export const getMenuDropdown = async () => {
+  const res = await API.get("/api/menu/dropdown");
+  // console.log("Menu Dropdown Response:", res.data);
+  return res.data.data;
+};
