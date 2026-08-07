@@ -15,8 +15,8 @@ import {
   QrCode,
   ShoppingBag,
   Truck,
+  UserPlus,
 } from "lucide-react";
-
 
 import QRCode from "react-qr-code";
 
@@ -27,11 +27,14 @@ import {
   createTable,
   deleteTable,
   updateTable,
+  assignWaiterToTable,
+  removeWaiterFromTable,
 } from "@/services/tableServices";
 import toast from "react-hot-toast";
 
 import { useAuthStore } from "@/store/useAuthStore";
 import TableQRSkeleton from "@/components/skeleton/TableQRSkeleton";
+import { getStaffByRole, getWaiters } from "@/services/staffService";
 
 export default function TablesPage() {
   const queryClient = useQueryClient();
@@ -39,7 +42,12 @@ export default function TablesPage() {
   const [editingTable, setEditingTable] = useState<any>(null);
   const [formData, setFormData] = useState({ number: "", capacity: "" });
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [selectedTable, setSelectedTable] = useState<any>(null);
+  const [selectedWaiter, setSelectedWaiter] = useState("");
+  const [selectedWaiterId, setSelectedWaiterId] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedWaiterName, setSelectedWaiterName] = useState("");
   const [copiedType, setCopiedType] = useState("");
 
   const restaurantId = useAuthStore((state) => state.restaurant?._id);
@@ -88,6 +96,48 @@ export default function TablesPage() {
     },
   });
 
+  const { data: waiters = [] } = useQuery({
+    queryKey: ["waiters"],
+    queryFn: () => getStaffByRole("waiter"),
+  });
+
+  // console.log("Waiters:", waiters);
+  console.log("Tables :", tables);
+
+  const assignWaiterMutation = useMutation({
+    mutationFn: ({
+      tableId,
+      waiterId,
+    }: {
+      tableId: string;
+      waiterId: string;
+    }) => assignWaiterToTable(tableId, waiterId),
+
+    onSuccess: () => {
+      toast.success("Waiter assigned successfully");
+      queryClient.invalidateQueries({ queryKey: ["tables"] });
+      closeAssignModal();
+    },
+
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || "Failed to assign waiter");
+    },
+  });
+  const removeWaiterMutation = useMutation({
+    mutationFn: (tableId: string) => removeWaiterFromTable(tableId),
+
+    onSuccess: () => {
+      toast.success("Waiter removed successfully");
+      queryClient.invalidateQueries({ queryKey: ["tables"] });
+    },
+
+    onError: (error: any) => {
+      toast.error(
+        error?.response?.data?.message || "Failed to remove waiter"
+      );
+    },
+  });
+
   const copyLink = async (url: string, type: "takeaway" | "delivery") => {
     await navigator.clipboard.writeText(url);
     setCopiedType(type);
@@ -105,10 +155,7 @@ export default function TablesPage() {
     return `${process.env.NEXT_PUBLIC_FRONTEND_URL}/menu/${slug}?mode=delivery`;
   };
 
-  const downloadHighQualityQR = async (
-    elementId: string,
-    fileName: string
-  ) => {
+  const downloadHighQualityQR = async (elementId: string, fileName: string) => {
     try {
       const element = document.getElementById(elementId);
 
@@ -144,29 +191,19 @@ export default function TablesPage() {
     }
   };
 
-
   const downloadTableQR = useCallback(
     async (tableId: string, tableNumber: number) => {
-      await downloadHighQualityQR(
-        `qr-${tableId}`,
-        `table-${tableNumber}-qr`
-      );
+      await downloadHighQualityQR(`qr-${tableId}`, `table-${tableNumber}-qr`);
     },
-    []
+    [],
   );
 
   const downloadTakeawayQR = useCallback(async () => {
-    await downloadHighQualityQR(
-      "takeaway-qr",
-      `${slug}-takeaway-qr`
-    );
+    await downloadHighQualityQR("takeaway-qr", `${slug}-takeaway-qr`);
   }, [slug]);
 
   const downloadDeliveryQR = useCallback(async () => {
-    await downloadHighQualityQR(
-      "delivery-qr",
-      `${slug}-delivery-qr`
-    );
+    await downloadHighQualityQR("delivery-qr", `${slug}-delivery-qr`);
   }, [slug]);
 
   const copyQRUrl = useCallback(async (tableNumber: number, id: string) => {
@@ -263,6 +300,27 @@ export default function TablesPage() {
     setFormData({ number: "", capacity: "" });
   };
 
+  const openAssignModal = (table: any) => {
+    setSelectedTable(table);
+    const currentWaiterId = table.assignedWaiter?._id || "";
+    setSelectedWaiter(currentWaiterId);
+    setSelectedWaiterName(table.assignedWaiter?.name || "");
+    setAssignModalOpen(true);
+  };
+
+  const closeAssignModal = () => {
+    setAssignModalOpen(false);
+    setSelectedTable(null);
+    setSelectedWaiter("");
+  };
+  const handleAssignWaiter = () => {
+    if (!selectedTable) return;
+
+    assignWaiterMutation.mutate({
+      tableId: selectedTable._id,
+      waiterId: selectedWaiter || "",
+    });
+  };
   if (isLoading) {
     return <TableQRSkeleton />;
   }
@@ -285,7 +343,8 @@ export default function TablesPage() {
               QR & Table Management
             </h1>
             <p className="text-xs text-gray-600 mt-0.5">
-              Generate and manage QR codes for dine-in, takeaway and delivery ordering.
+              Generate and manage QR codes for dine-in, takeaway and delivery
+              ordering.
             </p>
           </div>
           <button
@@ -384,7 +443,9 @@ export default function TablesPage() {
                 {/* Actions */}
                 <div className="p-3 flex justify-center gap-2">
                   <button
-                    onClick={() => downloadTableQR(table._id, table.tableNumber)}
+                    onClick={() =>
+                      downloadTableQR(table._id, table.tableNumber)
+                    }
                     className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors font-medium text-xs"
                   >
                     <Download size={13} />
@@ -407,6 +468,116 @@ export default function TablesPage() {
                     )}
                   </button>
                 </div>
+                <div className="px-3 py-3 border-t border-gray-100">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    {/* Left Section */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs text-gray-500 shrink-0">
+                        Waiter
+                      </span>
+
+                      {table.assignedWaiter ? (
+                        <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-full px-2.5 py-1 min-w-0 max-w-full">
+                          <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                            {table.assignedWaiter.name.charAt(0).toUpperCase()}
+                          </div>
+
+                          <span
+                            className="text-sm font-medium text-gray-700 truncate"
+                            title={table.assignedWaiter.name}
+                          >
+                            {table.assignedWaiter.name}
+                          </span>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+
+                              toast.custom((t) => (
+                                <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-4 w-80">
+                                  <h3 className="font-semibold text-gray-900">
+                                    Remove Waiter?
+                                  </h3>
+
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    Unassign{" "}
+                                    <span className="font-medium text-gray-700">
+                                      {table.assignedWaiter.name}
+                                    </span>{" "}
+                                    from Table {table.tableNumber}?
+                                  </p>
+
+                                  <div className="flex justify-end gap-2 mt-4">
+                                    <button
+                                      onClick={() => toast.dismiss(t.id)}
+                                      className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm"
+                                    >
+                                      Cancel
+                                    </button>
+
+                                    <button
+                                      onClick={() => {
+                                        removeWaiterMutation.mutate(table._id);
+                                        toast.dismiss(t.id);
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm hover:bg-red-600"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                </div>
+                              ));
+                            }}
+                            className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                            title="Remove assignment"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400 italic">
+                          Not assigned
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Right Section */}
+                    <button
+                      onClick={() => openAssignModal(table)}
+                      className="
+        w-full
+        sm:w-auto
+        flex
+        items-center
+        justify-center
+        gap-1
+        px-3
+        py-2
+        rounded-lg
+        border
+        border-orange-200
+        bg-orange-50
+        text-sm
+        font-medium
+        text-orange-600
+        hover:bg-orange-100
+        transition
+      "
+                    >
+                      {table.assignedWaiter ? (
+                        <>
+                          <Edit size={14} />
+                          Change
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus size={14} />
+                          Assign Waiter
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -419,7 +590,8 @@ export default function TablesPage() {
               Online Ordering QR Codes
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Share these QR codes or links to let customers place takeaway and delivery orders directly.
+              Share these QR codes or links to let customers place takeaway and
+              delivery orders directly.
             </p>
           </div>
 
@@ -431,8 +603,12 @@ export default function TablesPage() {
                   <ShoppingBag className="w-4 h-4 text-orange-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Takeaway QR</h3>
-                  <p className="text-[10px] text-gray-500">Customers order for pickup</p>
+                  <h3 className="font-semibold text-gray-900 text-sm">
+                    Takeaway QR
+                  </h3>
+                  <p className="text-[10px] text-gray-500">
+                    Customers order for pickup
+                  </p>
                 </div>
               </div>
 
@@ -485,8 +661,12 @@ export default function TablesPage() {
                   <Truck className="w-4 h-4 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Delivery QR</h3>
-                  <p className="text-[10px] text-gray-500">Customers order home delivery</p>
+                  <h3 className="font-semibold text-gray-900 text-sm">
+                    Delivery QR
+                  </h3>
+                  <p className="text-[10px] text-gray-500">
+                    Customers order home delivery
+                  </p>
                 </div>
               </div>
 
@@ -536,93 +716,210 @@ export default function TablesPage() {
       </div>
 
       {/* Modal for Add/Edit */}
-      {
-        isModalOpen && (
+      {isModalOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 animate-in fade-in duration-200"
+          onClick={closeModal}
+        >
           <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 animate-in fade-in duration-200"
-            onClick={closeModal}
+            className="bg-white rounded-xl shadow-xl max-w-md w-full transform transition-all animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              className="bg-white rounded-xl shadow-xl max-w-md w-full transform transition-all animate-in zoom-in-95 duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center p-4 border-b border-gray-100">
-                <h2 className="text-lg font-bold bg-linear-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                  {editingTable
-                    ? `Edit Table ${editingTable.tableNumber}`
-                    : "Add New Table"}
-                </h2>
+            <div className="flex justify-between items-center p-4 border-b border-gray-100">
+              <h2 className="text-lg font-bold bg-linear-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                {editingTable
+                  ? `Edit Table ${editingTable.tableNumber}`
+                  : "Add New Table"}
+              </h2>
+              <button
+                onClick={closeModal}
+                className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Table Number
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g., 1, 2, 3..."
+                  value={formData.number}
+                  onChange={(e) =>
+                    setFormData({ ...formData, number: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all text-sm"
+                  required
+                  min="1"
+                  step="1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Capacity (guests)
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g., 2, 4, 6..."
+                  value={formData.capacity}
+                  onChange={(e) =>
+                    setFormData({ ...formData, capacity: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all text-sm"
+                  required
+                  min="1"
+                  step="1"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
                 <button
+                  type="button"
                   onClick={closeModal}
-                  className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium text-sm"
                 >
-                  <X size={20} className="text-gray-500" />
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    createMutation.isPending || updateMutation.isPending
+                  }
+                  className="flex-1 px-4 py-2 bg-linear-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-lg font-medium shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                >
+                  {(createMutation.isPending || updateMutation.isPending) && (
+                    <Loader2 size={16} className="animate-spin" />
+                  )}
+                  {editingTable ? "Update Table" : "Create Table"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {assignModalOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 animate-in fade-in duration-200"
+          onClick={closeAssignModal}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-md w-full transform transition-all animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-center p-4 border-b border-gray-100">
+              <h2 className="text-lg font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                Assign Waiter
+              </h2>
+              <button
+                onClick={closeAssignModal}
+                className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Current assignment */}
+              {selectedTable?.assignedWaiter && (
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-orange-400 flex items-center justify-center text-white text-sm font-bold">
+                    {selectedTable.assignedWaiter.name.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">
+                      Currently assigned
+                    </p>
+                    <p className="text-sm font-bold text-gray-900">
+                      {selectedTable.assignedWaiter.name}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Waiter selection with search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Choose a waiter
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Users size={16} className="text-gray-400" />
+                  </div>
+                  <input
+                    list="waiter-list"
+                    value={selectedWaiterName || ""}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      const found = waiters.find((w: any) => w.name === name);
+                      setSelectedWaiter(found ? found._id : "");
+                      setSelectedWaiterName(name);
+                    }}
+                    placeholder="Type or select a waiter"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all text-sm"
+                  />
+                  <datalist id="waiter-list">
+                    {waiters.map((w: any) => (
+                      <option key={w._id} value={w.name} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  onClick={closeAssignModal}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAssignWaiter}
+                  disabled={!selectedWaiter || assignWaiterMutation.isPending}
+                  className="flex-1 px-4 py-2.5 bg-linear-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-lg font-medium shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                >
+                  {assignWaiterMutation.isPending ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Assigning...
+                    </>
+                  ) : (
+                    "Assign Waiter"
+                  )}
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-4 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Table Number
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="e.g., 1, 2, 3..."
-                    value={formData.number}
-                    onChange={(e) =>
-                      setFormData({ ...formData, number: e.target.value })
+              {/* Remove assignment – only shown when a waiter is assigned */}
+              {selectedTable?.assignedWaiter && (
+                <button
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Remove ${selectedTable.assignedWaiter.name} from this table?`,
+                      )
+                    ) {
+                      assignWaiterMutation.mutate({
+                        tableId: selectedTable._id,
+                        waiterId: "",
+                      });
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all text-sm"
-                    required
-                    min="1"
-                    step="1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Capacity (guests)
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="e.g., 2, 4, 6..."
-                    value={formData.capacity}
-                    onChange={(e) =>
-                      setFormData({ ...formData, capacity: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all text-sm"
-                    required
-                    min="1"
-                    step="1"
-                  />
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium text-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={
-                      createMutation.isPending || updateMutation.isPending
-                    }
-                    className="flex-1 px-4 py-2 bg-linear-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-lg font-medium shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
-                  >
-                    {(createMutation.isPending || updateMutation.isPending) && (
-                      <Loader2 size={16} className="animate-spin" />
-                    )}
-                    {editingTable ? "Update Table" : "Create Table"}
-                  </button>
-                </div>
-              </form>
+                  }}
+                  className="w-full mt-1 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors text-sm flex items-center justify-center gap-2"
+                >
+                  <Trash2 size={16} />
+                  Remove Assignment
+                </button>
+              )}
             </div>
           </div>
-        )
-      }
-    </div >
+        </div>
+      )}
+    </div>
   );
 }

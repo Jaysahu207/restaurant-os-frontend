@@ -40,9 +40,21 @@ export const deleteStaff = async (id: string) => {
 
 
 };
+// ================= GET STAFF BY ROLE =================
+export const getStaffByRole = async (role: string) => {
+    const res = await API.get(`/api/auth/staff?role=${role}`);
+    return res.data;
+};
 
 
 export const updateStaff = async (id: string, data: any) => {
     const res = await API.put(`/api/auth/staff/${id}`, data);
+    return res.data;
+};
+
+
+// ================= GET WAITERS =================
+export const getWaiters = async () => {
+    const res = await API.get("/api/auth/staff?role=waiter");
     return res.data;
 };

@@ -24,3 +24,23 @@ export const toggleTable = (id: string) =>
 
 export const updateTable = (id: string, data: any) =>
     API.put(`api/tables/${id}`, data);
+
+
+// ==========================
+// ASSIGN WAITER
+// ==========================
+
+export const assignWaiterToTable = (
+    tableId: string,
+    waiterId: string
+) =>
+    API.patch(`api/tables/${tableId}/assign-waiter`, {
+        waiterId,
+    });
+
+// ==========================
+// REMOVE WAITER
+// ==========================
+
+export const removeWaiterFromTable = (tableId: string) =>
+    API.patch(`api/tables/${tableId}/remove-waiter`);
