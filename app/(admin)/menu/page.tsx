@@ -472,11 +472,10 @@ export default function MenuPage() {
               <button
                 key={sort.key}
                 onClick={() => handleSort(sort.key)}
-                className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
-                  sortField === sort.key
-                    ? "bg-orange-500 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-orange-100"
-                }`}
+                className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${sortField === sort.key
+                  ? "bg-orange-500 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-orange-100"
+                  }`}
               >
                 {sort.label}
                 {sortField === sort.key &&
@@ -515,13 +514,12 @@ export default function MenuPage() {
               {/* Food Type */}
               <div className="absolute left-2 top-2">
                 <span
-                  className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
-                    item.type === "veg"
-                      ? "bg-green-600 text-white"
-                      : item.type === "non-veg"
-                        ? "bg-red-600 text-white"
-                        : "bg-yellow-500 text-white"
-                  }`}
+                  className={`rounded-full px-2 py-1 text-[10px] font-semibold ${item.type === "veg"
+                    ? "bg-green-600 text-white"
+                    : item.type === "non-veg"
+                      ? "bg-red-600 text-white"
+                      : "bg-yellow-500 text-white"
+                    }`}
                 >
                   {item.type.toUpperCase()}
                 </span>
@@ -547,11 +545,10 @@ export default function MenuPage() {
               {/* Availability */}
               <div className="absolute bottom-2 left-2">
                 <span
-                  className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
-                    item.isAvailable
-                      ? "bg-green-500 text-white"
-                      : "bg-red-500 text-white"
-                  }`}
+                  className={`rounded-full px-2 py-1 text-[10px] font-semibold ${item.isAvailable
+                    ? "bg-green-500 text-white"
+                    : "bg-red-500 text-white"
+                    }`}
                 >
                   {item.isAvailable ? "Available" : "Unavailable"}
                 </span>
@@ -824,7 +821,7 @@ function MenuFormModal({ item, onSave, onClose, categories }: any) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Price ($) *
+                Price (₹) *
               </label>
               <input
                 type="number"
