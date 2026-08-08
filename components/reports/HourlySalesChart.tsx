@@ -34,8 +34,27 @@ export function HourlySalesChart({ hourlySales }: { hourlySales: HourlySales }) 
           <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} interval={2} />
           <YAxis tick={{ fontSize: 12, fill: "#94A3B8" }} axisLine={false} tickLine={false} />
           <Tooltip
-            contentStyle={{ borderRadius: 12, border: "1px solid #F1F5F9", fontSize: 13 }}
-            formatter={(value: number, name: string) => [name === "sales" ? `₹${value.toLocaleString("en-IN")}` : value, name === "sales" ? "Sales" : "Orders"]}
+            contentStyle={{
+              borderRadius: 12,
+              border: "1px solid #F1F5F9",
+              fontSize: 13,
+            }}
+            formatter={(value, name) => {
+              const numericValue = Number(value ?? 0);
+              const label = String(name ?? "");
+
+              if (label === "sales") {
+                return [
+                  `₹${numericValue.toLocaleString("en-IN")}`,
+                  "Sales",
+                ];
+              }
+
+              return [
+                numericValue,
+                "Orders",
+              ];
+            }}
           />
           <Bar dataKey="sales" radius={[4, 4, 0, 0]}>
             {data.map((d, i) => (
